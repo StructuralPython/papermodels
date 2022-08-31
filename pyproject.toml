@@ -1,0 +1,25 @@
+[build-system]
+requires = ["flit_core >=3.2,<4"]
+build-backend = "flit_core.buildapi"
+
+[project]
+name = "papermodels"
+authors = [{name = "Connor Ferster", email = "connor@structuralpython.com"}]
+readme = "README.md"
+license = {file = "LICENSE"}
+classifiers = ["License :: OSI Approved :: Apache Software License"]
+dynamic = ["version", "description"]
+
+dependencies = [
+    "matplotlib",
+    "parse",
+    "shapely",
+    "colour",
+    "numpy",
+    "sqlalchemy"
+
+]
+
+
+[project.urls]
+Home = "https://github.com/connorferster/papermodels"
