@@ -1,14 +1,20 @@
 from typing import Optional, Any, Union
 import pathlib
 
-from colour import Color
 import numpy as np
 import parse
 
 from papermodels.db.data_model import Annotation
 
 
-def read_fdf_file(file_path: pathlib.Path) -> list[str]:
+def read_annotations(fdf_file: pathlib.Path) -> list[Annotation]:
+    """
+    Returns a list of annotations contained in 'fdf_file'.
+    """
+    return _get_annotations_from_fdf(_read_fdf_file(fdf_file))
+
+
+def _read_fdf_file(file_path: pathlib.Path) -> list[str]:
     """
     Reads the FDF file and returns a list of strings.
     """
@@ -22,7 +28,7 @@ def read_fdf_file(file_path: pathlib.Path) -> list[str]:
     return acc
 
 
-def get_annotations_from_fdf(fdf_str: str) -> list[Annotation]:
+def _get_annotations_from_fdf(fdf_str: str) -> list[Annotation]:
     """
     Separates FDF data by objects
     """
@@ -51,7 +57,7 @@ def get_annotations_from_fdf(fdf_str: str) -> list[Annotation]:
         
     for line in fdf_str:
         if "endstream" in line and stream_data:
-            stream_properties = extract_stream_properties(stream_data)
+            stream_properties = _extract_stream_properties(stream_data)
             stream_data = None
         elif in_stream_data == True:
             stream_data = line
@@ -62,8 +68,8 @@ def get_annotations_from_fdf(fdf_str: str) -> list[Annotation]:
         elif "stream" in line:
             in_stream_data = True
             continue       
-        type_and_vertices = extract_type_and_vertices(line)
-        object_properties = extract_object_properties(line)
+        type_and_vertices = _extract_type_and_vertices(line)
+        object_properties = _extract_object_properties(line)
         if annot_type and vertices and stream_properties:
             annotation_properties.update(stream_properties)
             annotation = Annotation(
@@ -71,9 +77,9 @@ def get_annotations_from_fdf(fdf_str: str) -> list[Annotation]:
                 vertices=vertices,
                 page=page,
                 text=text,
-                line_color=Color(rgb=stream_properties["line_color"]),
+                line_color=stream_properties["line_color"],
                 line_weight=stream_properties["line_weight"],
-                fill_color=Color(rgb=stream_properties["fill_color"]),
+                fill_color=stream_properties["fill_color"],
                 line_type=stream_properties["line_type"],
                 line_opacity=object_properties["line_opacity"],
                 fill_opacity=object_properties["fill_opacity"],
@@ -92,7 +98,7 @@ def get_annotations_from_fdf(fdf_str: str) -> list[Annotation]:
     return annotations
 
 
-def extract_type_and_vertices(line: str) -> Optional[tuple[str, str]]:
+def _extract_type_and_vertices(line: str) -> Optional[tuple[str, str]]:
     """
     Returns a tuple of two strings representing the annotation type and
     a string of vertices in the annotation type extracted from 'line',
@@ -119,16 +125,16 @@ def extract_type_and_vertices(line: str) -> Optional[tuple[str, str]]:
             return (annot_type, vertices)
 
         
-def extract_object_properties(line: str) -> Optional[dict]:
+def _extract_object_properties(line: str) -> Optional[dict]:
     object_properties = {}
-    object_properties.update(extract_object_opacity(line))
-    object_properties.update(extract_label(line))
-    object_properties.update(extract_page(line))
-    object_properties.update(extract_matrix(line))
+    object_properties.update(_extract_object_opacity(line))
+    object_properties.update(_extract_label(line))
+    object_properties.update(_extract_page(line))
+    object_properties.update(_extract_matrix(line))
     return object_properties
         
         
-def extract_object_opacity(line: str) -> Optional[dict]:
+def _extract_object_opacity(line: str) -> Optional[dict]:
     fill_opacity = parse.search("/FillOpacity {:g}/", line)
     line_opacity = parse.search("/LineOpacity {:g}/", line)
     if fill_opacity: fill_opacity = fill_opacity[0]
@@ -136,20 +142,20 @@ def extract_object_opacity(line: str) -> Optional[dict]:
     return {"fill_opacity": fill_opacity, "line_opacity": line_opacity}
 
 
-def extract_label(line: str) -> Optional[dict]:
+def _extract_label(line: str) -> Optional[dict]:
     label = parse.search("/Contents({})/", line)
     if label: label = label[0]
     return {"label": label}
 
 
-def extract_page(line: str) -> Optional[dict]:
+def _extract_page(line: str) -> Optional[dict]:
     page = parse.search("/Page {}", line)
     if page: 
         page = page[0]
     return {"page": page}
 
 
-def extract_matrix(line: str) -> Optional[dict]:
+def _extract_matrix(line: str) -> Optional[dict]:
     matrix = parse.search("/Matrix[{}]/", line)
     if matrix: 
         matrix = matrix[0]
@@ -157,15 +163,15 @@ def extract_matrix(line: str) -> Optional[dict]:
     return {"matrix": matrix}
 
 
-def extract_stream_properties(stream_line: str) -> dict:
+def _extract_stream_properties(stream_line: str) -> dict:
     """
     Returns a dict of properties which are available from the stream data:
     'line_color', 'fill_color', 'line_weight'.
     """
-    line_color = parse_line_color(stream_line)
-    fill_color = parse_fill_color(stream_line)
-    line_weight = parse_line_weight(stream_line)
-    line_type = parse_line_type(stream_line)
+    line_color = _parse_line_color(stream_line)
+    fill_color = _parse_fill_color(stream_line)
+    line_weight = _parse_line_weight(stream_line)
+    line_type = _parse_line_type(stream_line)
     return {
         "line_color": line_color, 
         "fill_color": fill_color, 
@@ -174,7 +180,7 @@ def extract_stream_properties(stream_line: str) -> dict:
     }
 
 
-def parse_line_color(stream_line: str) -> tuple[int]:
+def _parse_line_color(stream_line: str) -> tuple[int]:
     """
     Returns a tuple representing the parsed line color specification contained
     within 'stream_line', a line of text representing the FDF data stream.
@@ -190,7 +196,7 @@ def parse_line_color(stream_line: str) -> tuple[int]:
         return (0, 0, 0)
     
     
-def parse_fill_color(stream_line: str) -> tuple[int]:
+def _parse_fill_color(stream_line: str) -> tuple[int]:
     """
     Returns a tuple representing the parsed line color specification contained
     within 'stream_line', a line of text representing the FDF data stream.
@@ -206,7 +212,7 @@ def parse_fill_color(stream_line: str) -> tuple[int]:
         return (1, 1, 1)
 
     
-def parse_line_weight(stream_line: str) -> float:
+def _parse_line_weight(stream_line: str) -> float:
     """
     Returns a float representing the parsed line weight specification contained
     within 'stream_line', a line of text representing the FDF data stream.
@@ -219,7 +225,7 @@ def parse_line_weight(stream_line: str) -> float:
         return line_weight_result[0]
     
 
-def parse_line_type(stream_line: str) -> tuple[float, tuple]:
+def _parse_line_type(stream_line: str) -> tuple[float, tuple]:
     """
     Returns a tuple representing the parsed line type specification contained
     within 'stream_line', a line of text representing the FDF data stream.
@@ -241,21 +247,3 @@ def scale_object(annot: Annotation, scale: float) -> str:
     """
     return
 
-
-# def group_vertices(vertices: str, close = False) -> list[str]:
-#     """
-#     Returns a list of (x, y) tuples from a string of vertices in the format of:
-#     'x1 y1 x2 y2 x3 y3 ... xn yn'
-#     """
-#     acc = []
-#     coordinates = []
-#     for idx, ordinate in enumerate(vertices.split(" ")):
-#         if idx % 2:
-#             coordinates.append(ordinate)
-#             acc.append(" ".join(coordinates))
-#             coordinates = []
-#         else:
-#             coordinates.append(ordinate)
-#     if close:
-#         acc.append(acc[0])
-#     return ", ".join(acc)

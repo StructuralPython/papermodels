@@ -23,8 +23,8 @@ def plot_annotations(annots: list[Annotation], size: Optional[float], dpi: Optio
                     closed=True,
                     linestyle=annot.line_type,
                     linewidth=annot.line_weight,
-                    ec=annot.line_color.rgb,
-                    fc=annot.fill_color.rgb,
+                    ec=annot.line_color,
+                    fc=annot.fill_color,
                     alpha=annot.fill_opacity,
                     zorder=idx,
                 )
@@ -36,7 +36,7 @@ def plot_annotations(annots: list[Annotation], size: Optional[float], dpi: Optio
                 xy[1],
                 linestyle=annot.line_type,
                 linewidth=annot.line_weight,
-                color = annot.line_color.rgb,
+                color = annot.line_color,
                 alpha = annot.line_opacity,
                 zorder=idx
             )
