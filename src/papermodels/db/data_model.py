@@ -1,5 +1,4 @@
 from typing import Any
-from colour import Color
 import sqlalchemy
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import create_engine
