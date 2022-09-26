@@ -1,8 +1,11 @@
 from typing import Optional
 from dataclasses import dataclass
-from shapely.geometry import Polygon, LineString, Point
+from shapely.geometry import Polygon, LineString, Point, MultiPolygon, GeometryCollection
 import itertools
 import more_itertools
+
+## Testing
+from IPython.display import display
 
 
 @dataclass
@@ -27,6 +30,33 @@ OL0 = Overlap(x0=-5., x1=10., ma=-4., ba=15., mb=2, bb=-2.)
 OL1 = Overlap(x0=12.3, x1=16.3, ma=0.5, ba=6.1, mb=-3.34, bb=2.5)
 
 
+@dataclass
+class Trapezoid:
+    """
+    Represents a trapezoid with a "flat base". The trapezoid is described with
+    x0, x1 (the left and right edges) and y0 and y1 which correspond to x0 and x1.
+    """
+    x0: float
+    x1: float
+    y0: float
+    y1: float
+
+    def __add__(self, other):
+        try:
+            if self.x0 != other.x0 and self.x1 != other.x1:
+                raise ValueError("Adding two Trapezoid instances requires both trapezoids to have the"
+                " same x0 and x1 values")
+            y0 = self.y0 + other.y0
+            y1 = self.y1 + other.y1
+        except (AttributeError, ValueError, TypeError):
+            raise ValueError(f"Can only add two Trapezoid instances, not {self} and {other}")
+        return Trapezoid(self.x0, self.x1, y0, y1)
+
+# Examples
+TZ0 = Trapezoid(-0.43, 4.5, 11.2, 15.4)
+TZ1 = Trapezoid(0., 12., -3.4, -5.9)
+
+
 def get_projected_polygons(p: Polygon) -> list[Polygon]:
     """
     Returns the projected trapezoids corresponding to the polygon,
@@ -41,17 +71,50 @@ def get_projected_polygons(p: Polygon) -> list[Polygon]:
     return projected_polygons
 
 
-def overlap_region_to_polygon(ovlp: Overlap) -> Polygon:
+def get_projected_trapezoids(p: Polygon) -> list[Trapezoid]:
     """
-    Returns a Polygon generated from an Overlap.
+    Returns the projected trapezoids corresponding to the polygon,
+    'p'.
     """
-    ya0 = ovlp.ma * ovlp.x0 + ovlp.ba
-    ya1 = ovlp.ma * ovlp.x1 + ovlp.ba
-    yb0 = ovlp.mb * ovlp.x0 + ovlp.bb
-    yb1 = ovlp.mb * ovlp.x1 + ovlp.bb
+    overlap_regions = get_overlap_regions(p)
+    sorted_regions = sorted(overlap_regions, key=lambda x: x.x0)
+    ovlp_combos = itertools.combinations(sorted_regions, 2)
+    non_overlap_traps = []
+    overlap_traps = []
+    for ovlp_a, ovlp_b in ovlp_combos:
+        xa0, xa1 = ovlp_a.x0, ovlp_a.x1
+        xb0, xb1 = ovlp_b.x0, ovlp_b.x1
+        overlap_coords = get_overlap_coords(xa0, xa1, xb0, xb1)
+        if overlap_coords is None:
+            if ovlp_a not in non_overlap_traps:
+                non_overlap_traps
+        
+        projected_trapezoid= overlap_region_to_trapezoid(overlap_region)
+        projected_trapezoids.append(projected_trapezoid)
+    return projected_trapezoids
 
-    y0 = max(ya0, yb0) - min(ya0, yb0)
-    y1 = max(ya1, yb1) - min(ya1, yb1)
+
+# def combine_overlapping_trapezoids(traps: list[Trapezoid]) -> list[Trapezoid]:
+#     """
+#     Returns a list of trapezoids representing 'traps' with any of the overlapping trapezoids
+#     in broken apart and with their y-values summed to make a composite trapezoid.
+#     """
+#     trap_combos = itertools.combinations(traps, 2)
+#     cleaned_traps = []
+#     for trap_a, trap_b in trap_combos:
+#         xa0, xa1 = trap_a.x0, trap_a.x1
+#         xb0, xb1 = trap_b.x0, trap_b.x1
+#         overlap_coords = get_overlap_coords(xa0, xa1, xb0, xb1)
+#         if overlap_coords is None: continue
+
+
+
+
+def overlap_region_to_projected_polygon(ovlp: Overlap) -> Polygon:
+    """
+    Returns a projected Polygon generated from an Overlap.
+    """
+    y0, y1 = get_range(ovlp)
 
     coords = [
         [ovlp.x0, 0],
@@ -60,6 +123,72 @@ def overlap_region_to_polygon(ovlp: Overlap) -> Polygon:
         [ovlp.x1, 0]
     ]
     return Polygon(coords)
+
+
+def overlap_region_to_polygon(ovlp: Overlap) -> Polygon:
+    """
+    Returns a projected Polygon generated from an Overlap.
+    """
+    y0, y1 = get_range(ovlp)
+
+    coords = [
+        [ovlp.x0, 0],
+        [ovlp.x0, y0],
+        [ovlp.x1, y1],
+        [ovlp.x1, 0]
+    ]
+    return Polygon(coords)
+
+
+def trapezoid_to_polygon(trap: Overlap) -> Polygon:
+    """
+    Returns a Polygon generated from an Overlap.
+    """
+    coords = [
+        [trap.x0, 0],
+        [trap.x0, trap.y0],
+        [trap.x1, trap.y1],
+        [trap.x1, 0]
+    ]
+    return Polygon(coords)
+
+
+def overlap_region_to_trapezoid(ovlp: Overlap) -> Trapezoid:
+    """
+    Returns a Trapezoid generated from an Overlap.
+    """
+    y0, y1 = get_range(ovlp)
+    trap = Trapezoid(ovlp.x0, ovlp.x1, y0, y1)
+    return trap
+
+
+def get_range(ovlp: Overlap) -> tuple[float, float]:
+    """
+    Returns a tuple representing the values of y0 and y1 calculated
+    from the information in 'ovlp' where y0 and y1 correlate with
+    the locations of x0 and x1.
+    """
+    ya0 = ovlp.ma * ovlp.x0 + ovlp.ba
+    ya1 = ovlp.ma * ovlp.x1 + ovlp.ba
+    yb0 = ovlp.mb * ovlp.x0 + ovlp.bb
+    yb1 = ovlp.mb * ovlp.x1 + ovlp.bb
+
+    y0 = max(ya0, yb0) - min(ya0, yb0)
+    y1 = max(ya1, yb1) - min(ya1, yb1)
+    return y0, y1
+
+
+def get_y_vals(ovlp: Overlap) -> tuple[float, float]:
+    """
+    Returns a tuple representing the values of y0 and y1 calculated
+    from the information in 'ovlp' where y0 and y1 correlate with
+    the locations of x0 and x1.
+    """
+    ya0 = min(ovlp.ma * ovlp.x0 + ovlp.ba, ovlp.mb * ovlp.x0 + ovlp.bb)
+    ya1 = min(ovlp.ma * ovlp.x1 + ovlp.ba, ovlp.mb * ovlp.x1 + ovlp.bb)
+    yb0 = max(ovlp.ma * ovlp.x0 + ovlp.ba, ovlp.mb * ovlp.x0 + ovlp.bb)
+    yb1 = max(ovlp.ma * ovlp.x1 + ovlp.ba, ovlp.mb * ovlp.x1 + ovlp.bb)
+    return ya0, ya1, yb0, yb1
 
 
 def get_overlap_regions(p: Polygon) -> list[Overlap]:
@@ -71,18 +200,22 @@ def get_overlap_regions(p: Polygon) -> list[Overlap]:
     edge_indexes = [[k,k+1] for k in range(len(vertices) - 1)]
     edge_combinations = itertools.combinations(edge_indexes, 2)
     overlapping_regions = []
+    is_convex = check_convex_polygon(p)
     for edge_a, edge_b in edge_combinations:
         pa0_idx, pa1_idx = edge_a
         pb0_idx, pb1_idx = edge_b
         pa0, pa1 = vertices[pa0_idx], vertices[pa1_idx]
         pb0, pb1 = vertices[pb0_idx], vertices[pb1_idx]
-        overlapping_region = get_overlap_region(pa0, pa1, pb0, pb1)
+        if is_convex:
+            overlapping_region = get_overlap_region(pa0, pa1, pb0, pb1, p, convex=True)
+        else:
+            overlapping_region = get_overlap_region(pa0, pa1, pb0, pb1, p, convex=False)
         if overlapping_region is None: continue
         overlapping_regions.append(overlapping_region)
     return overlapping_regions
 
 
-def get_overlap_region(pa0, pa1, pb0, pb1) -> Optional[Overlap]:
+def get_overlap_region(pa0: tuple[float, float], pa1: tuple[float, float], pb0: tuple[float, float], pb1: tuple[float, float], p: Polygon, convex: bool) -> Optional[Overlap]:
     """
     Returns an Overlap object representing the overlapping portion of the line
     segments a and b, represented by their respective points, p0 and p1.
@@ -93,21 +226,37 @@ def get_overlap_region(pa0, pa1, pb0, pb1) -> Optional[Overlap]:
     xb1, _ = pb1
     xa0, xa1 = list(sorted([xa0, xa1]))
     xb0, xb1 = list(sorted([xb0, xb1]))
-    overlapping_coords = get_overlap_coords(xa0, xa1, xb0, xb1)
+    xc0, xc1 = None, None
+    if not convex:
+        xc0, xc1 = get_void_extents(p)
+    overlapping_coords = get_overlap_coords(xa0, xa1, xb0, xb1, xc0, xc1)
     if overlapping_coords is None:
         return None
     a_slope, a_intercept = get_slope_and_intercept(pa0, pa1)
     b_slope, b_intercept = get_slope_and_intercept(pb0, pb1)
     x0 = min(overlapping_coords)
     x1 = max(overlapping_coords)
-    return Overlap(x0, x1, a_slope, a_intercept, b_slope, b_intercept)
+    overlap = Overlap(x0, x1, a_slope, a_intercept, b_slope, b_intercept)
+    if convex == False:
+        ya0, ya1, yb0, yb1 = get_y_vals(overlap)
+
+        overlap_test_poly = Polygon(
+            [[x0, ya0], [x0, yb0], [x1, yb1], [x1,ya1]]
+        )
+        display(GeometryCollection([overlap_test_poly, p]))
+        if not check_poly_contains(overlap_test_poly, p):
+            return None
+    return overlap
 
 
-def get_overlap_coords(xa0: float, xa1: float, xb0: float, xb1: float) -> Optional[tuple[float, float]]:
+def get_overlap_coords(xa0: float, xa1: float, xb0: float, xb1: float, xc0: Optional[float], xc1: Optional[float]) -> Optional[tuple[float, float]]:
     """
     Returns a tuple representing the starting and ending x-coordinates of the region of overlap
     between two line segments, a and b, defined solely by each line segment's start and end 
     x-coordinates, x0 and x1.
+
+    xc0 and xc1 represent the extents of void space that may incur into the overlap region.
+    If xc0 and xc1 are provided, then the returned extents are further bounded by their location.
 
     If no overlap exists, None is returned.
     """
@@ -115,21 +264,28 @@ def get_overlap_coords(xa0: float, xa1: float, xb0: float, xb1: float) -> Option
     # (The fifth state is when the coordinates of xa and xb
     # are the same which will be captured by condition 3 and 4 but by 
     # condition 3 first)
-
+    overlap_coords = None
     # 1. Overlapping region with b "ahead" of a
     if xb0 < xa1 < xb1 and xa0 < xb0:
-        return (xa1, xb1)
+        overlap_coords = (xa1, xb1)
     # 2. Overlapping region with a "ahead" of b
     elif xb0 < xa0 < xb1 and xa1 > xb1:
-        return (xa0, xb1)
+        overlap_coords = (xa0, xb1)
     # 3. Overlapping region with a "inside" b
     elif xa0 >= xb0 and xa1 <= xb1:
-        return (xa0, xa1)
+        overlap_coords = (xa0, xa1)
     # 4. Overlapping region with b "inside" a
     elif xb0 >= xa0 and xb1 <= xa1:
-        return (xb0, xb1)
-    else:
-        return None
+        overlap_coords = (xb0, xb1)
+
+    # # Check for void space boundaries
+    # if overlap_coords is not None and xc0 is not None and xc1 is not None:
+    #     xa, xb = overlap_coords
+    #     if xa <= xc1 < xb:
+    #         overlap_coords = (xc1, xb)
+    #     elif xc0 <= xb:
+    #         overlap_coords = (xa, xc0)
+    return overlap_coords
 
 
 def get_slope_and_intercept(p0: tuple[float], p1: tuple[float]) -> tuple[float, float]:
@@ -144,54 +300,39 @@ def get_slope_and_intercept(p0: tuple[float], p1: tuple[float]) -> tuple[float, 
     slope = (y1 - y0) / (x1 - x0)
     y_intercept = y1 - slope * x1
     return slope, y_intercept
-    
-
-def sort_points_in_polygon(p: Polygon, axis: str = "x", ascending: bool = True) -> list[Point]:
-    """
-    Returns the list of vertices in 'p' sorted according to 'axis' and 'ascending'.
-    """
-    sorted_acc = list(set([vertex for vertex in p.exterior.coords]))
-    sort_index = 0 if axis == 'x' else 1
-    sorted_acc.sort(key=lambda x: x[sort_index])
-    return sorted_acc
 
 
-def min_x_point(p: Polygon) -> int:
+def check_convex_polygon(p: Polygon) -> bool:
     """
-    Returns the index of the vertex in 'p' with the minimum value of x coordinate.
-    If there are more than one vertex with the same minimum, the vertex
-    with lowest y value coordinate will be returned.
+    Returns True if the polygon is convex. 
+    Returns False if the polygon is non-convex.
     """
-    vertices = [vertex for vertex in p.exterior.coords]
-    unique_vertices = list(set([vertex for vertex in p.exterior.coords]))
-    sorted_vertices = sorted(unique_vertices, key=lambda x: (x[0], x[1]))
-    min_vertex = sorted_vertices[0]    
-    index = vertices.index(min_vertex)
-    return index
+    convex_hull = p.convex_hull
+    if not isinstance(convex_hull - p, (Polygon, MultiPolygon)):
+        return True
+    return False
 
 
-def get_poly_edges(p: Polygon, start: tuple[float, float]) -> list[tuple[int, int]]:
+def get_void_extents(p: Polygon) -> bool:
     """
-    Returns a list of tuples representing the edges of the polygon in clockwise order
-    starting from the vertex of 'start'.
+    Returns the region of any void space that exists in the concave Polygon, 'p'.
     """
-    vertices = [vertex for vertex in p.exterior.coords]
-    num_vertices = len(vertices)
-    start_idx = vertices.index(start)
-    vertex_cycler = itertools.cycle(vertices)
-    vertex_cycler = more_itertools.consume(vertex_cycler, start_idx)
-    
-    edges = []
-    for idx, vertex in enumerate(vertex_cycler):
-        if idx == num_vertices:
-            break
-        else:
-            pass
-            
-            
-        
-        
-    
-    
-    
-        
+    convex_hull = p.convex_hull
+    void_space = convex_hull - p
+    minx, miny, maxx, maxy = void_space.bounds
+    return minx, maxx
+
+
+def check_poly_contains(test_p: Polygon, p: Polygon) -> bool:
+    """
+    Returns True if the Polygon 'test_p' is wholly contained within 'p'.
+    """
+    test = False
+    test_geom = (p | test_p) - p
+    if test_geom.is_empty:
+        test = True
+    elif not isinstance(test_geom, Polygon) and not isinstance(test_geom, (GeometryCollection, MultiPolygon)):
+        test = True
+    elif test_geom.area < 1e-6:
+        test = True
+    return test       
