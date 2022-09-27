@@ -279,12 +279,14 @@ def get_overlap_coords(xa0: float, xa1: float, xb0: float, xb1: float, xc0: Opti
         overlap_coords = (xb0, xb1)
 
     # # Check for void space boundaries
-    # if overlap_coords is not None and xc0 is not None and xc1 is not None:
-    #     xa, xb = overlap_coords
-    #     if xa <= xc1 < xb:
-    #         overlap_coords = (xc1, xb)
-    #     elif xc0 <= xb:
-    #         overlap_coords = (xa, xc0)
+    if overlap_coords is not None and xc0 is not None and xc1 is not None:
+        xa, xb = overlap_coords
+        if xc0 <= xa and xb <= xc1:
+            pass
+        elif xa <= xc1 < xb:
+            overlap_coords = (xc1, xb)
+        elif xc0 <= xb:
+            overlap_coords = (xa, xc0)
     return overlap_coords
 
 
