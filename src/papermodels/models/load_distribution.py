@@ -30,33 +30,6 @@ OL0 = Overlap(x0=-5., x1=10., ma=-4., ba=15., mb=2, bb=-2.)
 OL1 = Overlap(x0=12.3, x1=16.3, ma=0.5, ba=6.1, mb=-3.34, bb=2.5)
 
 
-@dataclass
-class Trapezoid:
-    """
-    Represents a trapezoid with a "flat base". The trapezoid is described with
-    x0, x1 (the left and right edges) and y0 and y1 which correspond to x0 and x1.
-    """
-    x0: float
-    x1: float
-    y0: float
-    y1: float
-
-    def __add__(self, other):
-        try:
-            if self.x0 != other.x0 and self.x1 != other.x1:
-                raise ValueError("Adding two Trapezoid instances requires both trapezoids to have the"
-                " same x0 and x1 values")
-            y0 = self.y0 + other.y0
-            y1 = self.y1 + other.y1
-        except (AttributeError, ValueError, TypeError):
-            raise ValueError(f"Can only add two Trapezoid instances, not {self} and {other}")
-        return Trapezoid(self.x0, self.x1, y0, y1)
-
-# Examples
-TZ0 = Trapezoid(-0.43, 4.5, 11.2, 15.4)
-TZ1 = Trapezoid(0., 12., -3.4, -5.9)
-
-
 def get_projected_polygons(p: Polygon) -> list[Polygon]:
     """
     Returns the projected trapezoids corresponding to the polygon,
@@ -69,60 +42,6 @@ def get_projected_polygons(p: Polygon) -> list[Polygon]:
         projected_polygon = overlap_region_to_polygon(overlap_region)
         projected_polygons.append(projected_polygon)
     return projected_polygons
-
-
-def get_projected_trapezoids(p: Polygon) -> list[Trapezoid]:
-    """
-    Returns the projected trapezoids corresponding to the polygon,
-    'p'.
-    """
-    overlap_regions = get_overlap_regions(p)
-    sorted_regions = sorted(overlap_regions, key=lambda x: x.x0)
-    ovlp_combos = itertools.combinations(sorted_regions, 2)
-    non_overlap_traps = []
-    overlap_traps = []
-    for ovlp_a, ovlp_b in ovlp_combos:
-        xa0, xa1 = ovlp_a.x0, ovlp_a.x1
-        xb0, xb1 = ovlp_b.x0, ovlp_b.x1
-        overlap_coords = get_overlap_coords(xa0, xa1, xb0, xb1)
-        if overlap_coords is None:
-            if ovlp_a not in non_overlap_traps:
-                non_overlap_traps
-        
-        projected_trapezoid= overlap_region_to_trapezoid(overlap_region)
-        projected_trapezoids.append(projected_trapezoid)
-    return projected_trapezoids
-
-
-# def combine_overlapping_trapezoids(traps: list[Trapezoid]) -> list[Trapezoid]:
-#     """
-#     Returns a list of trapezoids representing 'traps' with any of the overlapping trapezoids
-#     in broken apart and with their y-values summed to make a composite trapezoid.
-#     """
-#     trap_combos = itertools.combinations(traps, 2)
-#     cleaned_traps = []
-#     for trap_a, trap_b in trap_combos:
-#         xa0, xa1 = trap_a.x0, trap_a.x1
-#         xb0, xb1 = trap_b.x0, trap_b.x1
-#         overlap_coords = get_overlap_coords(xa0, xa1, xb0, xb1)
-#         if overlap_coords is None: continue
-
-
-
-
-def overlap_region_to_projected_polygon(ovlp: Overlap) -> Polygon:
-    """
-    Returns a projected Polygon generated from an Overlap.
-    """
-    y0, y1 = get_range(ovlp)
-
-    coords = [
-        [ovlp.x0, 0],
-        [ovlp.x0, y0],
-        [ovlp.x1, y1],
-        [ovlp.x1, 0]
-    ]
-    return Polygon(coords)
 
 
 def overlap_region_to_polygon(ovlp: Overlap) -> Polygon:
@@ -140,26 +59,17 @@ def overlap_region_to_polygon(ovlp: Overlap) -> Polygon:
     return Polygon(coords)
 
 
-def trapezoid_to_polygon(trap: Overlap) -> Polygon:
+def overlap_region_to_singularity_function(ovlp: Overlap, precision: int = 6) -> callable:
     """
-    Returns a Polygon generated from an Overlap.
-    """
-    coords = [
-        [trap.x0, 0],
-        [trap.x0, trap.y0],
-        [trap.x1, trap.y1],
-        [trap.x1, 0]
-    ]
-    return Polygon(coords)
-
-
-def overlap_region_to_trapezoid(ovlp: Overlap) -> Trapezoid:
-    """
-    Returns a Trapezoid generated from an Overlap.
+    Returns a singularity function generated from 'ovlp'
     """
     y0, y1 = get_range(ovlp)
-    trap = Trapezoid(ovlp.x0, ovlp.x1, y0, y1)
-    return trap
+    x0 = ovlp.x0
+    x1 = ovlp.x1
+    m = (y1 - y0) / (x1 - x0)
+    def singularity_function(x: float) -> float:
+        return round((x > x0) * (y0 + m*(x - x0)) * (x <= x1), precision)
+    return singularity_function
 
 
 def get_range(ovlp: Overlap) -> tuple[float, float]:
