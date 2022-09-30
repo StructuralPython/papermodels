@@ -30,6 +30,41 @@ OL0 = Overlap(x0=-5., x1=10., ma=-4., ba=15., mb=2, bb=-2.)
 OL1 = Overlap(x0=12.3, x1=16.3, ma=0.5, ba=6.1, mb=-3.34, bb=2.5)
 
 
+@dataclass
+class Singularity:
+    """
+    Represents a singularity function with customizable attributes. The 
+    Singularity can be called like a function to generate a 'y' value
+    from a given 'x' value.
+
+    The singularity function is assumed to be linear and defined over a
+    certain domain between x0 and x1, a slope of m, and with an initial 
+    y-value of y0. The resulting y-value for y1 will be rounded to 
+    'precision'.
+
+    This class is defined as a callable class instead of as a function
+    so that the attributes can be altered as required for appropriate
+    scaling of the singularity function after it has been defined.
+    """
+    x0: float
+    x1: float
+    m: float
+    y0: float
+    precision: int
+
+    def __call__(self, x: float) -> float:
+        """
+        Returns a value for 'y' calculated from 'x' and the attributes
+        stored in the singularity function class instance.
+        """
+        y0 = self.y0
+        x0 = self.x0
+        x1 = self.x1
+        m = self.m
+        return round((x > x0) * (y0 + m*(x - x0)) * (x <= x1), self.precision)
+
+
+
 def get_projected_polygons(p: Polygon) -> list[Polygon]:
     """
     Returns the projected trapezoids corresponding to the polygon,
@@ -67,8 +102,7 @@ def overlap_region_to_singularity_function(ovlp: Overlap, precision: int = 6) ->
     x0 = ovlp.x0
     x1 = ovlp.x1
     m = (y1 - y0) / (x1 - x0)
-    def singularity_function(x: float) -> float:
-        return round((x > x0) * (y0 + m*(x - x0)) * (x <= x1), precision)
+    singularity_function = Singularity(x0, x1, m, y0, precision)
     return singularity_function
 
 
