@@ -94,7 +94,7 @@ def overlap_region_to_polygon(ovlp: Overlap) -> Polygon:
     return Polygon(coords)
 
 
-def overlap_region_to_singularity_function(ovlp: Overlap, precision: int = 6) -> callable:
+def overlap_region_to_singularity(ovlp: Overlap, precision: int = 6) -> callable:
     """
     Returns a singularity function generated from 'ovlp'
     """
@@ -105,6 +105,47 @@ def overlap_region_to_singularity_function(ovlp: Overlap, precision: int = 6) ->
     singularity_function = Singularity(x0, x1, m, y0, precision)
     return singularity_function
 
+
+def singularities_to_polygon(los: list[Singularity]) -> Polygon:
+    """
+    Returns a Polygon in the shape of the singularity function.
+    """
+    sorted_sings = sorted(los, key=lambda x: x.x1)
+    x_acc = []
+    for idx, sing in enumerate(sorted_sings):
+        if idx == 0:
+            x_acc.append(round(sing.x0, sing.precision))
+            continue
+        x_acc.append(round(sing.x0 + 10**-sing.precision, sing.precision))
+        x_acc.append(round(sing.x1, sing.precision))
+
+    # else:
+    x_acc.append(round(sing.x1, sing.precision))
+    x_acc = sorted(list(set(x_acc)))
+    y_vals = [sum([sing(x) for sing in los]) for x in x_acc]
+
+    xy_vals = list(zip(x_acc, y_vals))
+    xy_vals = xy_vals + [(x_acc[-1], 0)]
+    print(xy_vals)
+    poly = Polygon(xy_vals)
+    return poly
+    
+
+
+def apply_total_load(sing: Singularity, total_load: float) -> Singularity:
+    """
+    Returns a Singularity function that has been scaled to represent a trapezoid
+    with an area that is equal to the value of 'total_load'.
+    """
+    delta_x = sing.x1 - sing.x0
+
+    area = total_load
+    slope = sing.m
+    load_0 = (2*area - delta_x**2) / (2*delta_x)
+
+    scaled_sing = Singularity(x0=sing.x0, x1=sing.x1, m=slope, y0=load_0, precision=sing.precision)
+    return scaled_sing
+    
 
 def get_range(ovlp: Overlap) -> tuple[float, float]:
     """
@@ -135,7 +176,7 @@ def get_y_vals(ovlp: Overlap) -> tuple[float, float]:
     return ya0, ya1, yb0, yb1
 
 
-def get_overlap_regions(p: Polygon) -> list[Overlap]:
+def get_overlap_regions(p: Polygon, display_progress: bool = False) -> list[Overlap]:
     """
     Returns a list of overlapping regions described by the vertices in the polygon, 'p'.
     An overlapping region is an enclosed region in the polygon bounded by an upper y and a lower y.
@@ -151,15 +192,23 @@ def get_overlap_regions(p: Polygon) -> list[Overlap]:
         pa0, pa1 = vertices[pa0_idx], vertices[pa1_idx]
         pb0, pb1 = vertices[pb0_idx], vertices[pb1_idx]
         if is_convex:
-            overlapping_region = get_overlap_region(pa0, pa1, pb0, pb1, p, convex=True)
+            overlapping_region = get_overlap_region(pa0, pa1, pb0, pb1, p, convex=True, show_overlap=display_progress)
         else:
-            overlapping_region = get_overlap_region(pa0, pa1, pb0, pb1, p, convex=False)
+            overlapping_region = get_overlap_region(pa0, pa1, pb0, pb1, p, convex=False, show_overlap=display_progress)
         if overlapping_region is None: continue
         overlapping_regions.append(overlapping_region)
     return overlapping_regions
 
 
-def get_overlap_region(pa0: tuple[float, float], pa1: tuple[float, float], pb0: tuple[float, float], pb1: tuple[float, float], p: Polygon, convex: bool) -> Optional[Overlap]:
+def get_overlap_region(
+    pa0: tuple[float, float], 
+    pa1: tuple[float, float], 
+    pb0: tuple[float, float], 
+    pb1: tuple[float, float], 
+    p: Polygon, 
+    convex: bool,
+    show_overlap: bool = False
+    ) -> Optional[Overlap]:
     """
     Returns an Overlap object representing the overlapping portion of the line
     segments a and b, represented by their respective points, p0 and p1.
@@ -187,7 +236,8 @@ def get_overlap_region(pa0: tuple[float, float], pa1: tuple[float, float], pb0: 
         overlap_test_poly = Polygon(
             [[x0, ya0], [x0, yb0], [x1, yb1], [x1,ya1]]
         )
-        display(GeometryCollection([overlap_test_poly, p]))
+        if show_overlap:
+            display(GeometryCollection([overlap_test_poly, p]))
         if not check_poly_contains(overlap_test_poly, p):
             return None
     return overlap
