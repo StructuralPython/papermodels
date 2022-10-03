@@ -126,7 +126,6 @@ def singularities_to_polygon(los: list[Singularity]) -> Polygon:
 
     xy_vals = list(zip(x_acc, y_vals))
     xy_vals = xy_vals + [(x_acc[-1], 0)]
-    print(xy_vals)
     poly = Polygon(xy_vals)
     return poly
     
