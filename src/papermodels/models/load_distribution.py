@@ -64,7 +64,6 @@ class Singularity:
         return round((x > x0) * (y0 + m*(x - x0)) * (x <= x1), self.precision)
 
 
-
 def get_projected_polygons(p: Polygon) -> list[Polygon]:
     """
     Returns the projected trapezoids corresponding to the polygon,

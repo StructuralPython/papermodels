@@ -1,7 +1,7 @@
 from __future__ import annotations
 from shapely.wkt import loads as wkt_loads
 from shapely.geometry import GeometryCollection
-from papermodels.db.data_model import Annotation
+from papermodels.datatypes.annotation import Annotation
 from typing import Any, Optional
 import numpy as np
 

@@ -25,7 +25,9 @@ annot_label = Table(
 )
 
 class Annotation(Base):
-
+    """
+    A data type to represent a PDF annotation exported through an FDF file.
+    """
     __tablename__ = 'annotations'
     
     annot_id = Column(Integer, primary_key=True)
@@ -43,6 +45,13 @@ class Annotation(Base):
     
     def __repr__(self):
         return class_representation(self)
+
+# Examples
+# A0 = Annotation(
+#     annot_id=0,
+#     object_type="rect",
+#     page=
+# )
 
     
 class Geometry(Base):
