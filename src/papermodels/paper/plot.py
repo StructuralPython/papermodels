@@ -9,7 +9,10 @@ import parse
 
 from papermodels.db.data_model import Annotation
 
-def plot_annotations(annots: list[Annotation], size: Optional[float], dpi: Optional[float]) -> None:
+
+def plot_annotations(
+    annots: list[Annotation], size: Optional[float], dpi: Optional[float]
+) -> None:
     """
     Plots annotations with matplotlib
     """
@@ -36,9 +39,9 @@ def plot_annotations(annots: list[Annotation], size: Optional[float], dpi: Optio
                 xy[1],
                 linestyle=annot.line_type,
                 linewidth=annot.line_weight,
-                color = annot.line_color,
-                alpha = annot.line_opacity,
-                zorder=idx
+                color=annot.line_color,
+                alpha=annot.line_opacity,
+                zorder=idx,
             )
 
     plt.axis("scaled")
@@ -47,9 +50,9 @@ def plot_annotations(annots: list[Annotation], size: Optional[float], dpi: Optio
     if dpi:
         fig.set_dpi(dpi)
     plt.show()
-    
 
-def xy_vertices(vertices: str, close = False) -> list[list[float]]:
+
+def xy_vertices(vertices: str, close=False) -> list[list[float]]:
     """
     Returns a list of lists of floats to emulate a 2d numpy array of x, y values
     """

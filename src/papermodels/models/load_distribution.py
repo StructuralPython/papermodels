@@ -1,6 +1,12 @@
 from typing import Optional
 from dataclasses import dataclass
-from shapely.geometry import Polygon, LineString, Point, MultiPolygon, GeometryCollection
+from shapely.geometry import (
+    Polygon,
+    LineString,
+    Point,
+    MultiPolygon,
+    GeometryCollection,
+)
 import itertools
 import more_itertools
 
@@ -18,6 +24,7 @@ class Overlap:
         x0, x1: starting and ending x coordinates
         m, b: slope and y-intercept
     """
+
     x0: float
     x1: float
     ma: float
@@ -25,27 +32,29 @@ class Overlap:
     mb: float
     bb: float
 
+
 # Examples
-OL0 = Overlap(x0=-5., x1=10., ma=-4., ba=15., mb=2, bb=-2.)
+OL0 = Overlap(x0=-5.0, x1=10.0, ma=-4.0, ba=15.0, mb=2, bb=-2.0)
 OL1 = Overlap(x0=12.3, x1=16.3, ma=0.5, ba=6.1, mb=-3.34, bb=2.5)
 
 
 @dataclass
 class Singularity:
     """
-    Represents a singularity function with customizable attributes. The 
+    Represents a singularity function with customizable attributes. The
     Singularity can be called like a function to generate a 'y' value
     from a given 'x' value.
 
     The singularity function is assumed to be linear and defined over a
-    certain domain between x0 and x1, a slope of m, and with an initial 
-    y-value of y0. The resulting y-value for y1 will be rounded to 
+    certain domain between x0 and x1, a slope of m, and with an initial
+    y-value of y0. The resulting y-value for y1 will be rounded to
     'precision'.
 
     This class is defined as a callable class instead of as a function
     so that the attributes can be altered as required for appropriate
     scaling of the singularity function after it has been defined.
     """
+
     x0: float
     x1: float
     m: float
@@ -61,7 +70,7 @@ class Singularity:
         x0 = self.x0
         x1 = self.x1
         m = self.m
-        return round((x > x0) * (y0 + m*(x - x0)) * (x <= x1), self.precision)
+        return round((x > x0) * (y0 + m * (x - x0)) * (x <= x1), self.precision)
 
 
 def get_projected_polygons(p: Polygon) -> list[Polygon]:
@@ -84,12 +93,7 @@ def overlap_region_to_polygon(ovlp: Overlap) -> Polygon:
     """
     y0, y1 = get_range(ovlp)
 
-    coords = [
-        [ovlp.x0, 0],
-        [ovlp.x0, y0],
-        [ovlp.x1, y1],
-        [ovlp.x1, 0]
-    ]
+    coords = [[ovlp.x0, 0], [ovlp.x0, y0], [ovlp.x1, y1], [ovlp.x1, 0]]
     return Polygon(coords)
 
 
@@ -127,7 +131,6 @@ def singularities_to_polygon(los: list[Singularity]) -> Polygon:
     xy_vals = xy_vals + [(x_acc[-1], 0)]
     poly = Polygon(xy_vals)
     return poly
-    
 
 
 def apply_total_load(sing: Singularity, total_load: float) -> Singularity:
@@ -139,11 +142,13 @@ def apply_total_load(sing: Singularity, total_load: float) -> Singularity:
 
     area = total_load
     slope = sing.m
-    load_0 = (2*area - delta_x**2) / (2*delta_x)
+    load_0 = (2 * area - delta_x**2) / (2 * delta_x)
 
-    scaled_sing = Singularity(x0=sing.x0, x1=sing.x1, m=slope, y0=load_0, precision=sing.precision)
+    scaled_sing = Singularity(
+        x0=sing.x0, x1=sing.x1, m=slope, y0=load_0, precision=sing.precision
+    )
     return scaled_sing
-    
+
 
 def get_range(ovlp: Overlap) -> tuple[float, float]:
     """
@@ -180,7 +185,7 @@ def get_overlap_regions(p: Polygon, display_progress: bool = False) -> list[Over
     An overlapping region is an enclosed region in the polygon bounded by an upper y and a lower y.
     """
     vertices = [vertex for vertex in p.exterior.coords]
-    edge_indexes = [[k,k+1] for k in range(len(vertices) - 1)]
+    edge_indexes = [[k, k + 1] for k in range(len(vertices) - 1)]
     edge_combinations = itertools.combinations(edge_indexes, 2)
     overlapping_regions = []
     is_convex = check_convex_polygon(p)
@@ -190,23 +195,28 @@ def get_overlap_regions(p: Polygon, display_progress: bool = False) -> list[Over
         pa0, pa1 = vertices[pa0_idx], vertices[pa1_idx]
         pb0, pb1 = vertices[pb0_idx], vertices[pb1_idx]
         if is_convex:
-            overlapping_region = get_overlap_region(pa0, pa1, pb0, pb1, p, convex=True, show_overlap=display_progress)
+            overlapping_region = get_overlap_region(
+                pa0, pa1, pb0, pb1, p, convex=True, show_overlap=display_progress
+            )
         else:
-            overlapping_region = get_overlap_region(pa0, pa1, pb0, pb1, p, convex=False, show_overlap=display_progress)
-        if overlapping_region is None: continue
+            overlapping_region = get_overlap_region(
+                pa0, pa1, pb0, pb1, p, convex=False, show_overlap=display_progress
+            )
+        if overlapping_region is None:
+            continue
         overlapping_regions.append(overlapping_region)
     return overlapping_regions
 
 
 def get_overlap_region(
-    pa0: tuple[float, float], 
-    pa1: tuple[float, float], 
-    pb0: tuple[float, float], 
-    pb1: tuple[float, float], 
-    p: Polygon, 
+    pa0: tuple[float, float],
+    pa1: tuple[float, float],
+    pb0: tuple[float, float],
+    pb1: tuple[float, float],
+    p: Polygon,
     convex: bool,
-    show_overlap: bool = False
-    ) -> Optional[Overlap]:
+    show_overlap: bool = False,
+) -> Optional[Overlap]:
     """
     Returns an Overlap object representing the overlapping portion of the line
     segments a and b, represented by their respective points, p0 and p1.
@@ -231,9 +241,7 @@ def get_overlap_region(
     if convex == False:
         ya0, ya1, yb0, yb1 = get_y_vals(overlap)
 
-        overlap_test_poly = Polygon(
-            [[x0, ya0], [x0, yb0], [x1, yb1], [x1,ya1]]
-        )
+        overlap_test_poly = Polygon([[x0, ya0], [x0, yb0], [x1, yb1], [x1, ya1]])
         if show_overlap:
             display(GeometryCollection([overlap_test_poly, p]))
         if not check_poly_contains(overlap_test_poly, p):
@@ -241,10 +249,17 @@ def get_overlap_region(
     return overlap
 
 
-def get_overlap_coords(xa0: float, xa1: float, xb0: float, xb1: float, xc0: Optional[float], xc1: Optional[float]) -> Optional[tuple[float, float]]:
+def get_overlap_coords(
+    xa0: float,
+    xa1: float,
+    xb0: float,
+    xb1: float,
+    xc0: Optional[float],
+    xc1: Optional[float],
+) -> Optional[tuple[float, float]]:
     """
     Returns a tuple representing the starting and ending x-coordinates of the region of overlap
-    between two line segments, a and b, defined solely by each line segment's start and end 
+    between two line segments, a and b, defined solely by each line segment's start and end
     x-coordinates, x0 and x1.
 
     xc0 and xc1 represent the extents of void space that may incur into the overlap region.
@@ -254,7 +269,7 @@ def get_overlap_coords(xa0: float, xa1: float, xb0: float, xb1: float, xc0: Opti
     """
     # Five possible states captured by four conditions
     # (The fifth state is when the coordinates of xa and xb
-    # are the same which will be captured by condition 3 and 4 but by 
+    # are the same which will be captured by condition 3 and 4 but by
     # condition 3 first)
     overlap_coords = None
     # 1. Overlapping region with b "ahead" of a
@@ -298,7 +313,7 @@ def get_slope_and_intercept(p0: tuple[float], p1: tuple[float]) -> tuple[float, 
 
 def check_convex_polygon(p: Polygon) -> bool:
     """
-    Returns True if the polygon is convex. 
+    Returns True if the polygon is convex.
     Returns False if the polygon is non-convex.
     """
     convex_hull = p.convex_hull
@@ -325,8 +340,10 @@ def check_poly_contains(test_p: Polygon, p: Polygon) -> bool:
     test_geom = (p | test_p) - p
     if test_geom.is_empty:
         test = True
-    elif not isinstance(test_geom, Polygon) and not isinstance(test_geom, (GeometryCollection, MultiPolygon)):
+    elif not isinstance(test_geom, Polygon) and not isinstance(
+        test_geom, (GeometryCollection, MultiPolygon)
+    ):
         test = True
     elif test_geom.area < 1e-6:
         test = True
-    return test       
+    return test

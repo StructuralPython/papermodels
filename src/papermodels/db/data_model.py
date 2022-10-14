@@ -24,12 +24,14 @@ annot_label = Table(
     Column("label_id", Integer, ForeignKey("labels.label_id")),
 )
 
+
 class Annotation(Base):
     """
     A data type to represent a PDF annotation exported through an FDF file.
     """
-    __tablename__ = 'annotations'
-    
+
+    __tablename__ = "annotations"
+
     annot_id = Column(Integer, primary_key=True)
     object_type = Column(String)
     page = Column(String)
@@ -42,9 +44,10 @@ class Annotation(Base):
     line_opacity = Column(Float)
     fill_color = Column(ColorType)
     fill_opacity = Column(Float)
-    
+
     def __repr__(self):
         return class_representation(self)
+
 
 # Examples
 # A0 = Annotation(
@@ -53,61 +56,57 @@ class Annotation(Base):
 #     page=
 # )
 
-    
+
 class Geometry(Base):
 
-    __tablename__ = 'geometry'
-    
+    __tablename__ = "geometry"
+
     geom_id = Column(Integer, primary_key=True)
     wkt = Column(String)
     label = Column(String)
-    
+
     def __repr__(self):
         return class_representation(self)
 
 
 class Labels(Base):
 
-    __tablename__ = 'labels'
-    
+    __tablename__ = "labels"
+
     label_id = Column(Integer, primary_key=True)
     label = Column(String)
     assigned_to = Column(String)
-    
+
     def __repr__(self):
         return class_representation(self)
 
 
 class LegendEntry(Base):
 
-    __tablename__ = 'legend'
-    
+    __tablename__ = "legend"
+
     legend_id = Column(Integer, primary_key=True)
     key = Column(String)
     value = Column(String)
-    
+
     def __repr__(self):
         return class_representation(self)
 
-        
+
 def class_representation(object: Any) -> str:
     """
     Returns a generic repr string for a given 'object' where 'object' is a
     "data class"-like object.
     """
-    class_name = (
-        str(type(object)).split('.')[-1]
-        .replace("'","")
-        .replace(">","")
-    )
+    class_name = str(type(object)).split(".")[-1].replace("'", "").replace(">", "")
     attrs = []
     for k, v in object.__dict__.items():
-        if k.startswith('_'): continue
+        if k.startswith("_"):
+            continue
         if isinstance(v, str):
             v = f"'{v}'"
-        attrs.append(f'{k}={v}')
+        attrs.append(f"{k}={v}")
     return f"{class_name}({', '.join(attrs)})"
-
 
 
 def db_connect():
