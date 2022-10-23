@@ -4,7 +4,7 @@ import pathlib
 import numpy as np
 import parse
 
-from papermodels.db.data_model import Annotation
+from papermodels.datatypes.annotation import Annotation
 
 
 def read_annotations(fdf_file: pathlib.Path) -> list[Annotation]:
@@ -22,9 +22,14 @@ def _read_fdf_file(file_path: pathlib.Path) -> list[str]:
         acc = []
         for line in file:
             try:
-                acc.append(line.decode("utf-8"))
+                acc.append(
+                    # line
+                    line.decode("utf-8"),
+                    )
             except:
-                pass
+                acc.append(
+                line.decode("utf_7")
+                )
     return acc
 
 

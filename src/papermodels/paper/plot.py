@@ -49,7 +49,7 @@ def plot_annotations(
         fig.set_size_inches(size, size)
     if dpi:
         fig.set_dpi(dpi)
-    plt.show()
+    return fig, ax
 
 
 def xy_vertices(vertices: str, close=False) -> list[list[float]]:
