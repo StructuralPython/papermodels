@@ -23,13 +23,10 @@ def _read_fdf_file(file_path: pathlib.Path) -> list[str]:
         for line in file:
             try:
                 acc.append(
-                    # line
                     line.decode("utf-8"),
                     )
             except:
-                acc.append(
-                line.decode("utf_7")
-                )
+                pass
     return acc
 
 
