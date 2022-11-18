@@ -47,6 +47,7 @@ def _read_fdf_file(file_path: pathlib.Path) -> list[str]:
         except UnicodeDecodeError:
             if line_no != 1:
                 file_data.append(decoded_bits[error_counter])
+                error_counter += 1
 
     return file_data
 
