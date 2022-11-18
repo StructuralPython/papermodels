@@ -1,6 +1,7 @@
 from typing import Optional, Any, Union
 import pathlib
-
+import re
+import zlib
 import numpy as np
 import parse
 
@@ -14,20 +15,40 @@ def read_annotations(fdf_file: pathlib.Path) -> list[Annotation]:
     return _get_annotations_from_fdf(_read_fdf_file(fdf_file))
 
 
+def _decompress_flate(bin_data: list[bytes]) -> list[bytes]:
+    """
+    Finds and decompresses any flate bytes strings within the 
+    content streams of the fdf file data. Returns the binary
+    file data in 'bin_data' decompressed.
+    """
+
+
+
 def _read_fdf_file(file_path: pathlib.Path) -> list[str]:
     """
     Reads the FDF file and returns a list of strings.
     """
-    with open(file_path, "rb") as file:
-        acc = []
-        for line in file:
-            try:
-                acc.append(
-                    line.decode("utf-8"),
-                    )
-            except:
-                pass
-    return acc
+    with open(file_path, 'rb') as file:
+        fdf = file.read()
+
+    stream = re.compile(b'.*?FlateDecode.*?stream(.*?)endstream', re.S)
+
+    decoded_bits = []
+    for s in re.findall(stream, fdf):
+        s = s.strip(b"\r\n")
+        decoded_bits.append(zlib.decompress(s).decode('utf-8'))
+
+    file_data = []
+    error_counter = 0
+    for line_no, line in enumerate(fdf.split(b"\n")):
+        try:
+            decoded = line.decode('utf-8')
+            file_data.append(decoded)
+        except UnicodeDecodeError:
+            if line_no != 1:
+                file_data.append(decoded_bits[error_counter])
+
+    return file_data
 
 
 def _get_annotations_from_fdf(fdf_str: str) -> list[Annotation]:
