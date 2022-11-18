@@ -121,9 +121,12 @@ def _extract_type_and_vertices(line: str) -> Optional[tuple[str, str]]:
             return (annot_type, vertices)
         elif annot_type in ("Rectangle", "Square"):
             bbox = parse.search("/Rect[{}]", line)[0]
+            buffers = parse.search("/RD[{}]", line)[0]
             x1, y1, x2, y2 = bbox.split()
-            vertices = " ".join([x1, y1, x1, y2, x2, y2, x2, y1])
-            vertices = [float(vertex) for vertex in vertices.split(" ")]
+            x1, y1, x2, y2 = float(x1), float(y1), float(x2), float(y2)
+            b1, b2, b3, b4 = buffers.split()
+            b1, b2, b3, b4 = float(b1), float(b2), float(b3), float(b4)
+            vertices = [x1, y1, x1, y2 - b4 - b2, x2 - b3 - b1, y2 - b4 - b2, x2 - b3 - b1, y1]
             return (annot_type, vertices)
 
 
