@@ -48,12 +48,10 @@ def filter_annotations(annots: list[Annotation], properties: dict) -> list[Annot
     the keywords in 'properties'.
     Note: The filtering process currently requires that both the keys AND values in 'properties'
     be hashable.
-
     'properties' is a dictionary of annotation properties and their values, e.g.
         {'line_weight': 3.0, 'line_color': (1, 0, 0)}
         or 
         {'text': "Slab Outline"}
-
     The returned annotations will only be annotations that match ALL of the properties
     described.
     """
