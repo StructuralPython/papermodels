@@ -10,9 +10,10 @@ def annotations_to_shapely(
     annots: list[Annotation], as_geometry_collection=False
 ) -> list[Any]:
     """
-    Returns a WKT string representing the geometry in 'annot'
+    Returns a shapely geometry representing the geometry in 'annot'
     'annots' - a list of Annotation objects
-    'as_geometry_collection' - If
+    'as_geometry_collection' - If True, the geometries in 'annots'
+        will all be grouped together in a shapely.geometry.GeometryCollection
     """
     geoms = [annotation_to_shapely(annot) for annot in annots]
     if as_geometry_collection:
@@ -30,7 +31,8 @@ def annotation_to_shapely(annot: Annotation) -> Any:
 
 def _annotation_to_wkt(annot: Annotation) -> str:
     """
-    Returns a WKT string representing the geometry in 'annot'
+    Returns a WKT string representing the geometry in 'annot'. The WKT
+    string can be loaded with shapely.wkt.loads (see shapely documentation)
     """
     if annot.object_type == "PolyLine" or annot.object_type == "Line":
         grouped_vertices = _group_vertices_str(annot.vertices)
@@ -46,6 +48,14 @@ def filter_annotations(annots: list[Annotation], properties: dict) -> list[Annot
     the keywords in 'properties'.
     Note: The filtering process currently requires that both the keys AND values in 'properties'
     be hashable.
+
+    'properties' is a dictionary of annotation properties and their values, e.g.
+        {'line_weight': 3.0, 'line_color': (1, 0, 0)}
+        or 
+        {'text': "Slab Outline"}
+
+    The returned annotations will only be annotations that match ALL of the properties
+    described.
     """
     filtered = []
     for annot in annots:
@@ -64,6 +74,8 @@ def scale_annotations(
     by 'scale'.
     If 'paper_origin' is provided, then the annotation coordinates will have their origin reset
     to 'paper_origin'. Note that 'paper_origin' is the unscaled coordinate space (i.e. in points)
+    The purpose of setting 'paper_origin' if the annotation has a "datum" that is set somewhere in the
+    file. Leave as None if there is no datum set.
     """
     scaled_annotations = []
     for annot in annots:

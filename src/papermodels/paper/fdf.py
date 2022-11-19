@@ -8,20 +8,14 @@ import parse
 from papermodels.datatypes.annotation import Annotation
 
 
-def read_annotations(fdf_file: pathlib.Path) -> list[Annotation]:
+def read_annotations(fdf_file: Union[str, pathlib.Path]) -> list[Annotation]:
     """
-    Returns a list of annotations contained in 'fdf_file'.
+    Returns a list of Annotation objects representing the data
+    contained in 'fdf_file'.
+
+    'fdf_file' can either be a str or pathlib.Path
     """
     return _get_annotations_from_fdf(_read_fdf_file(fdf_file))
-
-
-def _decompress_flate(bin_data: list[bytes]) -> list[bytes]:
-    """
-    Finds and decompresses any flate bytes strings within the 
-    content streams of the fdf file data. Returns the binary
-    file data in 'bin_data' decompressed.
-    """
-
 
 
 def _read_fdf_file(file_path: pathlib.Path) -> list[str]:

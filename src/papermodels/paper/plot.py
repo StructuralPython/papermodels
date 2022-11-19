@@ -14,7 +14,10 @@ def plot_annotations(
     annots: list[Annotation], size: Optional[float], dpi: Optional[float]
 ) -> None:
     """
-    Plots annotations with matplotlib
+    Plots that annotations, 'annots' in matplotlib. Size and dpi can be adjusted
+    to make the plot bigger/smaller. Size is in inches and dpi stands for
+    "dots per inch". For a biggish plot, values of size=12, dpi=200 gives 
+    good results.
     """
     fig, ax = plt.subplots()
     for idx, annot in enumerate(annots):
