@@ -1,4 +1,5 @@
 from __future__ import annotations
+from copy import deepcopy
 from shapely.wkt import loads as wkt_loads
 from shapely.geometry import GeometryCollection
 from papermodels.datatypes.annotation import Annotation
@@ -77,7 +78,8 @@ def scale_annotations(
     """
     scaled_annotations = []
     for annot in annots:
-        scaled_annotations.append(scale_annotation(annot, scale, paper_origin))
+        new_annot = deepcopy(annot)
+        scaled_annotations.append(scale_annotation(new_annot, scale, paper_origin))
     return scaled_annotations
 
 
@@ -94,9 +96,9 @@ def scale_annotation(
     if paper_origin is not None:
         offset_x = paper_origin[0]
         offset_y = paper_origin[1]
-        vertices = _translate_vertices(vertices, offset_x, offset_y)
+        new_vertices = _translate_vertices(vertices, offset_x, offset_y)
 
-    scaled_vertices = [vertex * scale for vertex in vertices]
+    scaled_vertices = [vertex * scale for vertex in new_vertices]
     annot.vertices = scaled_vertices
     return annot
 
