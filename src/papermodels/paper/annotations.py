@@ -96,9 +96,9 @@ def scale_annotation(
     if paper_origin is not None:
         offset_x = paper_origin[0]
         offset_y = paper_origin[1]
-        new_vertices = _translate_vertices(vertices, offset_x, offset_y)
+        vertices = _translate_vertices(vertices, offset_x, offset_y)
 
-    scaled_vertices = [vertex * scale for vertex in new_vertices]
+    scaled_vertices = [vertex * scale for vertex in vertices]
     annot.vertices = scaled_vertices
     return annot
 
