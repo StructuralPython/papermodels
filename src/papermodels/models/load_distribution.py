@@ -73,6 +73,8 @@ class Singularity:
         m = self.m
         return round((x > x0) * (y0 + m * (x - x0)) * (x <= x1), self.precision)
 
+    
+
 
 def get_projected_polygons(p: Polygon) -> list[Polygon]:
     """
@@ -180,12 +182,11 @@ def get_y_vals(ovlp: Overlap) -> tuple[float, float]:
     return ya0, ya1, yb0, yb1
 
 
-def get_overlap_regions(poly: Polygon, display_progress: bool = False) -> list[Overlap]:
+def get_overlap_regions(p: Polygon, display_progress: bool = False) -> list[Overlap]:
     """
     Returns a list of overlapping regions described by the vertices in the polygon, 'p'.
     An overlapping region is an enclosed region in the polygon bounded by an upper y and a lower y.
     """
-    p = poly.convex_hull
     vertices = [vertex for vertex in p.exterior.coords]
     edge_indexes = [[k, k + 1] for k in range(len(vertices) - 1)]
     edge_combinations = itertools.combinations(edge_indexes, 2)
@@ -196,14 +197,9 @@ def get_overlap_regions(poly: Polygon, display_progress: bool = False) -> list[O
         pb0_idx, pb1_idx = edge_b
         pa0, pa1 = vertices[pa0_idx], vertices[pa1_idx]
         pb0, pb1 = vertices[pb0_idx], vertices[pb1_idx]
-        if is_convex:
-            overlapping_region = get_overlap_region(
-                pa0, pa1, pb0, pb1, p, convex=True, show_overlap=display_progress
-            )
-        else:
-            overlapping_region = get_overlap_region(
-                pa0, pa1, pb0, pb1, p, convex=False, show_overlap=display_progress
-            )
+        overlapping_region = get_overlap_region(
+            pa0, pa1, pb0, pb1, p, convex=True, show_overlap=display_progress
+        )
         if overlapping_region is None:
             continue
         overlapping_regions.append(overlapping_region)
@@ -229,11 +225,8 @@ def get_overlap_region(
     xb1, _ = pb1
     xa0, xa1 = list(sorted([xa0, xa1]))
     xb0, xb1 = list(sorted([xb0, xb1]))
-    xc0, xc1 = None, None
 
-    if not convex:
-        void_regions = get_void_regions(p)
-    overlapping_coords = get_overlap_coords(xa0, xa1, xb0, xb1, void_regions)
+    overlapping_coords = get_overlap_coords(xa0, xa1, xb0, xb1)
     if overlapping_coords is None:
         return None
     a_slope, a_intercept = get_slope_and_intercept(pa0, pa1)
@@ -241,13 +234,6 @@ def get_overlap_region(
     x0 = min(overlapping_coords)
     x1 = max(overlapping_coords)
     overlap = Overlap(x0, x1, a_slope, a_intercept, b_slope, b_intercept)
-    if convex == False:
-        ya0, ya1, yb0, yb1 = get_y_vals(overlap)
-        overlap_test_poly = Polygon([[x0, ya0], [x0, yb0], [x1, yb1], [x1, ya1]])
-        if show_overlap:
-            display(GeometryCollection([overlap_test_poly, p]))
-        # if not check_poly_contains(overlap_test_poly, p):
-        #     return None
     return overlap
 
 
@@ -274,35 +260,29 @@ def get_overlap_coords(
     # (The fifth state is when the coordinates of xa and xb
     # are the same which will be captured by condition 3 and 4 but by
     # condition 3 first)
-    # print(f"a: {xa0}, {xa1}")
-    # print(f"b: {xb0}, {xb1}")
+    print(f"a: {xa0}, {xa1}")
+    print(f"b: {xb0}, {xb1}")
     overlap_coords = None
     if xa0 == xa1 or xb0 == xb1: # ignore vertical lines
         return overlap_coords
     # 1. Overlapping region with b "ahead" of a
-    elif xb0 < xa1 < xb1 and xa0 < xb0:
-        overlap_coords = (xa1, xb1)
+    if xb0 < xa1 < xb1 and xa0 < xb0:
+        overlap_coords = (xb0, xa1)
+        print("Cond 1")
     # 2. Overlapping region with a "ahead" of b
     elif xb0 < xa0 < xb1 and xa1 > xb1:
         overlap_coords = (xa0, xb1)
+        print("Cond 2")
     # 3. Overlapping region with a "inside" b
     elif xa0 >= xb0 and xa1 <= xb1:
         overlap_coords = (xa0, xa1)
+        print("Cond 3")
     # 4. Overlapping region with b "inside" a
     elif xb0 >= xa0 and xb1 <= xa1:
         overlap_coords = (xb0, xb1)
+        print("Cond 4")
 
-    # # # # Check for void space boundaries
-    # if overlap_coords is not None and void_regions is not None:
-    #     for void_region in void_regions:
-    #         xc0, xc1 = get_void_extents(void_region)
-    #         xa, xb = overlap_coords
-    #         if xc0 <= xa and xb <= xc1:
-    #             pass
-    #         elif xa <= xc1 < xb:
-    #             overlap_coords = (xc1, xb)
-    #         elif xc0 <= xb:
-    #             overlap_coords = (xa, xc0)
+    print(overlap_coords)
     return overlap_coords
 
 
