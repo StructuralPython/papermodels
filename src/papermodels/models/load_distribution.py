@@ -73,6 +73,10 @@ class Singularity:
         m = self.m
         return round((x > x0) * (y0 + m * (x - x0)) * (x <= x1), self.precision)
 
+
+    def __neg__(self):
+        return Singularity(self.x0, self.x1, -self.m, -self.y0, self.precision)
+
     
 
 
@@ -118,22 +122,31 @@ def singularities_to_polygon(los: list[Singularity]) -> Polygon:
     """
     sorted_sings = sorted(los, key=lambda x: x.x1)
     x_acc = []
+    eps = 1e-12
+    prev_x = 0
     for idx, sing in enumerate(sorted_sings):
+        print(f"{sing=}")
+        n = sing.precision
         if idx == 0:
-            x_acc.append(round(sing.x0, sing.precision))
-            continue
-        x_acc.append(round(sing.x0 + 10**-sing.precision, sing.precision))
-        x_acc.append(round(sing.x1, sing.precision))
+            x_acc.append(0.)
+        if prev_x != sing.x0:
+            x_acc.append(prev_x + eps)
+        x_acc.append(sing.x0)
+        x_acc.append(sing.x0 + eps)
+        if idx == len(sorted_sings) - 1:
+            x_acc.append(sing.x1 - eps)
+        x_acc.append(sing.x1)
+        prev_x = sing.x1
 
-    # else:
-    x_acc.append(round(sing.x1, sing.precision))
+    x_acc.append(sing.x1)
     x_acc = sorted(list(set(x_acc)))
-    y_vals = [sum([sing(x) for sing in los]) for x in x_acc]
+    print(f"{x_acc=}")
+    y_acc = [sum([sing(x) for sing in sorted_sings]) for x in x_acc[:-1]]
+    y_acc += [0.]
+    xy_acc = zip(x_acc, y_acc)
+    print(xy_acc)
+    return Polygon(xy_acc)
 
-    xy_vals = list(zip(x_acc, y_vals))
-    xy_vals = xy_vals + [(x_acc[-1], 0)]
-    poly = Polygon(xy_vals)
-    return poly
 
 
 def apply_total_load(sing: Singularity, total_load: float) -> Singularity:
@@ -182,10 +195,37 @@ def get_y_vals(ovlp: Overlap) -> tuple[float, float]:
     return ya0, ya1, yb0, yb1
 
 
-def get_overlap_regions(p: Polygon, display_progress: bool = False) -> list[Overlap]:
+def get_singularity_functions(p: Polygon, display_progress: bool = False) -> tuple[list[Singularity]]:
     """
-    Returns a list of overlapping regions described by the vertices in the polygon, 'p'.
-    An overlapping region is an enclosed region in the polygon bounded by an upper y and a lower y.
+    Returns a 2-tuple, each element a list of Singularity. The first element is the overlapping regions
+    of the convex hull of the polygon. The second element is the overlapping regions of the void spaces
+    within the convex hull.
+    """
+    if p == p.convex_hull:
+        return (get_overlap_regions(p), [])
+    elif p.is_empty:
+        return ([], [])
+    else:
+        void_regions = get_void_regions(p)
+        convex_overlaps = get_overlap_regions(p.convex_hull)
+        void_overlaps = []
+        for void_region in void_regions:
+            if void_region == void_region.convex_hull:
+                void_overlaps += [-void_overlap for void_overlap in get_overlap_regions(void_region)]
+                print("convex_void")
+            else:
+                convex_voids, negative_voids = get_singularity_functions(void_region)
+                print("Hull void + voids")
+                void_overlaps += [-void_overlap for void_overlap in convex_voids]
+                void_overlaps += [-void_overlap for void_overlap in negative_voids]
+    return (convex_overlaps, void_overlaps)
+
+
+
+def get_overlap_regions(p: Polygon, display_progress: bool = False) -> list[Singularity]:
+    """
+    Returns a list of overlapping regions described by the vertices in the CONVEX polygon.
+    The overlapping regions are described as a list of Singularity functions.
     """
     vertices = [vertex for vertex in p.exterior.coords]
     edge_indexes = [[k, k + 1] for k in range(len(vertices) - 1)]
@@ -202,7 +242,8 @@ def get_overlap_regions(p: Polygon, display_progress: bool = False) -> list[Over
         )
         if overlapping_region is None:
             continue
-        overlapping_regions.append(overlapping_region)
+        singularity_function = overlap_region_to_singularity(overlapping_region)
+        overlapping_regions.append(singularity_function)
     return overlapping_regions
 
 
@@ -268,21 +309,17 @@ def get_overlap_coords(
     # 1. Overlapping region with b "ahead" of a
     if xb0 < xa1 < xb1 and xa0 < xb0:
         overlap_coords = (xb0, xa1)
-        print("Cond 1")
     # 2. Overlapping region with a "ahead" of b
     elif xb0 < xa0 < xb1 and xa1 > xb1:
         overlap_coords = (xa0, xb1)
-        print("Cond 2")
     # 3. Overlapping region with a "inside" b
     elif xa0 >= xb0 and xa1 <= xb1:
         overlap_coords = (xa0, xa1)
-        print("Cond 3")
     # 4. Overlapping region with b "inside" a
     elif xb0 >= xa0 and xb1 <= xa1:
         overlap_coords = (xb0, xb1)
-        print("Cond 4")
+    print("overlap: ", overlap_coords)
 
-    print(overlap_coords)
     return overlap_coords
 
 
@@ -311,7 +348,7 @@ def check_convex_polygon(p: Polygon) -> bool:
     return False
 
 
-def get_void_regions(p: Polygon) -> list:
+def get_void_regions(p: Polygon) -> list[Polygon]:
     """
     Returns the void regions as a list of Polygon, if any
     void regions exist within 'p'. If no void region is found,
@@ -328,7 +365,6 @@ def get_void_regions(p: Polygon) -> list:
         return list(void_regions.geoms)
     else:
         return []
-
 
 
 def get_void_extents(void_region: Polygon) -> bool:
