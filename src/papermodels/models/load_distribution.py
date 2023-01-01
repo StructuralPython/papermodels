@@ -77,22 +77,6 @@ class Singularity:
     def __neg__(self):
         return Singularity(self.x0, self.x1, -self.m, -self.y0, self.precision)
 
-    
-
-
-def get_projected_polygons(p: Polygon) -> list[Polygon]:
-    """
-    Returns the projected trapezoids corresponding to the polygon,
-    'p'.
-    """
-    overlap_regions = get_overlap_regions(p)
-    sorted_regions = sorted(overlap_regions, key=lambda x: x.x0)
-    projected_polygons = []
-    for overlap_region in sorted_regions:
-        projected_polygon = overlap_region_to_polygon(overlap_region)
-        projected_polygons.append(projected_polygon)
-    return projected_polygons
-
 
 def overlap_region_to_polygon(ovlp: Overlap) -> Polygon:
     """
@@ -125,7 +109,6 @@ def singularities_to_polygon(los: list[Singularity]) -> Polygon:
     eps = 1e-12
     prev_x = 0
     for idx, sing in enumerate(sorted_sings):
-        print(f"{sing=}")
         n = sing.precision
         if idx == 0:
             x_acc.append(0.)
@@ -140,13 +123,13 @@ def singularities_to_polygon(los: list[Singularity]) -> Polygon:
 
     x_acc.append(sing.x1)
     x_acc = sorted(list(set(x_acc)))
-    print(f"{x_acc=}")
     y_acc = [sum([sing(x) for sing in sorted_sings]) for x in x_acc[:-1]]
     y_acc += [0.]
-    xy_acc = zip(x_acc, y_acc)
-    print(xy_acc)
+    xy_acc = zip(
+        [round(x, n) for x in x_acc], 
+        [round(y, n) for y in y_acc]
+        )
     return Polygon(xy_acc)
-
 
 
 def apply_total_load(sing: Singularity, total_load: float) -> Singularity:
@@ -212,10 +195,8 @@ def get_singularity_functions(p: Polygon, display_progress: bool = False) -> tup
         for void_region in void_regions:
             if void_region == void_region.convex_hull:
                 void_overlaps += [-void_overlap for void_overlap in get_overlap_regions(void_region)]
-                print("convex_void")
             else:
                 convex_voids, negative_voids = get_singularity_functions(void_region)
-                print("Hull void + voids")
                 void_overlaps += [-void_overlap for void_overlap in convex_voids]
                 void_overlaps += [-void_overlap for void_overlap in negative_voids]
     return (convex_overlaps, void_overlaps)
@@ -231,14 +212,13 @@ def get_overlap_regions(p: Polygon, display_progress: bool = False) -> list[Sing
     edge_indexes = [[k, k + 1] for k in range(len(vertices) - 1)]
     edge_combinations = itertools.combinations(edge_indexes, 2)
     overlapping_regions = []
-    is_convex = check_convex_polygon(p)
     for edge_a, edge_b in edge_combinations:
         pa0_idx, pa1_idx = edge_a
         pb0_idx, pb1_idx = edge_b
         pa0, pa1 = vertices[pa0_idx], vertices[pa1_idx]
         pb0, pb1 = vertices[pb0_idx], vertices[pb1_idx]
         overlapping_region = get_overlap_region(
-            pa0, pa1, pb0, pb1, p, convex=True, show_overlap=display_progress
+            pa0, pa1, pb0, pb1
         )
         if overlapping_region is None:
             continue
@@ -252,9 +232,6 @@ def get_overlap_region(
     pa1: tuple[float, float],
     pb0: tuple[float, float],
     pb1: tuple[float, float],
-    p: Polygon,
-    convex: bool,
-    show_overlap: bool = True,
 ) -> Optional[Overlap]:
     """
     Returns an Overlap object representing the overlapping portion of the line
@@ -283,17 +260,11 @@ def get_overlap_coords(
     xa1: float,
     xb0: float,
     xb1: float,
-    void_regions: Optional[list[Polygon]] = None,
-    # # xc0: Optional[float],
-    # # xc1: Optional[float],
 ) -> Optional[tuple[float, float]]:
     """
     Returns a tuple representing the starting and ending x-coordinates of the region of overlap
     between two line segments, a and b, defined solely by each line segment's start and end
     x-coordinates, x0 and x1.
-
-    # xc0 and xc1 represent the extents of void space that may incur into the overlap region.
-    # If xc0 and xc1 are provided, then the returned extents are further bounded by their location.
 
     If no overlap exists, None is returned.
     """
@@ -301,8 +272,6 @@ def get_overlap_coords(
     # (The fifth state is when the coordinates of xa and xb
     # are the same which will be captured by condition 3 and 4 but by
     # condition 3 first)
-    print(f"a: {xa0}, {xa1}")
-    print(f"b: {xb0}, {xb1}")
     overlap_coords = None
     if xa0 == xa1 or xb0 == xb1: # ignore vertical lines
         return overlap_coords
@@ -318,7 +287,6 @@ def get_overlap_coords(
     # 4. Overlapping region with b "inside" a
     elif xb0 >= xa0 and xb1 <= xa1:
         overlap_coords = (xb0, xb1)
-    print("overlap: ", overlap_coords)
 
     return overlap_coords
 
@@ -327,6 +295,8 @@ def get_slope_and_intercept(p0: tuple[float], p1: tuple[float]) -> tuple[float, 
     """
     Returns a tuple representing the slope and y-intercept of the line enclosing the
     line segment represented by the points 'p0' and 'p1'.
+
+    p0 and p1 cannot describe a vertical line.
     """
     if not len(p0) == len(p1) == 2:
         return ValueError("Both p0 and p1 must be tuples of len == 2")
@@ -335,17 +305,6 @@ def get_slope_and_intercept(p0: tuple[float], p1: tuple[float]) -> tuple[float, 
     slope = (y1 - y0) / (x1 - x0)
     y_intercept = y1 - slope * x1
     return slope, y_intercept
-
-
-def check_convex_polygon(p: Polygon) -> bool:
-    """
-    Returns True if the polygon is convex.
-    Returns False if the polygon is non-convex.
-    """
-    convex_hull = p.convex_hull
-    if not isinstance(convex_hull - p, (Polygon, MultiPolygon)):
-        return True
-    return False
 
 
 def get_void_regions(p: Polygon) -> list[Polygon]:
@@ -359,34 +318,9 @@ def get_void_regions(p: Polygon) -> list[Polygon]:
     """
     convex_hull = p.convex_hull
     void_regions = convex_hull - p
-    if isinstance(void_regions, Polygon):
+    if isinstance(void_regions, Polygon) and not void_regions.is_empty:
         return [void_regions]
     elif isinstance(void_regions, MultiPolygon):
         return list(void_regions.geoms)
     else:
         return []
-
-
-def get_void_extents(void_region: Polygon) -> bool:
-    """
-    Returns the region of any void space that exists in the concave Polygon, 'p'.
-    """
-    minx, miny, maxx, maxy = void_region.bounds
-    return minx, maxx
-
-
-def check_poly_contains(test_p: Polygon, p: Polygon) -> bool:
-    """
-    Returns True if the Polygon 'test_p' is wholly contained within 'p'.
-    """
-    test = False
-    test_geom = (p | test_p) - p
-    if test_geom.is_empty:
-        test = True
-    elif not isinstance(test_geom, Polygon) and not isinstance(
-        test_geom, (GeometryCollection, MultiPolygon)
-    ):
-        test = True
-    elif test_geom.area < 1e-6:
-        test = True
-    return test
