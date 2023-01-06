@@ -78,7 +78,7 @@ class Singularity:
         return Singularity(self.x0, self.x1, -self.m, -self.y0, self.precision)
 
 
-def project_polygons(original: Polygon, total_load: Optional[float] = None, xy: bool = False) -> Polygon | tuple[list[float], list[float]]:
+def project_polygon(original: Polygon, total_load: Optional[float] = None, xy: bool = False) -> Polygon | tuple[list[float], list[float]]:
     """
     Returns the 'original' polygon, projected onto a horizontal line so that it maintains
     the same area as 'original'.
@@ -97,7 +97,7 @@ def project_polygons(original: Polygon, total_load: Optional[float] = None, xy: 
 
     if xy:
         x, y = singularities_to_polygon(sings, xy=xy)
-        if len(y) == len(x) + 1:
+        if len(y) == len(x) + 1: # HACK to return consistent xy trapezoid coords
             return x[1:-2], y[1:-1]
         return x[1:-1], y[1:-1]
     result = singularities_to_polygon(sings, xy=xy)
