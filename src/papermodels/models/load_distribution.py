@@ -127,8 +127,8 @@ def singularities_to_polygon(los: list[Singularity], xy: bool = False) -> Polygo
     for idx, sing in enumerate(sorted_sings):
         n = sing.precision
         eps = 10**(-2*n)
-        if idx == 0:
-            x_acc.append(0.)
+        # if idx == 0:
+        #     x_acc.append(0.)
         if prev_x != sing.x0:
             x_acc.append(prev_x + eps)
         x_acc.append(sing.x0)
@@ -138,10 +138,13 @@ def singularities_to_polygon(los: list[Singularity], xy: bool = False) -> Polygo
         x_acc.append(sing.x1)
         prev_x = sing.x1
 
+    x_acc.append(sing.x1)
     x_acc = sorted(list(set(x_acc)))
     y_acc = [sum([sing(x) for sing in sorted_sings]) for x in x_acc[:-1]]
-    if len(y_acc) % 2 == 1:
-        y_acc += [0.]
+    # if len(y_acc) % 2 == 1:
+    print(y_acc[-1])
+    y_acc += [0.]
+    print(y_acc[-1])
     if xy:
         return x_acc, y_acc
     else: 

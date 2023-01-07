@@ -30,19 +30,23 @@ def _read_fdf_file(file_path: pathlib.Path) -> list[str]:
 
     decoded_bits = []
     for s in re.findall(stream, fdf):
+        fdf = fdf.replace(s, b"#custom-marker#")
         s = s.strip(b"\r\n")
         decoded_bits.append(zlib.decompress(s).decode('utf-8'))
 
+    for decoded_bit in decoded_bits:
+        decoded_bit = " ".join(decoded_bit.split("\n"))
+        fdf = fdf.replace(b"#custom-marker#", bytes(f"\n{decoded_bit}\n", 'utf-8'), 1)
+
     file_data = []
-    error_counter = 0
     for line_no, line in enumerate(fdf.split(b"\n")):
         try:
+            # print(line)
             decoded = line.decode('utf-8')
             file_data.append(decoded)
         except UnicodeDecodeError:
-            if line_no != 1:
-                file_data.append(decoded_bits[error_counter])
-                error_counter += 1
+            print(f"UnicodeDecodeError on line: {line_no}")
+
 
     return file_data
 
@@ -50,6 +54,11 @@ def _read_fdf_file(file_path: pathlib.Path) -> list[str]:
 def _get_annotations_from_fdf(fdf_str: str) -> list[Annotation]:
     """
     Separates FDF data by objects
+    #TODO This currently only works with FDF files formatted by Bluebeam Revu.
+    # FDF Files created by programs with nicer formatting, like Qoppa PDF Studio,
+    # use different line break locations which nicely breaks this whole function.
+    # Will have to invest resources into reading PDF data directly via pikepdf
+    # or something.
     """
     annotations = []
     in_stream_data = False
@@ -75,6 +84,7 @@ def _get_annotations_from_fdf(fdf_str: str) -> list[Annotation]:
     #  the general approach taken.
 
     for line in fdf_str:
+        print(line)
         if "endstream" in line and stream_data:
             stream_properties = _extract_stream_properties(stream_data)
             stream_data = None
@@ -85,11 +95,14 @@ def _get_annotations_from_fdf(fdf_str: str) -> list[Annotation]:
         elif not parse.search("{} 0 obj<<", line) and "stream" not in line:
             continue
         elif "stream" in line:
+            print("stream")
             in_stream_data = True
             continue
         type_and_vertices = _extract_type_and_vertices(line)
+        print(type_and_vertices)
         object_properties = _extract_object_properties(line)
         if annot_type and vertices and stream_properties:
+            print("Here")
             annotation_properties.update(stream_properties)
             annotation = Annotation(
                 object_type=annot_type,
