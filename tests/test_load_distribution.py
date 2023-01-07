@@ -116,8 +116,8 @@ def test_get_range():
     assert ld.get_range(ld.Overlap(-10., -2., -1., -11., 1., 11.)) == (2., 18.)
 
 
-def test_apply_total_load():
-    assert ld.apply_total_load(ld.Singularity(x0=4.0, x1=8.0, m=2.0, y0=1, precision=6), 10) == ld.Singularity(x0=4.0, x1=8.0, m=1.0, y0=0.5, precision=6)
+def test_scale_singularity():
+    assert ld.scale_singularity(ld.Singularity(x0=4.0, x1=8.0, m=2.0, y0=1, precision=6), 0.5) == ld.Singularity(x0=4.0, x1=8.0, m=1.0, y0=0.5, precision=6)
 
 
 def test_singularities_to_polygon():

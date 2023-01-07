@@ -123,13 +123,11 @@ def singularities_to_polygon(los: list[Singularity], xy: bool = False) -> Polygo
     """
     sorted_sings = sorted(los, key=lambda x: x.x1)
     x_acc = []
-    prev_x = 0
+    prev_x = None
     for idx, sing in enumerate(sorted_sings):
         n = sing.precision
         eps = 10**(-2*n)
-        # if idx == 0:
-        #     x_acc.append(0.)
-        if prev_x != sing.x0:
+        if prev_x != sing.x0 and prev_x is not None:
             x_acc.append(prev_x + eps)
         x_acc.append(sing.x0)
         x_acc.append(sing.x0 + eps)
