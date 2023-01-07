@@ -78,7 +78,7 @@ class Singularity:
         return Singularity(self.x0, self.x1, -self.m, -self.y0, self.precision)
 
 
-def project_polygon(original: Polygon, total_load: Optional[float] = None, xy: bool = False) -> Polygon | tuple[list[float], list[float]]:
+def project_polygon(original: Polygon, total_load: Optional[float] = None, xy: bool = False, display_progress: bool = False) -> Polygon | tuple[list[float], list[float]]:
     """
     Returns the 'original' polygon, projected onto a horizontal line so that it maintains
     the same area as 'original'.
@@ -89,7 +89,7 @@ def project_polygon(original: Polygon, total_load: Optional[float] = None, xy: b
     If 'xy' is True, then instead of a Polygon object being returned, a list of 
     x-coordinates and a list of y-coordinates is returned.
     """
-    convex, voids = get_singularity_functions(original)
+    convex, voids = get_singularity_functions(original, display_progress)
     sings = convex + voids
     if total_load is not None:
         scale_ratio = calculate_scale_ratio(convex + voids, total_load)
@@ -126,6 +126,7 @@ def singularities_to_polygon(los: list[Singularity], xy: bool = False) -> Polygo
     sorted_sings = sorted(los, key=lambda x: x.x1)
     x_acc = []
     prev_x = None
+    n = None
     for idx, sing in enumerate(sorted_sings):
         n = sing.precision
         eps = 10**(-2*n)
@@ -137,18 +138,20 @@ def singularities_to_polygon(los: list[Singularity], xy: bool = False) -> Polygo
             x_acc.append(sing.x1 - eps)
         x_acc.append(sing.x1)
         prev_x = sing.x1
+        if idx == len(sorted_sings) - 1: # Last iteration of actual iterations
+            x_acc.append(sing.x1)
 
-    x_acc.append(sing.x1)
     x_acc = sorted(list(set(x_acc)))
     y_acc = [sum([sing(x) for sing in sorted_sings]) for x in x_acc[:-1]]
     # if len(y_acc) % 2 == 1:
     y_acc += [0.]
     if xy:
         return x_acc, y_acc
-    else: 
+    else:
+        precision = n if n else 2
         xy_acc = zip(
-            [round(x, n) for x in x_acc], 
-            [round(y, n) for y in y_acc]
+            [round(x, precision) for x in x_acc], 
+            [round(y, precision) for y in y_acc]
             )
         
         return Polygon(xy_acc)
@@ -215,7 +218,7 @@ def get_singularity_functions(p: Polygon, display_progress: bool = False) -> tup
                     display(void_region)
                 void_overlaps += [-void_overlap for void_overlap in get_overlap_regions(void_region)]
             else:
-                convex_voids, negative_voids = get_singularity_functions(void_region)
+                convex_voids, negative_voids = get_singularity_functions(void_region, display_progress)
                 if display_progress:
                     display("Non-convex voids found:")
                     display(void_region)
