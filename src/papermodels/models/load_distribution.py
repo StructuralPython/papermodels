@@ -97,9 +97,11 @@ def project_polygon(original: Polygon, total_load: Optional[float] = None, xy: b
 
     if xy:
         x, y = singularities_to_polygon(sings, xy=xy)
-        if len(y) == len(x) + 1: # HACK to return consistent xy trapezoid coords
-            return x[1:-2], y[1:-1]
-        return x[1:-1], y[1:-1]
+        # if len(y) == len(x) + 1: # HACK to return consistent xy trapezoid coords
+        #     return x[1:-2], y[1:-1]
+        # elif len(x) == len(y) + 1:
+        #     return x[1:-1], y[1:-2]
+        return x, y
     result = singularities_to_polygon(sings, xy=xy)
     return result
 
