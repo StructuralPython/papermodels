@@ -142,9 +142,7 @@ def singularities_to_polygon(los: list[Singularity], xy: bool = False) -> Polygo
     x_acc = sorted(list(set(x_acc)))
     y_acc = [sum([sing(x) for sing in sorted_sings]) for x in x_acc[:-1]]
     # if len(y_acc) % 2 == 1:
-    print(y_acc[-1])
     y_acc += [0.]
-    print(y_acc[-1])
     if xy:
         return x_acc, y_acc
     else: 
