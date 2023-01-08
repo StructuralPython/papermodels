@@ -3,16 +3,9 @@ from typing import Optional
 from dataclasses import dataclass
 from shapely.geometry import (
     Polygon,
-    LineString,
-    Point,
     MultiPolygon,
-    GeometryCollection,
 )
 import itertools
-import more_itertools
-
-## Testing
-from IPython.display import display
 
 
 @dataclass
