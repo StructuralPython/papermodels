@@ -3,36 +3,54 @@ from sqlalchemy import Column, Integer, String, Float
 from sqlalchemy_utils import ColorType
 from sqlalchemy_utils import ScalarListType
 
+from dataclasses import dataclass
+from decimal import Decimal
+from typing import Any
 from papermodels.datatypes.utils import class_representation
 
-Base = declarative_base()
+
+# Base = declarative_base()
 
 
-class Annotation(Base):
-    """
-    A data type to represent a PDF annotation exported through an FDF file.
-    """
+# class Annotation(Base):
+#     """
+#     A data type to represent a PDF annotation exported through an FDF file.
+#     """
 
-    __tablename__ = "annotations"
+#     __tablename__ = "annotations"
 
-    annot_id = Column(Integer, primary_key=True)
-    object_type = Column(
-        String
-    )  # One of "Line", "Circle", "Rectangle", "Square", "PolyLine", "Polygon"
-    page = Column(String)  # "0" or integer as a string
-    text = Column(String)  # Optional[str]
-    vertices = Column(ScalarListType)  # [x1, y1, x2, y2, x3, y3, ..., xn, yn]; auto-closed depending on object_type
-    matrix = Column(ScalarListType)  # [1., 0., 0., 1., 0., 0.]
-    line_color = Column(ColorType)  # (r, g, b)
-    line_weight = Column(Float)  # 0 <= x
-    line_type = Column(ScalarListType)
-    line_opacity = Column(Float)  # 0 <= x <= 1
-    fill_color = Column(ColorType)  # (r, g, b)
-    fill_opacity = Column(Float)  # 0 <= x <= 1
+#     annot_id = Column(Integer, primary_key=True)
+#     object_type = Column(
+#         String
+#     )  # One of "Line", "Circle", "Rectangle", "Square", "PolyLine", "Polygon"
+#     page = Column(String)  # "0" or integer as a string
+#     text = Column(String)  # Optional[str]
+#     vertices = Column(ScalarListType)  # [x1, y1, x2, y2, x3, y3, ..., xn, yn]; auto-closed depending on object_type
+#     matrix = Column(ScalarListType)  # [1., 0., 0., 1., 0., 0.]
+#     line_color = Column(ColorType)  # (r, g, b)
+#     line_weight = Column(Float)  # 0 <= x
+#     line_type = Column(ScalarListType)
+#     line_opacity = Column(Float)  # 0 <= x <= 1
+#     fill_color = Column(ColorType)  # (r, g, b)
+#     fill_opacity = Column(Float)  # 0 <= x <= 1
 
-    def __repr__(self):
-        return class_representation(self)
-
+#     def __repr__(self):
+#         return class_representation(self)
+@dataclass
+class Annotation:
+    page: int
+    object_type: str
+    text: str
+    vertices: list[Decimal]
+    matrix: list[Decimal]
+    line_color: tuple[Decimal]
+    fill_color: tuple[Decimal]
+    line_type: Any
+    line_weight: Decimal
+    line_opacity: Decimal
+    fill_opacity: Decimal
+    matrix: list[Decimal]
+    
 
 A0 = Annotation(
     object_type="Rectangle",

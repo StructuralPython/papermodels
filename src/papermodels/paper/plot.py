@@ -62,7 +62,7 @@ def xy_vertices(vertices: str, close=False) -> list[list[float]]:
     """
     x = []
     y = []
-    for idx, ordinate in enumerate(vertices.split()):
+    for idx, ordinate in enumerate(vertices):
         if idx % 2:
             y.append(float(ordinate))
         else:

@@ -4,22 +4,24 @@ build-backend = "flit_core.buildapi"
 
 [project]
 name = "papermodels"
-authors = [{name = "Connor Ferster", email = "connorferster@gmail.com"}]
+authors = [{name = "Connor Ferster", email = "connor@structuralpython.com"}]
 license = {file = "LICENSE"}
 classifiers = ["License :: OSI Approved :: Apache Software License"]
 dynamic = ["version", "description"]
 dependencies = [
-    "shapely >= 1.8.0",
+    "shapely >= 2.0.0",
     "matplotlib",
     "pandas >= 1.4.0",
-    "pdfrw",
+    "pikepdf",
     "sqlalchemy",
     "sqlalchemy-utils",
     "parse",
     "colour",
-    "pytest"
+    "pytest",
+    "networkx",
+    "numpy"
 ]
 
 
 [project.urls]
-Home = "https://github.com/connorferster/papermodels"
+Home = "https://github.com/structuralpython/papermodels"

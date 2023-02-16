@@ -136,7 +136,6 @@ def singularities_to_polygon(los: list[Singularity], xy: bool = False) -> Polygo
 
     x_acc = sorted(list(set(x_acc)))
     y_acc = [sum([sing(x) for sing in sorted_sings]) for x in x_acc[:-1]]
-    # if len(y_acc) % 2 == 1:
     y_acc += [0.]
     if xy:
         return x_acc, y_acc
@@ -187,7 +186,7 @@ def get_range(ovlp: Overlap) -> tuple[float, float]:
     return y0, y1
 
 
-def get_singularity_functions(p: Polygon, display_progress: bool = False) -> tuple[list[Singularity]]:
+def get_singularity_functions(p: Polygon, display_progress: bool = False) -> tuple[list[Singularity], list[Singularity]]:
     """
     Returns a 2-tuple, each element a list of Singularity. The first element is the overlapping regions
     of the convex hull of the polygon. The second element is the overlapping regions of the void spaces
