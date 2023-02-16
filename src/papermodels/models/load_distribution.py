@@ -66,12 +66,16 @@ class Singularity:
         m = self.m
         return round((x > x0) * (y0 + m * (x - x0)) * (x <= x1), self.precision)
 
-
     def __neg__(self):
         return Singularity(self.x0, self.x1, -self.m, -self.y0, self.precision)
 
 
-def project_polygon(original: Polygon, total_load: Optional[float] = None, xy: bool = False, display_progress: bool = False) -> Polygon | tuple[list[float], list[float]]:
+def project_polygon(
+    original: Polygon,
+    total_load: Optional[float] = None,
+    xy: bool = False,
+    display_progress: bool = False,
+) -> Polygon | tuple[list[float], list[float]]:
     """
     Returns the 'original' polygon, projected onto a horizontal line so that it maintains
     the same area as 'original'.
@@ -79,7 +83,7 @@ def project_polygon(original: Polygon, total_load: Optional[float] = None, xy: b
     If 'total_load' is given, the projected polygon is scaled so that it's total area
     is equal to the value of 'total_load'.
 
-    If 'xy' is True, then instead of a Polygon object being returned, a list of 
+    If 'xy' is True, then instead of a Polygon object being returned, a list of
     x-coordinates and a list of y-coordinates is returned.
     """
     convex, voids = get_singularity_functions(original, display_progress)
@@ -98,7 +102,7 @@ def project_polygon(original: Polygon, total_load: Optional[float] = None, xy: b
     result = singularities_to_polygon(sings, xy=xy)
     return result
 
-        
+
 def overlap_region_to_singularity(ovlp: Overlap, precision: int = 6) -> callable:
     """
     Returns a singularity function generated from 'ovlp'
@@ -122,7 +126,7 @@ def singularities_to_polygon(los: list[Singularity], xy: bool = False) -> Polygo
     n = None
     for idx, sing in enumerate(sorted_sings):
         n = sing.precision
-        eps = 10**(-2*n)
+        eps = 10 ** (-2 * n)
         if prev_x != sing.x0 and prev_x is not None:
             x_acc.append(prev_x + eps)
         x_acc.append(sing.x0)
@@ -131,21 +135,20 @@ def singularities_to_polygon(los: list[Singularity], xy: bool = False) -> Polygo
             x_acc.append(sing.x1 - eps)
         x_acc.append(sing.x1)
         prev_x = sing.x1
-        if idx == len(sorted_sings) - 1: # Last iteration of actual iterations
+        if idx == len(sorted_sings) - 1:  # Last iteration of actual iterations
             x_acc.append(sing.x1)
 
     x_acc = sorted(list(set(x_acc)))
     y_acc = [sum([sing(x) for sing in sorted_sings]) for x in x_acc[:-1]]
-    y_acc += [0.]
+    y_acc += [0.0]
     if xy:
         return x_acc, y_acc
     else:
         precision = n if n else 2
         xy_acc = zip(
-            [round(x, precision) for x in x_acc], 
-            [round(y, precision) for y in y_acc]
-            )
-        
+            [round(x, precision) for x in x_acc], [round(y, precision) for y in y_acc]
+        )
+
         return Polygon(xy_acc)
 
 
@@ -186,7 +189,9 @@ def get_range(ovlp: Overlap) -> tuple[float, float]:
     return y0, y1
 
 
-def get_singularity_functions(p: Polygon, display_progress: bool = False) -> tuple[list[Singularity], list[Singularity]]:
+def get_singularity_functions(
+    p: Polygon, display_progress: bool = False
+) -> tuple[list[Singularity], list[Singularity]]:
     """
     Returns a 2-tuple, each element a list of Singularity. The first element is the overlapping regions
     of the convex hull of the polygon. The second element is the overlapping regions of the void spaces
@@ -208,9 +213,13 @@ def get_singularity_functions(p: Polygon, display_progress: bool = False) -> tup
                 if display_progress:
                     display("Convex voids found:")
                     display(void_region)
-                void_overlaps += [-void_overlap for void_overlap in get_overlap_regions(void_region)]
+                void_overlaps += [
+                    -void_overlap for void_overlap in get_overlap_regions(void_region)
+                ]
             else:
-                convex_voids, negative_voids = get_singularity_functions(void_region, display_progress)
+                convex_voids, negative_voids = get_singularity_functions(
+                    void_region, display_progress
+                )
                 if display_progress:
                     display("Non-convex voids found:")
                     display(void_region)
@@ -223,8 +232,9 @@ def get_singularity_functions(p: Polygon, display_progress: bool = False) -> tup
     return (convex_overlaps, void_overlaps)
 
 
-
-def get_overlap_regions(p: Polygon, display_progress: bool = False) -> list[Singularity]:
+def get_overlap_regions(
+    p: Polygon, display_progress: bool = False
+) -> list[Singularity]:
     """
     Returns a list of overlapping regions described by the vertices in the CONVEX polygon.
     The overlapping regions are described as a list of Singularity functions.
@@ -238,9 +248,7 @@ def get_overlap_regions(p: Polygon, display_progress: bool = False) -> list[Sing
         pb0_idx, pb1_idx = edge_b
         pa0, pa1 = vertices[pa0_idx], vertices[pa1_idx]
         pb0, pb1 = vertices[pb0_idx], vertices[pb1_idx]
-        overlapping_region = get_overlap_region(
-            pa0, pa1, pb0, pb1
-        )
+        overlapping_region = get_overlap_region(pa0, pa1, pb0, pb1)
         if overlapping_region is None:
             continue
         singularity_function = overlap_region_to_singularity(overlapping_region)
@@ -294,7 +302,7 @@ def get_overlap_coords(
     # are the same which will be captured by condition 3 and 4 but by
     # condition 3 first)
     overlap_coords = None
-    if xa0 == xa1 or xb0 == xb1: # ignore vertical lines
+    if xa0 == xa1 or xb0 == xb1:  # ignore vertical lines
         return overlap_coords
     # 1. Overlapping region with b "ahead" of a
     if xb0 < xa1 < xb1 and xa0 < xb0:

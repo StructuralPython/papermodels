@@ -50,7 +50,7 @@ class Annotation:
     line_opacity: Decimal
     fill_opacity: Decimal
     matrix: list[Decimal]
-    
+
 
 A0 = Annotation(
     object_type="Rectangle",

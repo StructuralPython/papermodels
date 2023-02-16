@@ -23,30 +23,29 @@ def _read_fdf_file(file_path: pathlib.Path) -> list[str]:
     """
     Reads the FDF file and returns a list of strings.
     """
-    with open(file_path, 'rb') as file:
+    with open(file_path, "rb") as file:
         fdf = file.read()
 
-    stream = re.compile(b'.*?FlateDecode.*?stream(.*?)endstream', re.S)
+    stream = re.compile(b".*?FlateDecode.*?stream(.*?)endstream", re.S)
 
     decoded_bits = []
     for s in re.findall(stream, fdf):
         fdf = fdf.replace(s, b"#custom-marker#")
         s = s.strip(b"\r\n")
-        decoded_bits.append(zlib.decompress(s).decode('utf-8'))
+        decoded_bits.append(zlib.decompress(s).decode("utf-8"))
 
     for decoded_bit in decoded_bits:
         decoded_bit = " ".join(decoded_bit.split("\n"))
-        fdf = fdf.replace(b"#custom-marker#", bytes(f"\n{decoded_bit}\n", 'utf-8'), 1)
+        fdf = fdf.replace(b"#custom-marker#", bytes(f"\n{decoded_bit}\n", "utf-8"), 1)
 
     file_data = []
     for line_no, line in enumerate(fdf.split(b"\n")):
         try:
             # print(line)
-            decoded = line.decode('utf-8')
+            decoded = line.decode("utf-8")
             file_data.append(decoded)
         except UnicodeDecodeError:
             print(f"UnicodeDecodeError on line: {line_no}")
-
 
     return file_data
 
@@ -156,7 +155,16 @@ def _extract_type_and_vertices(line: str) -> Optional[tuple[str, str]]:
             x1, y1, x2, y2 = float(x1), float(y1), float(x2), float(y2)
             b1, b2, b3, b4 = buffers.split()
             b1, b2, b3, b4 = float(b1), float(b2), float(b3), float(b4)
-            vertices = [x1, y1, x1, y2 - b4 - b2, x2 - b3 - b1, y2 - b4 - b2, x2 - b3 - b1, y1]
+            vertices = [
+                x1,
+                y1,
+                x1,
+                y2 - b4 - b2,
+                x2 - b3 - b1,
+                y2 - b4 - b2,
+                x2 - b3 - b1,
+                y1,
+            ]
             return (annot_type, vertices)
 
 

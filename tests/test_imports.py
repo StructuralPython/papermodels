@@ -4,4 +4,5 @@ def test_imports():
     from papermodels.paper import annotations
     from papermodels.paper import fdf
     from papermodels.paper import plot
+
     assert True
