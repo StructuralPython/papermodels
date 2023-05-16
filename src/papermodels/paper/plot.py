@@ -22,7 +22,7 @@ def plot_annotations(
     """
     fig, ax = plt.subplots()
     for idx, annot in enumerate(annots):
-        if annot.object_type == "Polygon" or annot.object_type == "Rectangle":
+        if annot.object_type in ("Polygon", "Square", "Rectangle"):
             xy = xy_vertices(annot.vertices)
             ax.add_patch(
                 Polygon(
@@ -36,7 +36,7 @@ def plot_annotations(
                     zorder=idx,
                 )
             )
-        elif annot.object_type == "Line" or annot.object_type == "PolyLine":
+        elif annot.object_type in ("Line", "Polyline"):
             xy = xy_vertices(annot.vertices)
             ax.plot(
                 xy[0],

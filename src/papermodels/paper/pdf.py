@@ -32,9 +32,9 @@ def load_pdf_annotations(pdf_path: pathlib.Path | str) -> list[Annotation]:
                 stream_dict = {}
             if "/Subj" in annot:
                 annot_type = str(annot["/Subj"])
-            if annot_type == "Polygon":
+            if annot_type in ("Polygon", "Polyline", "Circle"):
                 vertices = list(annot.get("/Vertices", []))
-            elif annot_type == "Rectangle":
+            elif annot_type in ("Rectangle", "Square"):
                 bbox = list(annot.get("/Rect", []))
                 buffers = list(annot.get("/RD", [0, 0, 0, 0]))
                 x1, y1, x2, y2 = bbox
@@ -49,7 +49,11 @@ def load_pdf_annotations(pdf_path: pathlib.Path | str) -> list[Annotation]:
                     x2 - b3 - b1,
                     y1,
                 ]
-            text = str(annot.get("/Contents", None))
+            elif annot_type == "Line":
+                vertices = list(annot.get("/L", []))
+            else:
+                print(annot_type)
+            text = str(annot.get("/Contents", ""))
             line_color = tuple(annot.get("/C", stream_dict.get("RG", (0, 0, 0))))
             fill_color = tuple(annot.get("/IC", stream_dict.get("rg", (1, 1, 1))))
             fill_opacity = annot.get("/FillOpacity", Decimal("1.0"))
