@@ -1,7 +1,7 @@
 from __future__ import annotations
 from copy import deepcopy
 from shapely.wkt import loads as wkt_loads
-from shapely.geometry import GeometryCollection
+from shapely import Geometry, GeometryCollection
 from papermodels.datatypes.annotation import Annotation
 from typing import Any, Optional
 import numpy as np
@@ -28,6 +28,35 @@ def annotation_to_shapely(annot: Annotation) -> Any:
     vertices in 'annot'.
     """
     return wkt_loads(_annotation_to_wkt(annot))
+
+
+def get_annotation_geometry_pairs(annots: list[Annotation]) -> dict[Annotation, Geometry]:
+    """
+    Returns a dict of annotation, shapely geometry pairs
+    """
+    return {annot: annotation_to_shapely(annot) for annot in annots}
+
+
+def parse_annotations(annots: list[Annotation], legend: list[Annotation]) -> dict[Annotation, dict]:
+    """
+    Returns a dictionary of annotations organized by their legend entry. If the annotation type is not
+    in the 'legend', then it is excluded from the results.
+    """
+    # TODO: Make this more configurable by the user
+    properties_to_match = ['object_type', 'line_color', 'fill_color', 'line_type', 'line_weight']
+    parsed_annotations = {}
+    for legend_item in legend:
+        legend_properties = {prop: getattr(legend_item, prop) for prop in properties_to_match}
+        matching_annots = filter_annotations(annots, legend_properties)
+        legend_data=legend_item.text.replace("Legend\n", "").split("\n")
+        annot_attributes = {legend_attr.split(": ")[0]: legend_attr.split(": ")[1] for legend_attr in legend_data}
+        for annot in matching_annots:
+            annot_geom = annotation_to_shapely(annot)
+            annot_attributes['geometry'] = annot_geom
+            annot_attributes['Rank'] = int(annot_attributes['Rank'])
+            parsed_annotations.update({annot: annot_attributes})
+    return parsed_annotations
+
 
 
 def _annotation_to_wkt(annot: Annotation) -> str:

@@ -36,7 +36,7 @@ from papermodels.datatypes.utils import class_representation
 
 #     def __repr__(self):
 #         return class_representation(self)
-@dataclass
+@dataclass(frozen=True)
 class Annotation:
     page: int
     object_type: str

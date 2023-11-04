@@ -1,5 +1,6 @@
 import numpy as np
 from shapely import intersects, Geometry
+from papermodels.datatypes.annotation import Annotation
 
 def intersections_by_all_ranks(geoms_by_rank: dict[str, Geometry]):
     """
@@ -28,5 +29,13 @@ def intersections_by_all_ranks(geoms_by_rank: dict[str, Geometry]):
             b = np.array([rank_geoms[sub_rank]])
             intersections = intersects(a, b.T)
             rank_intersections.update({rank: intersections})
-        
-    
+
+
+
+
+
+def get_geometries_by_rank(annots_on_page: list[Annotation]) -> dict[str, Geometry]:
+    """
+    Returns a dictionary of 
+    """
+    pass
