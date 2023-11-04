@@ -34,7 +34,7 @@ def intersections_by_all_ranks(geoms_by_rank: dict[str, Geometry]):
 
 
 
-def get_geometries_by_rank(annots_on_page: list[Annotation]) -> dict[str, Geometry]:
+def get_geometries_by_rank(parsed_annotations: dict[Annotation, dict]) -> dict[str, Geometry]:
     """
     Returns a dictionary of 
     """

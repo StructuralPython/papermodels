@@ -52,12 +52,32 @@ def parse_annotations(annots: list[Annotation], legend: list[Annotation]) -> dic
         annot_attributes = {legend_attr.split(": ")[0]: legend_attr.split(": ")[1] for legend_attr in legend_data}
         for annot in matching_annots:
             annot_geom = annotation_to_shapely(annot)
-            annot_attributes['geometry'] = annot_geom
-            annot_attributes['Rank'] = int(annot_attributes['Rank'])
-            parsed_annotations.update({annot: annot_attributes})
+            annot_attrs = annot_attributes.copy()
+            annot_attrs['geometry'] = annot_geom
+            annot_attrs['Rank'] = int(annot_attributes['Rank'])
+            parsed_annotations.update({annot: annot_attrs})
     return parsed_annotations
 
 
+def tag_parsed_annotations(parsed_annots: dict[Annotation, dict]) -> dict[Annotation, dict]:
+    """
+    Adds an identifying tag to the annotation based on the page number of the annotation and
+    its identified type.
+    """
+    counts = {}
+    for annot, annot_attrs in parsed_annots.items():
+        type_initials = "".join([label[0].upper() for label in annot_attrs['Type'].split(" ")])
+        tag_prefix = f"{type_initials}{annot.page}"
+        if tag_prefix not in counts:
+            counts[tag_prefix] = 1
+        count = counts[tag_prefix]
+        tag = f"{tag_prefix}.{count}"
+        print(tag)
+        annot_attrs['tag'] = tag
+        # print(annot_attrs['tag'])
+        counts[tag_prefix] += 1
+        # print(parsed_annots[annot])
+    # return parsed_annots
 
 def _annotation_to_wkt(annot: Annotation) -> str:
     """
