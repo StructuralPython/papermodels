@@ -49,12 +49,12 @@ def parse_annotations(annots: list[Annotation], legend: list[Annotation]) -> dic
         legend_properties = {prop: getattr(legend_item, prop) for prop in properties_to_match}
         matching_annots = filter_annotations(annots, legend_properties)
         legend_data=legend_item.text.replace("Legend\n", "").split("\n")
-        annot_attributes = {legend_attr.split(": ")[0]: legend_attr.split(": ")[1] for legend_attr in legend_data}
+        annot_attributes = {legend_attr.split(": ")[0].lower(): legend_attr.split(": ")[1] for legend_attr in legend_data}
         for annot in matching_annots:
             annot_geom = annotation_to_shapely(annot)
             annot_attrs = annot_attributes.copy()
             annot_attrs['geometry'] = annot_geom
-            annot_attrs['Rank'] = int(annot_attributes['Rank'])
+            annot_attrs['rank'] = int(annot_attributes['rank'])
             parsed_annotations.update({annot: annot_attrs})
     return parsed_annotations
 
@@ -67,7 +67,7 @@ def tag_parsed_annotations(parsed_annots: dict[Annotation, dict]) -> dict[Annota
     counts = {}
     annots_to_tag = parsed_annots.copy()
     for annot, annot_attrs in annots_to_tag.items():
-        type_initials = "".join([label[0].upper() for label in annot_attrs['Type'].split(" ")])
+        type_initials = "".join([label[0].upper() for label in annot_attrs['type'].split(" ")])
         tag_prefix = f"{type_initials}{annot.page}"
         if tag_prefix not in counts:
             counts[tag_prefix] = 1
