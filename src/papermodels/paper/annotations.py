@@ -89,6 +89,7 @@ def get_structural_elements(annots: list[Annotation], legend: list[Annotation]) 
     parsed_annotations = parse_annotations(sorted_by_page_annotations, legend)
     tagged_annotations = tag_parsed_annotations(parsed_annotations)
     intersecting_annotations = get_geometry_intersections(tagged_annotations)
+    print(intersecting_annotations)
     corresponding_annotations = get_geometry_correspondents(intersecting_annotations)
     elements = []
     for annot, annot_attrs in corresponding_annotations.items():
@@ -121,20 +122,19 @@ def get_geometry_intersections(tagged_annotations: dict[Annotation, dict]) -> di
             j_rank = j_attrs['rank']
             j_page = j_annot.page
             if i_rank < j_rank and i_page == j_page:
+                # print(f"I tag: {i_attrs['tag']} | J tag: {j_attrs['tag']}")
                 i_geom = i_attrs['geometry']
                 j_geom = j_attrs['geometry']
                 intersection_point = i_geom & j_geom if j_geom.geom_type != "Polygon" else i_geom & j_geom.exterior
-                if intersection_point.is_empty:
-                    continue
-                elif intersection_point.geom_type == "MultiPoint":
+                if intersection_point.geom_type == "MultiPoint":
                     intersection_point = Point(
                         np.array(
                             [np.array(geom.coords[0]) for geom in intersection_point.geoms]
                             ).mean(axis=1)
                     )
-                else:
+                if not intersection_point.is_empty:
                     intersection = (j_attrs['tag'], intersection_point)
-                intersections.append(intersection)
+                    intersections.append(intersection)
         i_attrs['intersections'] = intersections
     return intersected_annotations
 

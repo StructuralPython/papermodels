@@ -13,14 +13,13 @@ def get_graph_model_from_elements(elements: list[Element], floor_elevations: Opt
     """
     top_down_elements = sorted(elements, key=lambda x: x.page, reverse=True)
     g = nx.DiGraph()
-    correspondents_to_skip = []
     for element in top_down_elements:
-        if element.tag in correspondents_to_skip:
-            continue
-        elif not element.correspondents:
-            g.add_node(element.tag, element=element)
-        else:
-            this_element_id = element.tag.split()
+        g.add_node(element.tag, element=element)
+        for intersection in element.intersections:
+            g.add_edge(element.tag, intersection[0])
+        for correspondent in element.correspondents:
+            g.add_edge(element.tag, correspondent)
+    return g
 
 
 def get_new_correspondent_tag(this_element_tag: str, corresponding_element_tag) -> str:
