@@ -1,79 +1,50 @@
+from typing import Optional
 import numpy as np
 from shapely import intersects, Geometry, Point
 from papermodels.datatypes.annotation import Annotation
+from papermodels.datatypes.element import Element
+import parse
+import networkx as nx
 
-def intersections_by_all_ranks(geoms_by_rank: dict[str, Geometry]):
+def get_graph_model_from_elements(elements: list[Element], floor_elevations: Optional[dict] = None) -> nx.DiGraph:
     """
-    Returns a dictionary of intersection arrays by rank.
-
-    The underlying assumption is that all geometries of a lower rank
-    can be supported by any of the geometries of a higher rank. 
-    Geometries of "Rank:0" can be supported by geometries of "Rank:1",
-    "Rank:2", or "Rank:3", etc.
-
-    The returned dictionary will contain keys for n - 1 ranks so if the
-    the 'geoms_by_rank' dict goes to "Rank:4", then the return dict will
-    go to "Rank:3". This is because the geometries on "Rank:4" are not
-    being supported by anything (i.e. they are the end of the load path)
+    Returns a networkx DiGraph based upon the intersections and correspondents
+    of the 'elements'.
     """
-    nodes = []
-    for geoms in rank_geoms.values():
-        nodes += geoms
-
-    ranks = list(rank_geoms.keys())
-
-    rank_intersections = {}
-    for i, rank in enumerate(ranks):
-        for sub_rank in ranks[i+1:]:
-            a = np.array([rank_geoms[rank]])
-            b = np.array([rank_geoms[sub_rank]])
-            intersections = intersects(a, b.T)
-            rank_intersections.update({rank: intersections})
+    top_down_elements = sorted(elements, key=lambda x: x.page, reverse=True)
+    g = nx.DiGraph()
+    correspondents_to_skip = []
+    for element in top_down_elements:
+        if element.tag in correspondents_to_skip:
+            continue
+        elif not element.correspondents:
+            g.add_node(element.tag, element=element)
+        else:
+            this_element_id = element.tag.split()
 
 
-def get_all_ranks(tagged_annotations: dict[Annotation, dict]) -> list[int]:
+def get_new_correspondent_tag(this_element_tag: str, corresponding_element_tag) -> str:
     """
-    Returns a list of all rank values present in 'tagged_annotations'
+    Returns a new correspondent tag for an element that is connected below
     """
-    acc = []
-    for annot_attr in tagged_annotations.values():
-        acc.append(annot_attr['rank'])
-    return sorted(set(acc))
+    format = "{type_tag}{page_tag:d}.{enum_tag:d}"
+    result = parse.parse(format, this_element_tag)
 
 
-def get_geometry_intersections(tagged_annotations: dict[Annotation, dict]) -> dict[str, Geometry]:
+def get_elements_by_page(elements: list[Element]) -> dict[int, list[Element]]:
     """
-    Returns a dictionary of 
+    Returns 'elements' sorted by page
     """
-    annots = list(tagged_annotations.keys())
-    intersected_annotations = tagged_annotations.copy()
-    for idx, i_annot in enumerate(annots):
-        next_annot = min(idx + 1, len(annots) - 1)
-        i_attrs = intersected_annotations[i_annot]
-        i_rank = i_attrs['rank']
-        i_page = i_annot.page
-        intersections = []
-        for j_annot in annots[next_annot:]:
-            j_attrs = intersected_annotations[j_annot]
-            j_rank = j_attrs['rank']
-            j_page = j_annot.page
-            if i_rank < j_rank and i_page == j_page:
-                i_geom = i_attrs['geometry']
-                j_geom = j_attrs['geometry']
-                intersection_point = i_geom & j_geom if j_geom.geom_type != "Polygon" else i_geom & j_geom.exterior
-                if intersection_point.is_empty:
-                    continue
-                elif intersection_point.geom_type == "MultiPoint":
-                    intersection_point = Point(
-                        np.array(
-                            [np.array(geom.coords[0]) for geom in intersection_point.geoms]
-                            ).mean(axis=1)
-                    )
-                else:
-                    intersection = (j_attrs['tag'], intersection_point)
-                intersections.append(intersection)
-        i_attrs['intersections'] = intersections
-    return intersected_annotations  
+    elements_by_page = {}
+    for element in elements:
+        elements_on_page = elements_by_page.get(element.page, [])
+        elements_on_page.append(element)
+        elements_by_page[element.page] = elements_on_page
+    return elements_by_page
+
+
+            
+
                     
 
 

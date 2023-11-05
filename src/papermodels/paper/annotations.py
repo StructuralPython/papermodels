@@ -1,8 +1,9 @@
 from __future__ import annotations
 from copy import deepcopy
 from shapely.wkt import loads as wkt_loads
-from shapely import Geometry, GeometryCollection
+from shapely import Geometry, GeometryCollection, Point
 from papermodels.datatypes.annotation import Annotation
+from papermodels.datatypes.element import Element
 from typing import Any, Optional
 import numpy as np
 
@@ -77,6 +78,104 @@ def tag_parsed_annotations(parsed_annots: dict[Annotation, dict]) -> dict[Annota
         counts[tag_prefix] += 1
     return annots_to_tag
 
+
+def get_structural_elements(annots: list[Annotation], legend: list[Annotation]) -> list[Element]:
+    """
+    Returns a list of Element generated from the annotations in 'annots' according to the element
+    types described in the 'legend'. If an annotation is not described in the legend then it will
+    not be included in the result list of Elements.
+    """
+    sorted_by_page_annotations = sorted(annots, key=lambda x: x.page, reverse=True)
+    parsed_annotations = parse_annotations(sorted_by_page_annotations, legend)
+    tagged_annotations = tag_parsed_annotations(parsed_annotations)
+    intersecting_annotations = get_geometry_intersections(tagged_annotations)
+    corresponding_annotations = get_geometry_correspondents(intersecting_annotations)
+    elements = []
+    for annot, annot_attrs in corresponding_annotations.items():
+        element = Element(
+            tag=annot_attrs['tag'],
+            type=annot_attrs['type'],
+            page=annot.page,
+            geometry=annot_attrs['geometry'],
+            intersections=annot_attrs['intersections'],
+            correspondents=annot_attrs['correspondents'],
+            page_label=annot_attrs.get('page_label', None)
+        )
+        elements.append(element)
+    return elements
+
+
+def get_geometry_intersections(tagged_annotations: dict[Annotation, dict]) -> dict[Annotation, dict]:
+    """
+    Returns a dictionary of 
+    """
+    annots = list(tagged_annotations.keys())
+    intersected_annotations = tagged_annotations.copy()
+    for i_annot in annots:
+        i_attrs = intersected_annotations[i_annot]
+        i_rank = i_attrs['rank']
+        i_page = i_annot.page
+        intersections = []
+        for j_annot in annots:
+            j_attrs = intersected_annotations[j_annot]
+            j_rank = j_attrs['rank']
+            j_page = j_annot.page
+            if i_rank < j_rank and i_page == j_page:
+                i_geom = i_attrs['geometry']
+                j_geom = j_attrs['geometry']
+                intersection_point = i_geom & j_geom if j_geom.geom_type != "Polygon" else i_geom & j_geom.exterior
+                if intersection_point.is_empty:
+                    continue
+                elif intersection_point.geom_type == "MultiPoint":
+                    intersection_point = Point(
+                        np.array(
+                            [np.array(geom.coords[0]) for geom in intersection_point.geoms]
+                            ).mean(axis=1)
+                    )
+                else:
+                    intersection = (j_attrs['tag'], intersection_point)
+                intersections.append(intersection)
+        i_attrs['intersections'] = intersections
+    return intersected_annotations
+
+
+def get_geometry_correspondents(tagged_annotations: dict[Annotation, dict]) -> dict[Annotation, dict]:
+    """
+    Returns a copy of 'tagged_annotations' with a 'correspondents' field added to that
+    attributes dictionary of each Annotation key.
+    """
+    annots_by_page = annotations_by_page(tagged_annotations)
+    descending_pages = sorted(annots_by_page.keys(), reverse=True)
+    last_page = descending_pages[-1]
+    corresponding_annotations = {}
+    for page in descending_pages:
+        if page != last_page:
+            next_page = page - 1
+            annots_here = annots_by_page[page]
+            annots_below = annots_by_page[next_page]
+            for i_annot, i_attrs in annots_here.items():
+                i_page = i_annot.page
+                correspondents = []
+                for j_annot, j_attrs in annots_below.items():
+                    j_attrs = annots_below[j_annot]
+                    j_page = j_annot.page
+                    i_geom = i_attrs['geometry']
+                    j_geom = j_attrs['geometry']
+                    if (
+                        j_page in (i_page + 1, i_page - 1)
+                        and i_geom.contains(j_geom)
+                    ):
+                        correspondents.append(j_attrs['tag'])
+                i_attrs['correspondents'] = correspondents
+                corresponding_annotations.update({i_annot: i_attrs})
+        else:
+            annots_here = annots_by_page[page]
+            for i_annot, i_attrs in annots_here.items():
+                i_attrs['correspondents'] = []
+                corresponding_annotations.update({i_annot: i_attrs})
+    return corresponding_annotations
+
+
 def _annotation_to_wkt(annot: Annotation) -> str:
     """
     Returns a WKT string representing the geometry in 'annot'. The WKT
@@ -148,6 +247,18 @@ def scale_annotation(
     scaled_vertices = [vertex * scale for vertex in vertices]
     annot.vertices = scaled_vertices
     return annot
+
+
+def annotations_by_page(annots: dict[Annotation, dict], ascending=False) -> dict[int, dict[Annotation, dict]]:
+    """
+    Returns 'annots' in a dictionary keyed by page number
+    """
+    annots_by_page = {}
+    for annot, annot_attrs in annots.items():
+        annots_on_page = annots_by_page.get(annot.page, {})
+        annots_on_page.update({annot: annot_attrs})
+        annots_by_page[annot.page] = annots_on_page
+    return annots_by_page
 
 
 def _translate_vertices(
