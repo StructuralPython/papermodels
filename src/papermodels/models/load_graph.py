@@ -3,8 +3,11 @@ import numpy as np
 from shapely import intersects, Geometry, Point
 from papermodels.datatypes.annotation import Annotation
 from papermodels.datatypes.element import Element
+from papermodels.models.load_factors import nbcc_2020_combos
+from PyNite import FEModel3D
 import parse
 import networkx as nx
+import math
 
 def get_graph_model_from_elements(elements: list[Element], floor_elevations: Optional[dict] = None) -> nx.DiGraph:
     """
@@ -13,13 +16,57 @@ def get_graph_model_from_elements(elements: list[Element], floor_elevations: Opt
     """
     top_down_elements = sorted(elements, key=lambda x: x.page, reverse=True)
     g = nx.DiGraph()
+    correspondent_parents = {}
     for element in top_down_elements:
-        g.add_node(element.tag, element=element)
-        for intersection in element.intersections:
-            g.add_edge(element.tag, intersection[0])
         for correspondent in element.correspondents:
-            g.add_edge(element.tag, correspondent)
+            correspondent_parents[correspondent] = element.tag
+
+        if element.tag not in correspondent_parents.keys():
+            g.add_node(element.tag, element=element)
+            for intersection in element.intersections:
+                g.add_edge(element.tag, intersection[0])
+        else:
+            for intersection in element.intersections:
+                g.add_edge(correspondent_parents[element.tag], intersection[0])
+
+
     return g
+
+
+def element_to_beam_model(element: Element) -> FEModel3D:
+    """
+    Returns an FEModel3D for the data in 'element'
+    """
+    model = FEModel3D()
+    model.add_material("default", 1, 1, 1, 1)
+    element_length = element.geometry.length
+    start_point = Point(element.geometry.coords[0])
+    add_start_node = True
+    add_end_node = True
+    start_node = "N0"
+    model.add_node(start_node, 0, 0, 0)
+    for node_name, point in element.intersections:
+        x_coord = start_point.distance(point)
+        if math.isclose(x_coord, element_length, abs_tol=1e-3):
+            last_node = node_name
+            add_end_node = False
+        if math.isclose(x_coord, 0, abs_tol=1e-3):
+            model.Nodes.pop(start_node)
+            start_node = node_name
+        model.add_node(node_name, x_coord, 0, 0)
+        model.def_support(node_name, support_DY=True)
+    model.def_support(node_name, 1, 1, 1, 1, 1, 0)
+
+    if add_end_node:
+        last_node = "Nn"
+        model.add_node(last_node, element_length, 0, 0)
+    model.add_member(element.tag, "N0", last_node, "default", 1, 1, 1, 1)
+
+    combos = nbcc_2020_combos()
+    for combo_name, load_combo in combos.items():
+        model.add_load_combo(combo_name, factors=load_combo)
+    return model
+
 
 
 def get_new_correspondent_tag(this_element_tag: str, corresponding_element_tag) -> str:

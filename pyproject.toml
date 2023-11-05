@@ -19,7 +19,8 @@ dependencies = [
     "colour",
     "pytest",
     "networkx",
-    "numpy"
+    "numpy",
+    "PyNiteFEA"
 ]
 
 

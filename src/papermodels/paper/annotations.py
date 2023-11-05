@@ -89,7 +89,6 @@ def get_structural_elements(annots: list[Annotation], legend: list[Annotation]) 
     parsed_annotations = parse_annotations(sorted_by_page_annotations, legend)
     tagged_annotations = tag_parsed_annotations(parsed_annotations)
     intersecting_annotations = get_geometry_intersections(tagged_annotations)
-    print(intersecting_annotations)
     corresponding_annotations = get_geometry_correspondents(intersecting_annotations)
     elements = []
     for annot, annot_attrs in corresponding_annotations.items():
