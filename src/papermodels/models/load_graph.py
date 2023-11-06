@@ -1,6 +1,8 @@
 import numpy as np
 from shapely import intersects, Geometry
 
+
+
 def intersections_by_all_ranks(geoms_by_rank: dict[str, Geometry]):
     """
     Returns a dictionary of intersection arrays by rank.
