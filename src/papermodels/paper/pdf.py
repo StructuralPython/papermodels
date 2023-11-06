@@ -5,6 +5,7 @@ import re
 from decimal import Decimal
 from papermodels.datatypes.annotation import Annotation
 import pathlib
+import parse
 
 
 def load_pdf_annotations(pdf_path: pathlib.Path | str) -> list[Annotation]:
@@ -32,9 +33,9 @@ def load_pdf_annotations(pdf_path: pathlib.Path | str) -> list[Annotation]:
                 stream_dict = {}
             if "/Subj" in annot:
                 annot_type = str(annot["/Subj"])
-            if annot_type in ("Polygon", "Polyline", "Circle"):
+            if annot_type.lower() in ("polygon", "polyline", "circle", "ellipse"):
                 vertices = list(annot.get("/Vertices", []))
-            elif annot_type in ("Rectangle", "Square"):
+            elif annot_type.lower() in ("rectangle", "square", "rectangle sketch to scale"):
                 bbox = list(annot.get("/Rect", []))
                 buffers = list(annot.get("/RD", [0, 0, 0, 0]))
                 x1, y1, x2, y2 = bbox
@@ -52,19 +53,24 @@ def load_pdf_annotations(pdf_path: pathlib.Path | str) -> list[Annotation]:
             elif annot_type == "Line":
                 vertices = list(annot.get("/L", []))
             else:
-                print(annot_type)
+                print(f"Cannot read (yet): {annot_type}")
+
             text = str(annot.get("/Contents", ""))
+            # popup = annot.get("/Popup")
+            # print(popup)
+            rc = annot.get("/RC")
+            text = parse_html_text_content(str(rc)) if rc is not None else ""
             line_color = tuple(annot.get("/C", stream_dict.get("RG", (0, 0, 0))))
             fill_color = tuple(annot.get("/IC", stream_dict.get("rg", (1, 1, 1))))
             fill_opacity = annot.get("/FillOpacity", Decimal("1.0"))
             line_width = stream_dict.get("w", [1])[0]
             line_type = None
             line_opacity = 1
-            matrix = [1, 0, 0, 1, 0, 0]
+            matrix = (1, 0, 0, 1, 0, 0)
             annotation = Annotation(
                 object_type=annot_type,
                 page=page_num,
-                vertices=vertices,
+                vertices=tuple(vertices),
                 text=text,
                 line_color=line_color,
                 fill_color=fill_color,
@@ -106,3 +112,16 @@ def parse_content_stream(stream: str) -> dict[str, list]:
             numerical_operands.append(elem)
         commands.update({operator: numerical_operands})
     return commands
+
+def parse_html_text_content(xml_code: str) -> str:
+    """
+    Returns 'Python-formatted' text for html text in the annotation popup
+    """
+    if xml_code is None: 
+        return ""
+    else:
+        format_code = "<body{xml_code}>{html_code}</body>"
+        results = parse.search(format_code, xml_code)
+        html_code = results.named['html_code']
+        python_text= html_code.replace("</p><p>", "\n").replace("<p>", "").replace("</p>", "")
+        return python_text
