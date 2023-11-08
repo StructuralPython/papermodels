@@ -4,6 +4,7 @@ from shapely import intersects, Geometry, Point
 from papermodels.datatypes.annotation import Annotation
 from papermodels.datatypes.element import Element
 from papermodels.models.load_factors import nbcc_2020_combos
+from papermodels.datatypes.joist import Joist
 from PyNite import FEModel3D
 import parse
 import networkx as nx
@@ -67,6 +68,30 @@ def element_to_beam_model(element: Element) -> FEModel3D:
         model.add_load_combo(combo_name, factors=load_combo)
     return model
 
+
+def element_to_joist_model(element: Element, w: float = 0.) -> Joist:
+    """
+    Returns a Joist object based on the data in 'element'
+    """
+    try:
+        r1, r2 = element.intersections
+    except ValueError:
+        raise ValueError(f"Joists currently need to have two supports. {element.tag=} | {element.intersections=}")
+    elem_geometry = element.geometry
+    i_end = Point(elem_geometry.coords[0])
+    j_end = Point(elem_geometry.coords[1])
+    length = elem_geometry.length
+    
+    # R1 should be closest to I-end
+    r1_geom = r1[1]
+    r2_geom = r2[1]
+    if i_end.distance(r1_geom) > i_end.distance(r2_geom):
+        r1, r2 = r2, r1
+    
+    span = r1_geom.distance(r2_geom)
+    a_cantilever = round(abs(i_end.distance(r1_geom)), 6)
+    b_cantilever = round(abs(r2_geom.distance(j_end)), 6)
+    return Joist(span, a_cantilever, b_cantilever)
 
 
 def get_new_correspondent_tag(this_element_tag: str, corresponding_element_tag) -> str:
