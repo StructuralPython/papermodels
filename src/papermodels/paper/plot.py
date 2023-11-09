@@ -34,10 +34,10 @@ def plot_annotations(
                     xy=xy.T,
                     closed=True,
                     linestyle=annot.line_type,
-                    linewidth=annot.line_weight,
-                    ec=annot.line_color,
-                    fc=annot.fill_color,
-                    alpha=annot.fill_opacity,
+                    linewidth=float(annot.line_weight),
+                    ec=tuple(float(elem) for elem in annot.line_color),
+                    fc=tuple(float(elem) for elem in annot.fill_color),
+                    alpha=float(annot.fill_opacity),
                     zorder=idx,
                 )
             )
@@ -47,9 +47,9 @@ def plot_annotations(
                 xy[0],
                 xy[1],
                 linestyle=annot.line_type,
-                linewidth=annot.line_weight,
-                color=annot.line_color,
-                alpha=annot.line_opacity,
+                linewidth=float(annot.line_weight),
+                color=tuple(float(elem) for elem in annot.line_color),
+                alpha=float(annot.line_opacity),
                 zorder=idx,
             )
         if annotation_dict and has_tags and plot_tags:
