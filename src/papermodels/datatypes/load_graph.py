@@ -63,7 +63,9 @@ class LoadGraph(nx.DiGraph):
                 model = element_to_beam_model(element)
                 for load_source in self.nodes['load_distribution'].keys():
                     model_copy = deepcopy(model)
-                    model.add_member_pt_load(node, "Fy", 1, x=1)
+                    source_element = self.nodes[load_source]['element']
+                    # TODO: Find the location of the source element on the model
+                    model.add_member_pt_load(node, "Fy", 1, x=1, )
                 self.nodes[node]['model'] = model
             elif prefix_dict[tag_prefix] == "joist":
                 model = element_to_joist_model(element)
