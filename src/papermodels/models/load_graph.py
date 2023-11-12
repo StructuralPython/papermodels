@@ -18,6 +18,7 @@ def get_graph_model_from_elements(elements: list[Element], floor_elevations: Opt
     top_down_elements = sorted(elements, key=lambda x: x.page, reverse=True)
     g = nx.DiGraph()
     for element in top_down_elements:
+        g.add_node(element.tag, element=element)
         for correspondent in element.correspondents:
             g.add_edge(element.tag, correspondent)
         for intersection in element.intersections:
