@@ -97,8 +97,8 @@ def get_structural_elements(annots: list[Annotation], legend: list[Annotation]) 
             type=annot_attrs['type'],
             page=annot.page,
             geometry=annot_attrs['geometry'],
-            intersections=annot_attrs['intersections'],
-            correspondents=annot_attrs['correspondents'],
+            intersections=tuple(annot_attrs['intersections']),
+            correspondents=tuple(annot_attrs['correspondents']),
             page_label=annot_attrs.get('page_label', None)
         )
         elements.append(element)
