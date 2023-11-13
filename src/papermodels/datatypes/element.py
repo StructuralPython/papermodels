@@ -43,6 +43,14 @@ class Element:
     correspondents: list[tuple[str, Geometry]]
     page_label: Optional[str] = None
 
+    def get_intersection(self, tag: str) -> Point | None:
+        """
+        Returns the corresponding Point object for 'tag' if 'tag' is in the tuple of 
+        self.intersections. Returns None if not.
+        """
+        lookup = dict(self.intersections)
+        return lookup.get(tag, None)
+
 
 # Examples
 ## This example shows a beam that is connected to a joist and a column on the same page
@@ -106,6 +114,7 @@ def element_to_beam_model(element: Element) -> FEModel3D:
         last_node = "Nn"
         model.add_node(last_node, element_length, 0, 0)
     model.add_member(element.tag, "N0", last_node, "default", 1, 1, 1, 1)
+    model.add_load_combo("Pass", {"pass": 1.0})
     return model
 
 
@@ -134,14 +143,6 @@ def element_to_joist_model(element: Element, w: float = 0.) -> Joist:
     return Joist(span, a_cantilever, b_cantilever)
 
 
-def get_new_correspondent_tag(this_element_tag: str, corresponding_element_tag) -> str:
-    """
-    Returns a new correspondent tag for an element that is connected below
-    """
-    format = "{type_tag}{page_tag:d}.{enum_tag:d}"
-    result = parse.parse(format, this_element_tag)
-
-
 def get_tag_type(this_element_tag: str) -> str:
     """
     Returns the prefix portion of 'this_element_tag'. The prefix portion is the
@@ -162,3 +163,15 @@ def get_elements_by_page(elements: list[Element]) -> dict[int, list[Element]]:
         elements_on_page.append(element)
         elements_by_page[element.page] = elements_on_page
     return elements_by_page
+
+
+def get_normalized_coordinate(element: Element, intersection_point: Point) -> float:
+    """
+    Returns a normalized x-coordinate for the given 'coord' as it is located on the geometry
+    of 'element'. Returns None if the 'coord' provided is not colinear with
+    the element geometry.
+    """
+    geom = element.geometry
+    i_coord = Point(geom.coords[0])
+    distance = i_coord.distance(intersection_point)
+    return distance

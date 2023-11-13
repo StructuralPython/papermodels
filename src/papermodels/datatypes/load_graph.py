@@ -1,11 +1,16 @@
+from __future__ import annotations
+from typing import Optional
 from copy import deepcopy
 import networkx as nx
-from hashlib import sha256
+import hashlib
 from papermodels.datatypes.element import (
+    Element,
     element_to_beam_model,
     element_to_joist_model,
-    get_tag_type
+    get_tag_type,
+    get_normalized_coordinate,
 )
+from rich.progress import track
 
 class LoadGraph(nx.DiGraph):
     """
@@ -18,6 +23,25 @@ class LoadGraph(nx.DiGraph):
         super().__init__()
         self.node_hash = None
 
+
+    @classmethod
+    def from_elements(cls, elements: list[Element], floor_elevations: Optional[dict] = None) -> LoadGraph:
+        """
+        Returns a LoadGraph (networkx.DiGraph) based upon the intersections and correspondents
+        of the 'elements'.
+        """
+        top_down_elements = sorted(elements, key=lambda x: x.page, reverse=True)
+        g = cls()
+        for element in top_down_elements:
+            hash = hashlib.sha256(str(element).encode()).hexdigest()
+            g.add_node(element.tag, element=element, sha256=hash)
+            for correspondent in element.correspondents:
+                g.add_edge(element.tag, correspondent)
+            for intersection in element.intersections:
+                g.add_edge(element.tag, intersection[0])
+        return g
+
+
     def hash_nodes(self):
         """
         Returns None. Sets the value of self.node_hash based on the hashed values of
@@ -28,7 +52,7 @@ class LoadGraph(nx.DiGraph):
         for node_name in nodes_from_top:
             element_hash = self.nodes[node_name]['sha256']
             hashes.append(element_hash)
-        graph_hash = sha256(str(tuple(hashes)).encode()).hexdigest()
+        graph_hash = hashlib.sha256(str(tuple(hashes)).encode()).hexdigest()
         self.node_hash = graph_hash
 
 
@@ -44,29 +68,48 @@ class LoadGraph(nx.DiGraph):
             self.nodes[node]['load_distribution'] = dist
 
 
-    def compile_distribution_functions(self, prefix_dict: dict = {
-        "FB": "beam",
-        "DB": "beam",
-        "W": "wall",
-        "CPL": "point_load",
-        "WLL": "line_load",
-        "J": "joist",
-    }):
+    def compile_distribution_functions(
+            self, 
+            prefix_dict: dict = {
+                "FB": "beam",
+                "DB": "beam",
+                "W": "wall",
+                "CPL": "point_load",
+                "WLL": "line_load",
+                "J": "joist",
+                "C": "column",
+            },
+            track_progress=False,
+        ):
         """
         Returns None. Populates the empty 'load_distribution' dict in 
         each node.
         """
-        for node in self.nodes:
-            element = self.nodes['element']
+        if not track_progress:
+            progress_tracker = lambda x: x
+        else:
+            progress_tracker = track
+        for node in progress_tracker(self.nodes):
+            element = self.nodes[node]['element']
             tag_prefix = get_tag_type(element.tag)
             if prefix_dict[tag_prefix] == "beam":
                 model = element_to_beam_model(element)
-                for load_source in self.nodes['load_distribution'].keys():
-                    model_copy = deepcopy(model)
-                    source_element = self.nodes[load_source]['element']
-                    # TODO: Find the location of the source element on the model
-                    model.add_member_pt_load(node, "Fy", 1, x=1, )
                 self.nodes[node]['model'] = model
+                for load_source, support_tags in self.nodes[node]['load_distribution'].items():
+
+                    # Factor this out to a new function
+                    # Note: this function needs to sort out the different
+                    # source element types (e.g. joist, column point load, wall, etc.)
+                    # so that they apply an appropriate load to the beam.
+                    model_copy = deepcopy(self.nodes[node]['model'])
+                    source_element = self.nodes[load_source]['element']
+                    intersecting_point = source_element.get_intersection(element.tag)
+                    source_loc = get_normalized_coordinate(element, intersecting_point)
+                    model_copy.add_member_pt_load(node, "Fy", -1, x=source_loc, case="pass")
+                    model_copy.analyze_linear(check_statics=False)
+                    for support_tag in support_tags:
+                        reaction = model_copy.Nodes[support_tag].RxnFY['Pass']
+                        support_tags[support_tag] = reaction
             elif prefix_dict[tag_prefix] == "joist":
                 model = element_to_joist_model(element)
                 self.nodes[node]['model'] = model
@@ -78,3 +121,5 @@ class LoadGraph(nx.DiGraph):
                 pass
             elif prefix_dict[tag_prefix] == "line_load":
                 pass
+
+
