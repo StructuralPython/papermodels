@@ -190,7 +190,7 @@ def get_range(ovlp: Overlap) -> tuple[float, float]:
 
 
 def get_singularity_functions(
-    p: Polygon, display_progress: bool = False
+    p: Polygon
 ) -> tuple[list[Singularity], list[Singularity]]:
     """
     Returns a 2-tuple, each element a list of Singularity. The first element is the overlapping regions
@@ -203,37 +203,24 @@ def get_singularity_functions(
         return ([], [])
     else:
         void_regions = get_void_regions(p)
-        if display_progress:
-            display("Void regions found:")
-            display(MultiPolygon(void_regions))
         convex_overlaps = get_overlap_regions(p.convex_hull)
         void_overlaps = []
         for void_region in void_regions:
             if void_region == void_region.convex_hull:
-                if display_progress:
-                    display("Convex voids found:")
-                    display(void_region)
                 void_overlaps += [
                     -void_overlap for void_overlap in get_overlap_regions(void_region)
                 ]
             else:
                 convex_voids, negative_voids = get_singularity_functions(
-                    void_region, display_progress
+                    void_region
                 )
-                if display_progress:
-                    display("Non-convex voids found:")
-                    display(void_region)
-                    display("Convex hull of singularity function of void:")
-                    display(singularities_to_polygon(convex_voids))
-                    display("Removing singularity function of inner void:")
-                    display(singularities_to_polygon(negative_voids))
                 void_overlaps += [-void_overlap for void_overlap in convex_voids]
                 void_overlaps += [-void_overlap for void_overlap in negative_voids]
     return (convex_overlaps, void_overlaps)
 
 
 def get_overlap_regions(
-    p: Polygon, display_progress: bool = False
+    p: Polygon
 ) -> list[Singularity]:
     """
     Returns a list of overlapping regions described by the vertices in the CONVEX polygon.
