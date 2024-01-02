@@ -125,11 +125,7 @@ def get_joist_extents(
     bj_to_a_jnode = project_node(bj_node, -joist_vector, magnitude_max)
     bj_to_a_ray = LineString([bj_node, bj_to_a_jnode])
 
-    from IPython.display import display
-    from shapely import GeometryCollection
-
-    display(GeometryCollection([a_support, b_support, ai_to_b_ray, aj_to_b_ray]))
-
+    # TODO: Ensure order of extent nodes is correctly ordered
     extents_a = [ai_node, aj_node]
     extents_b = [bi_node, bj_node]
 
