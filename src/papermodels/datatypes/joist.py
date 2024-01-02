@@ -108,9 +108,7 @@ def get_joist_extents(
     supports_bbox = get_system_bounds(joist_prototype, joist_supports)
     magnitude_max = get_magnitude(supports_bbox)
     joist_vector = get_direction_vector(joist_prototype)
-    print(joist_vector)
     ordered_supports = determine_support_order(joist_prototype, joist_supports)
-    print(ordered_supports)
     a_support, b_support = ordered_supports["A"], ordered_supports["B"]
 
     ai_node, aj_node = get_start_end_nodes(a_support)
