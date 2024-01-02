@@ -12,7 +12,10 @@ from papermodels.db.data_model import Annotation
 
 
 def plot_annotations(
-    annots: list[Annotation] | dict[Annotation, dict], figsize: tuple[float, float] = (17, 11), dpi: float = 100, plot_tags: bool = False
+    annots: list[Annotation] | dict[Annotation, dict],
+    figsize: tuple[float, float] = (17, 11),
+    dpi: float = 100,
+    plot_tags: bool = False,
 ) -> Figure:
     """
     Plots that annotations, 'annots' in matplotlib. Size and dpi can be adjusted
@@ -27,7 +30,12 @@ def plot_annotations(
     for idx, annot in enumerate(annots):
         if annotation_dict:
             has_tags = "tag" in annots[annot]
-        if annot.object_type.lower() in ("polygon", "square", "rectangle", 'rectangle sketch to scale'):
+        if annot.object_type.lower() in (
+            "polygon",
+            "square",
+            "rectangle",
+            "rectangle sketch to scale",
+        ):
             xy = xy_vertices(annot.vertices, dpi)
             ax.add_patch(
                 Polygon(
@@ -53,14 +61,13 @@ def plot_annotations(
                 zorder=idx,
             )
         if annotation_dict and has_tags and plot_tags:
-            tag = annots[annot]['tag']
-            geom = annots[annot]['geometry']
+            tag = annots[annot]["tag"]
+            geom = annots[annot]["geometry"]
             centroid = np.array(geom.centroid.coords[0])
             ax.annotate(
-                tag, 
+                tag,
                 centroid * dpi / 72,
                 zorder=100 * len(annots),
-                
             )
     ax.set_aspect("equal")
     ax.set_xlim(0, figsize[0] * dpi)

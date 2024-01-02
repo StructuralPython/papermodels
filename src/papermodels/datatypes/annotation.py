@@ -34,6 +34,7 @@ from papermodels.datatypes.utils import class_representation
 #     fill_color = Column(ColorType)  # (r, g, b)
 #     fill_opacity = Column(Float)  # 0 <= x <= 1
 
+
 #     def __repr__(self):
 #         return class_representation(self)
 @dataclass(frozen=True)

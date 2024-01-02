@@ -35,7 +35,11 @@ def load_pdf_annotations(pdf_path: pathlib.Path | str) -> list[Annotation]:
                 annot_type = str(annot["/Subj"])
             if annot_type.lower() in ("polygon", "polyline", "circle", "ellipse"):
                 vertices = list(annot.get("/Vertices", []))
-            elif annot_type.lower() in ("rectangle", "square", "rectangle sketch to scale"):
+            elif annot_type.lower() in (
+                "rectangle",
+                "square",
+                "rectangle sketch to scale",
+            ):
                 bbox = list(annot.get("/Rect", []))
                 buffers = list(annot.get("/RD", [0, 0, 0, 0]))
                 x1, y1, x2, y2 = bbox
@@ -113,15 +117,18 @@ def parse_content_stream(stream: str) -> dict[str, list]:
         commands.update({operator: numerical_operands})
     return commands
 
+
 def parse_html_text_content(xml_code: str) -> str:
     """
     Returns 'Python-formatted' text for html text in the annotation popup
     """
-    if xml_code is None: 
+    if xml_code is None:
         return ""
     else:
         format_code = "<body{xml_code}>{html_code}</body>"
         results = parse.search(format_code, xml_code)
-        html_code = results.named['html_code']
-        python_text= html_code.replace("</p><p>", "\n").replace("<p>", "").replace("</p>", "")
+        html_code = results.named["html_code"]
+        python_text = (
+            html_code.replace("</p><p>", "\n").replace("<p>", "").replace("</p>", "")
+        )
         return python_text

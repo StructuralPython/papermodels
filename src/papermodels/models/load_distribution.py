@@ -190,7 +190,7 @@ def get_range(ovlp: Overlap) -> tuple[float, float]:
 
 
 def get_singularity_functions(
-    p: Polygon
+    p: Polygon,
 ) -> tuple[list[Singularity], list[Singularity]]:
     """
     Returns a 2-tuple, each element a list of Singularity. The first element is the overlapping regions
@@ -211,17 +211,13 @@ def get_singularity_functions(
                     -void_overlap for void_overlap in get_overlap_regions(void_region)
                 ]
             else:
-                convex_voids, negative_voids = get_singularity_functions(
-                    void_region
-                )
+                convex_voids, negative_voids = get_singularity_functions(void_region)
                 void_overlaps += [-void_overlap for void_overlap in convex_voids]
                 void_overlaps += [-void_overlap for void_overlap in negative_voids]
     return (convex_overlaps, void_overlaps)
 
 
-def get_overlap_regions(
-    p: Polygon
-) -> list[Singularity]:
+def get_overlap_regions(p: Polygon) -> list[Singularity]:
     """
     Returns a list of overlapping regions described by the vertices in the CONVEX polygon.
     The overlapping regions are described as a list of Singularity functions.

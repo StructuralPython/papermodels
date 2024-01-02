@@ -58,7 +58,6 @@ class Annotation(Base):
 
 
 class Geometry(Base):
-
     __tablename__ = "geometry"
 
     geom_id = Column(Integer, primary_key=True)
@@ -70,7 +69,6 @@ class Geometry(Base):
 
 
 class Labels(Base):
-
     __tablename__ = "labels"
 
     label_id = Column(Integer, primary_key=True)
@@ -82,7 +80,6 @@ class Labels(Base):
 
 
 class LegendEntry(Base):
-
     __tablename__ = "legend"
 
     legend_id = Column(Integer, primary_key=True)
