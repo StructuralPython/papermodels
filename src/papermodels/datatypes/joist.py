@@ -4,22 +4,122 @@ from typing import Any, Optional
 import pycba as cba
 import numpy as np
 from shapely import LineString, Point, MultiLineString
+import shapely.ops as ops
+
+from papermodels.datatypes.utils import class_representation
 
 
-@dataclass
 class JoistArray:
     """
     Models a spread of joists over a region where the distance
     between the supports may vary linearly.
     """
 
-    cant_a: float
-    cant_b: float
-    extents_a: tuple[Point, Point]
-    extents_b: tuple[Point, Point]
-    spacing: float
-    initial_offset: float
-    vector_normal: np.ndarray
+    def __init__(
+        self,
+        joist_prototype: LineString,
+        joist_supports: list[LineString],
+        spacing: float | int,
+        initial_offset: float | int = 0.0,
+        joist_at_start: bool = True,
+        joist_at_end: bool = False,
+        cantilever_tolerance: float = 1e-2,
+    ):
+        self.spacing = spacing
+        self.initial_offset = initial_offset
+        self._joist_prototype = joist_prototype
+        self._cantilever_tolerance = cantilever_tolerance
+        self._extents = get_joist_extents(joist_prototype, joist_supports)
+        self._supports = determine_support_order(joist_prototype, joist_supports)
+        self._cantilevers = get_cantilever_segments(joist_prototype, self._supports)
+        self.vector_parallel = get_direction_vector(joist_prototype)
+        self.vector_normal = rotate_90(self.vector_parallel, ccw=False)
+        self.joist_at_start = joist_at_start
+        self.joist_at_end = joist_at_end
+
+    # def __repr__(self):
+    #     return class_representation(self)
+
+    def generate_joist(self, index: int):
+        """
+        Returns i, j coordinates of the joist in the JoistArray at the position
+        of 'index'. Raises IndexError if 'index' is not within the joist array
+        extents given the spacing.
+
+        'index': joists are numbered from 0 (first joist, at joist extent) and
+            go to n, the last joist in the array.
+        """
+        start_centroid = self.get_extent_edge("start").centroid
+        joist_distance = self.get_joist_location(index)
+        new_centroid = project_node(start_centroid, -self.vector_normal, joist_distance)
+        # return new_centroid
+        system_bounds = get_system_bounds(
+            self._joist_prototype, list(self._supports.values())
+        )
+        projection_distance = get_magnitude(system_bounds)
+        ray_aj = project_node(new_centroid, -self.vector_parallel, projection_distance)
+        ray_a = LineString([new_centroid, ray_aj])
+        ray_bj = project_node(new_centroid, self.vector_parallel, projection_distance)
+        ray_b = LineString([new_centroid, ray_bj])
+        support_a_loc = ray_a.intersection(self._supports["A"])
+        support_b_loc = ray_b.intersection(self._supports["B"])
+        end_a = support_a_loc
+        end_b = support_a_loc
+        if self._cantilevers["A"]:
+            end_a = project_node(
+                support_a_loc, -self.vector_parallel, self._cantilevers["A"]
+            )
+        if self._cantilevers["B"]:
+            end_b = project_node(
+                support_b_loc, self.vector_parallel, self._cantilevers["B"]
+            )
+        return LineString([end_a, end_b])
+
+    def index_in_array(self, index: int):
+        """
+        Returns True if
+        """
+        pass
+
+    def get_joist_location(self, index: int) -> float:
+        """
+        Returns the position of the joist centroid projected
+        along self.vector_normal
+        """
+        joist_start = 0.0
+        if not self.joist_at_start:
+            if not self.initial_offset:
+                joist_start = self.spacing
+            else:
+                joist_start = self.initial_offset
+
+        joist_next = self.spacing
+        if self.initial_offset:
+            joist_next = self.initial_offset
+
+        start_sequence = [joist_start]
+        if index >= 1:
+            start_sequence += [joist_next]
+        # exclude_start_joist = int(not self.joist_at_start)
+        remaining_indexes = max(0, index - (len(start_sequence) - 1))
+        print(index, remaining_indexes)
+        remaining_sequence = [self.spacing] * remaining_indexes
+        total_sequence = start_sequence + remaining_sequence
+        return sum(total_sequence)
+
+    def get_extent_edge(self, edge: str = "start"):
+        """
+        Gets the "joist" that would exist at the edge of the array
+
+        'edge': one of {'start', 'end'}
+        """
+        if edge == "start":
+            node_i = self._extents["A"][0]
+            node_j = self._extents["B"][0]
+        elif edge == "end":
+            node_i = self._extents["A"][1]
+            node_j = self._extents["B"][1]
+        return LineString([node_i, node_j])
 
 
 @dataclass
@@ -125,7 +225,6 @@ def get_joist_extents(
     bj_to_a_jnode = project_node(bj_node, -joist_vector, magnitude_max)
     bj_to_a_ray = LineString([bj_node, bj_to_a_jnode])
 
-    # TODO: Ensure order of extent nodes is correctly ordered
     extents_a = [ai_node, aj_node]
     extents_b = [bi_node, bj_node]
 
@@ -142,6 +241,26 @@ def get_joist_extents(
         extents_a[1] = bj_to_a_ray & a_support
 
     return {"A": tuple(extents_a), "B": tuple(extents_b)}
+
+
+def get_cantilever_segments(
+    joist_prototype: LineString,
+    ordered_supports: dict[str, LineString],
+    tolerance: float = 1e-1,
+) -> dict[str, float]:
+    """
+    Returns a dictionary containing the cantilever lengths over-hanging supports "A" and
+    "B", respectively. Returns a length of 0.0 if the length is less than the tolerance.
+    """
+    splits_a = ops.split(joist_prototype, ordered_supports["A"])
+    splits_b = ops.split(joist_prototype, ordered_supports["B"])
+    for geom_a in splits_a.geoms:
+        for geom_b in splits_b.geoms:
+            if not geom_a.intersects(geom_b):
+                return {
+                    "A": 0.0 if geom_a.length < tolerance else geom_a.length,
+                    "B": 0.0 if geom_b.length < tolerance else geom_b.length,
+                }
 
 
 def get_system_bounds(
@@ -250,4 +369,26 @@ def project_node(node: Point, vector: np.ndarray, magnitude: float):
     """
     scaled_vector = vector * magnitude
     projected_node = np.array(node.xy) + scaled_vector
+    # print(projected_node, scaled_vector)
     return Point(projected_node)
+
+
+def rotate_90(v: np.ndarray, precision: int = 6, ccw=True) -> tuple[float, float]:
+    """
+    Rotate the vector components, 'x1' and 'y1' by 90 degrees.
+
+    'precision': round result to this many decimal places
+    'ccw': if True, rotate counter-clockwise (clockwise, otherwise)
+    """
+    if ccw:
+        angle = math.pi / 2
+    else:
+        angle = -math.pi / 2
+
+    rot = np.array(
+        [
+            [round(math.cos(angle), precision), -round(math.sin(angle), precision)],
+            [round(math.sin(angle), precision), round(math.cos(angle), precision)],
+        ]
+    )
+    return rot @ v
