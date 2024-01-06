@@ -25,8 +25,8 @@ class JoistArray:
         joist_at_end: bool = False,
         cantilever_tolerance: float = 1e-2,
     ):
-        self.spacing = spacing
-        self.initial_offset = initial_offset
+        self.spacing = float(spacing)
+        self.initial_offset = float(initial_offset)
         self._joist_prototype = joist_prototype
         self._cantilever_tolerance = cantilever_tolerance
         self._extents = get_joist_extents(joist_prototype, joist_supports)
@@ -34,8 +34,15 @@ class JoistArray:
         self._cantilevers = get_cantilever_segments(joist_prototype, self._supports)
         self.vector_parallel = get_direction_vector(joist_prototype)
         self.vector_normal = rotate_90(self.vector_parallel, ccw=False)
-        self.joist_at_start = joist_at_start
-        self.joist_at_end = joist_at_end
+        self.joist_at_start = float(joist_at_start)
+        self.joist_at_end = float(joist_at_end)
+        self.joist_locations = get_joist_locations(
+            self.get_extent_edge("start"),
+            self.get_extent_edge("end"),
+            self.spacing,
+            self.initial_offset,
+            self.joist_at_start,
+        )
 
     # def __repr__(self):
     #     return class_representation(self)
@@ -50,21 +57,23 @@ class JoistArray:
             go to n, the last joist in the array.
         """
         start_centroid = self.get_extent_edge("start").centroid
-        joist_distance = self.get_joist_location(index)
+        joist_distance = self.joist_locations[index]
         new_centroid = project_node(start_centroid, -self.vector_normal, joist_distance)
-        # return new_centroid
         system_bounds = get_system_bounds(
             self._joist_prototype, list(self._supports.values())
         )
         projection_distance = get_magnitude(system_bounds)
+
         ray_aj = project_node(new_centroid, -self.vector_parallel, projection_distance)
         ray_a = LineString([new_centroid, ray_aj])
         ray_bj = project_node(new_centroid, self.vector_parallel, projection_distance)
         ray_b = LineString([new_centroid, ray_bj])
         support_a_loc = ray_a.intersection(self._supports["A"])
         support_b_loc = ray_b.intersection(self._supports["B"])
+
         end_a = support_a_loc
-        end_b = support_a_loc
+        end_b = support_b_loc
+
         if self._cantilevers["A"]:
             end_a = project_node(
                 support_a_loc, -self.vector_parallel, self._cantilevers["A"]
@@ -74,38 +83,6 @@ class JoistArray:
                 support_b_loc, self.vector_parallel, self._cantilevers["B"]
             )
         return LineString([end_a, end_b])
-
-    def index_in_array(self, index: int):
-        """
-        Returns True if
-        """
-        pass
-
-    def get_joist_location(self, index: int) -> float:
-        """
-        Returns the position of the joist centroid projected
-        along self.vector_normal
-        """
-        joist_start = 0.0
-        if not self.joist_at_start:
-            if not self.initial_offset:
-                joist_start = self.spacing
-            else:
-                joist_start = self.initial_offset
-
-        joist_next = self.spacing
-        if self.initial_offset:
-            joist_next = self.initial_offset
-
-        start_sequence = [joist_start]
-        if index >= 1:
-            start_sequence += [joist_next]
-        # exclude_start_joist = int(not self.joist_at_start)
-        remaining_indexes = max(0, index - (len(start_sequence) - 1))
-        print(index, remaining_indexes)
-        remaining_sequence = [self.spacing] * remaining_indexes
-        total_sequence = start_sequence + remaining_sequence
-        return sum(total_sequence)
 
     def get_extent_edge(self, edge: str = "start"):
         """
@@ -286,6 +263,37 @@ def get_magnitude(bounds: tuple[float, float, float, float]) -> float:
     delta_x = maxx - minx
     magnitude = (delta_y**2 + delta_x**2) ** 0.5
     return magnitude
+
+
+def get_joist_locations(
+    start_edge: LineString,
+    end_edge: LineString,
+    spacing: float,
+    initial_offset: float,
+    joist_at_start: bool,
+) -> list[float]:
+    """
+    Returns a list of location offsets (starting from 0.0)
+    """
+    distance = start_edge.distance(end_edge)
+    distance_remaining = distance
+    joist_locs = []
+    if joist_at_start:
+        joist_locs.append(0.0)
+        if initial_offset:
+            joist_locs.append(initial_offset)
+            distance_remaining -= initial_offset
+    else:
+        if initial_offset:
+            joist_locs.append(initial_offset)
+            distance_remaining -= initial_offset
+    while distance_remaining > spacing:
+        distance_remaining -= spacing
+        joist_locs.append(distance - distance_remaining)
+    else:
+        joist_locs.append(round(distance, 2))
+
+    return joist_locs
 
 
 def get_direction_vector(ls: LineString) -> np.ndarray:
