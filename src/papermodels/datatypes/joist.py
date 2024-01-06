@@ -57,7 +57,12 @@ class JoistArray:
             go to n, the last joist in the array.
         """
         start_centroid = self.get_extent_edge("start").centroid
-        joist_distance = self.joist_locations[index]
+        try:
+            joist_distance = self.joist_locations[index]
+        except IndexError as e:
+            raise IndexError(
+                f"Joist index {index} is beyond the extent of the joist array. Last index is {len(self.joist_locations) - 1} @ {self.joist_locations[-1]}"
+            ) from None
         new_centroid = project_node(start_centroid, -self.vector_normal, joist_distance)
         system_bounds = get_system_bounds(
             self._joist_prototype, list(self._supports.values())
@@ -291,7 +296,7 @@ def get_joist_locations(
         distance_remaining -= spacing
         joist_locs.append(distance - distance_remaining)
     else:
-        joist_locs.append(round(distance, 2))
+        joist_locs.append(distance)
 
     return joist_locs
 
