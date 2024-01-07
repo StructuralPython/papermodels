@@ -43,6 +43,7 @@ class JoistArray:
             self.initial_offset,
             self.joist_at_start,
         )
+        # self.joists = [self.generate_joist(idx) for idx, _ in enumerate(self.joist_locations)]
 
     # def __repr__(self):
     #     return class_representation(self)
@@ -63,21 +64,38 @@ class JoistArray:
             raise IndexError(
                 f"Joist index {index} is beyond the extent of the joist array. Last index is {len(self.joist_locations) - 1} @ {self.joist_locations[-1]}"
             ) from None
-        new_centroid = project_node(start_centroid, -self.vector_normal, joist_distance)
-        system_bounds = get_system_bounds(
-            self._joist_prototype, list(self._supports.values())
-        )
-        projection_distance = get_magnitude(system_bounds)
 
-        ray_aj = project_node(new_centroid, -self.vector_parallel, projection_distance)
-        ray_a = LineString([new_centroid, ray_aj])
-        ray_bj = project_node(new_centroid, self.vector_parallel, projection_distance)
-        ray_b = LineString([new_centroid, ray_bj])
-        support_a_loc = ray_a.intersection(self._supports["A"])
-        support_b_loc = ray_b.intersection(self._supports["B"])
+        if index != 0 and index != len(self.joist_locations) - 1:
+            new_centroid = project_node(
+                start_centroid, -self.vector_normal, joist_distance
+            )
 
-        end_a = support_a_loc
-        end_b = support_b_loc
+            system_bounds = get_system_bounds(
+                self._joist_prototype, list(self._supports.values())
+            )
+            projection_distance = get_magnitude(system_bounds)
+            ray_aj = project_node(
+                new_centroid, -self.vector_parallel, projection_distance
+            )
+            ray_a = LineString([new_centroid, ray_aj])
+            ray_bj = project_node(
+                new_centroid, self.vector_parallel, projection_distance
+            )
+            ray_b = LineString([new_centroid, ray_bj])
+            support_a_loc = ray_a.intersection(self._supports["A"])
+            support_b_loc = ray_b.intersection(self._supports["B"])
+
+            end_a = support_a_loc
+            end_b = support_b_loc
+
+        # These clauses req'd to deal with floating point error possible
+        # on the end joists (occurs after performing project_node)
+        elif index == 0:
+            end_a = support_a_loc = self._extents["A"][0]
+            end_b = support_b_loc = self._extents["B"][0]
+        elif index == len(self.joist_locations) - 1:
+            end_a = support_a_loc = self._extents["A"][1]
+            end_b = support_b_loc = self._extents["B"][1]
 
         if self._cantilevers["A"]:
             end_a = project_node(
@@ -238,7 +256,7 @@ def get_cantilever_segments(
     splits_b = ops.split(joist_prototype, ordered_supports["B"])
     for geom_a in splits_a.geoms:
         for geom_b in splits_b.geoms:
-            if not geom_a.intersects(geom_b):
+            if not geom_a.buffer(1e-6).intersects(geom_b):
                 return {
                     "A": 0.0 if geom_a.length < tolerance else geom_a.length,
                     "B": 0.0 if geom_b.length < tolerance else geom_b.length,
