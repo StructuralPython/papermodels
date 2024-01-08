@@ -17,6 +17,7 @@ class JoistArray:
 
     def __init__(
         self,
+        joist_id: str,
         joist_prototype: LineString,
         joist_supports: list[LineString],
         spacing: float | int,
@@ -25,6 +26,7 @@ class JoistArray:
         joist_at_end: bool = False,
         cantilever_tolerance: float = 1e-2,
     ):
+        self.id = joist_id
         self.spacing = float(spacing)
         self.initial_offset = float(initial_offset)
         self._joist_prototype = joist_prototype
@@ -62,7 +64,8 @@ class JoistArray:
             joist_distance = self.joist_locations[index]
         except IndexError as e:
             raise IndexError(
-                f"Joist index {index} is beyond the extent of the joist array. Last index is {len(self.joist_locations) - 1} @ {self.joist_locations[-1]}"
+                f"Joist index {index} is beyond the extent of the joist array for {self.id}. "
+                f"Last index is {len(self.joist_locations) - 1} @ {self.joist_locations[-1]}"
             ) from None
 
         if index != 0 and index != len(self.joist_locations) - 1:
@@ -120,6 +123,28 @@ class JoistArray:
             node_i = self._extents["A"][1]
             node_j = self._extents["B"][1]
         return LineString([node_i, node_j])
+
+    def get_joist_trib_widths(self, index) -> tuple[float, float]:
+        """
+        Returns the trib widths of the the joist at 'index'. The trib
+        widths are a tuple representing the left and right width,
+        respectively.
+        """
+        if index < 0:
+            # Convert -ve index lookup to a +ve index lookup
+            index = len(self.joist_locations) + index
+        if index == 0:
+            trib_widths = (0.0, self.joist_locations[1] / 2.0)
+        elif index == len(self.joist_locations) - 1:
+            spacing_left = self.joist_locations[-1] - self.joist_locations[-2]
+            trib_widths = (spacing_left / 2.0, 0.0)
+        else:
+            spacing_left = self.joist_locations[index] - self.joist_locations[index - 1]
+            spacing_right = (
+                self.joist_locations[index + 1] - self.joist_locations[index]
+            )
+            trib_widths = (spacing_left / 2.0, spacing_right / 2.0)
+        return trib_widths
 
 
 @dataclass
