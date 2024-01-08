@@ -3,7 +3,7 @@ import math
 from typing import Any, Optional
 import pycba as cba
 import numpy as np
-from shapely import LineString, Point, MultiLineString
+from shapely import LineString, Point, MultiLineString, Polygon, MultiPoint, convex_hull
 import shapely.ops as ops
 
 from papermodels.datatypes.utils import class_representation
@@ -45,7 +45,16 @@ class JoistArray:
             self.initial_offset,
             self.joist_at_start,
         )
-        # self.joists = [self.generate_joist(idx) for idx, _ in enumerate(self.joist_locations)]
+        self.joists = [
+            self.generate_joist(idx) for idx, _ in enumerate(self.joist_locations)
+        ]
+        self.joist_trib_widths = [
+            self.get_joist_trib_widths(idx)
+            for idx, _ in enumerate(self.joist_locations)
+        ]
+        self.joist_trib_areas = [
+            self.generate_trib_areas(idx) for idx, _ in enumerate(self.joist_locations)
+        ]
 
     # def __repr__(self):
     #     return class_representation(self)
@@ -145,6 +154,35 @@ class JoistArray:
             )
             trib_widths = (spacing_left / 2.0, spacing_right / 2.0)
         return trib_widths
+
+    def generate_trib_areas(self, index: int) -> tuple[Polygon, Polygon]:
+        """
+        Returns a tuple of Polygon representing the tributary area of the 'joist' based on the
+        given 'trib_widths'
+        """
+        joist = self.joists[index]
+        trib_widths = self.joist_trib_widths[index]
+        i_node, j_node = joist.boundary.geoms  # Point, Point
+        trib_left, trib_right = trib_widths  # float, float
+
+        # Left
+        if trib_left != 0.0:
+            i_left = project_node(i_node, -self.vector_normal, trib_left)
+            j_left = project_node(j_node, -self.vector_normal, trib_left)
+            trib_area_left = convex_hull(MultiPoint([i_left, j_left, j_node, i_node]))
+        else:
+            trib_area_left = Polygon()
+
+        # Right
+        if trib_right != 0.0:
+            i_right = project_node(i_node, self.vector_normal, trib_right)
+            j_right = project_node(j_node, self.vector_normal, trib_right)
+            trib_area_right = convex_hull(
+                MultiPoint([i_right, j_right, j_node, i_node])
+            )
+        else:
+            trib_area_right = Polygon()
+        return trib_area_left, trib_area_right
 
 
 @dataclass
