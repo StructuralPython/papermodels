@@ -53,7 +53,7 @@ class JoistArray:
             for idx, _ in enumerate(self.joist_locations)
         ]
         self.joist_trib_areas = [
-            self.generate_trib_areas(idx) for idx, _ in enumerate(self.joist_locations)
+            self.generate_trib_area(idx) for idx, _ in enumerate(self.joist_locations)
         ]
 
     # def __repr__(self):
@@ -155,7 +155,7 @@ class JoistArray:
             trib_widths = (spacing_left / 2.0, spacing_right / 2.0)
         return trib_widths
 
-    def generate_trib_areas(self, index: int) -> tuple[Polygon, Polygon]:
+    def generate_trib_area(self, index: int) -> Polygon:
         """
         Returns a tuple of Polygon representing the tributary area of the 'joist' based on the
         given 'trib_widths'
@@ -182,7 +182,7 @@ class JoistArray:
             )
         else:
             trib_area_right = Polygon()
-        return trib_area_left, trib_area_right
+        return trib_area_left | trib_area_right
 
 
 @dataclass
