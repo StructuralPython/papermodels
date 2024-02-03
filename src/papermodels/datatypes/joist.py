@@ -167,16 +167,16 @@ class JoistArray:
 
         # Left
         if trib_left != 0.0:
-            i_left = project_node(i_node, -self.vector_normal, trib_left)
-            j_left = project_node(j_node, -self.vector_normal, trib_left)
+            i_left = project_node(i_node, self.vector_normal, trib_left)
+            j_left = project_node(j_node, self.vector_normal, trib_left)
             trib_area_left = convex_hull(MultiPoint([i_left, j_left, j_node, i_node]))
         else:
             trib_area_left = Polygon()
 
         # Right
         if trib_right != 0.0:
-            i_right = project_node(i_node, self.vector_normal, trib_right)
-            j_right = project_node(j_node, self.vector_normal, trib_right)
+            i_right = project_node(i_node, -self.vector_normal, trib_right)
+            j_right = project_node(j_node, -self.vector_normal, trib_right)
             trib_area_right = convex_hull(
                 MultiPoint([i_right, j_right, j_node, i_node])
             )
