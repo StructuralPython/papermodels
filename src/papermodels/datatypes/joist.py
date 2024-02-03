@@ -142,9 +142,9 @@ class JoistArray:
         if index < 0:
             # Convert -ve index lookup to a +ve index lookup
             index = len(self.joist_locations) + index
-        if index == 0:
+        if index == 0: # The first joist
             trib_widths = (0.0, self.joist_locations[1] / 2.0)
-        elif index == len(self.joist_locations) - 1:
+        elif index == len(self.joist_locations) - 1: # The last joist
             spacing_left = self.joist_locations[-1] - self.joist_locations[-2]
             trib_widths = (spacing_left / 2.0, 0.0)
         else:
