@@ -6,13 +6,15 @@ import networkx as nx
 import hashlib
 
 from shapely import Point
+from PyNite import FEModel3D
 
 from papermodels.datatypes.element import (
     Element,
     get_tag_type,
     get_normalized_coordinate,
 )
-from papermodels.datatypes.j
+from papermodels.datatypes.geometry_graph import GeometryGraph
+from papermodels.datatypes.joist import JoistArray, Joist
 from rich.progress import track
 
 class LoadGraph(nx.DiGraph):
@@ -24,26 +26,33 @@ class LoadGraph(nx.DiGraph):
     """
     def __init__(self):
         super().__init__()
-        self.node_hash = None
+        self.geometry_hash = None
 
 
     @classmethod
-    def from_elements(cls, elements: list[Element], floor_elevations: Optional[dict] = None) -> LoadGraph:
-        """
-        Returns a LoadGraph (networkx.DiGraph) based upon the intersections and correspondents
-        of the 'elements'.
-        """
-        top_down_elements = sorted(elements, key=lambda x: x.page, reverse=True)
+    def from_geometry_graph(cls, graph: GeometryGraph):
         g = cls()
-        for element in top_down_elements:
-            hash = hashlib.sha256(str(element).encode()).hexdigest()
-            g.add_node(element.tag, element=element, sha256=hash)
-            for correspondent in element.correspondents:
-                g.add_edge(element.tag, correspondent)
-            for intersection in element.intersections:
-                g.add_edge(element.tag, intersection[0])
-        return g
+        g.geometry_hash = graph.node_hash
+        for node, element in graph.nodes.items():
+            if element.type.lower() == "joist":
+                model = element_to_joist_array(element)
+            elif "beam" in element.type.lower():
+                model = element_to_beam_model(element)
+            elif "column" in element.type.lower():
+                model = element_to_column_model(element)
+            g.add_node(node, model=model)
 
+
+        for edge, edge_data in graph.edges.data():
+            pass
+        # for element in top_down_elements:
+        #     hash = hashlib.sha256(str(element).encode()).hexdigest()
+        #     g.add_node(element.tag, element=element, sha256=hash)
+        #     for correspondent in element.correspondents:
+        #         g.add_edge(element.tag, correspondent)
+        #     for intersection in element.intersections:
+        #         g.add_edge(element.tag, intersection[0])
+        return g
 
     def hash_nodes(self):
         """
@@ -117,7 +126,7 @@ class LoadGraph(nx.DiGraph):
                         reaction = model_copy.Nodes[support_tag].RxnFY["Pass"]
                         support_tags[support_tag] = reaction
             elif prefix_dict[tag_prefix] == "joist":
-                model = element_to_joist_model(element)
+                model = element_to_joist_array(element)
                 self.nodes[node]["model"] = model
             elif prefix_dict[tag_prefix] == "column":
                 pass
@@ -127,8 +136,6 @@ class LoadGraph(nx.DiGraph):
                 pass
             elif prefix_dict[tag_prefix] == "line_load":
                 pass
-
-
 
 
 def element_to_beam_model(element: Element) -> FEModel3D:
@@ -163,26 +170,69 @@ def element_to_beam_model(element: Element) -> FEModel3D:
     return model
 
 
-def element_to_joist_model(element: Element, w: float = 0.) -> Joist:
+# def element_to_joist_model(element: Element, w: float = 0.) -> Joist:
+#     """
+#     Returns a Joist object based on the data in 'element'
+#     """
+#     try:
+#         r1, r2 = element.intersections
+#     except ValueError:
+#         raise ValueError(f"Joists currently need to have two supports. {element.tag=} | {element.intersections=}")
+#     elem_geometry = element.geometry
+#     i_end = Point(elem_geometry.coords[0])
+#     j_end = Point(elem_geometry.coords[1])
+#     length = elem_geometry.length
+    
+#     # R1 should be closest to I-end
+#     r1_geom = r1[1]
+#     r2_geom = r2[1]
+#     if i_end.distance(r1_geom) > i_end.distance(r2_geom):
+#         r1, r2 = r2, r1
+    
+#     span = r1_geom.distance(r2_geom)
+#     a_cantilever = round(abs(i_end.distance(r1_geom)), 6)
+#     b_cantilever = round(abs(r2_geom.distance(j_end)), 6)
+#     return Joist(span, a_cantilever, b_cantilever)
+
+
+def element_to_joist_array(
+        joist_element: Element, 
+        initial_offset: int | float = 0,
+        joist_at_start: bool = True,
+        joist_at_end: bool = False,
+        cantilever_tolerance: float = 0.01
+        ) -> JoistArray:
     """
     Returns a Joist object based on the data in 'element'
     """
-    try:
-        r1, r2 = element.intersections
-    except ValueError:
-        raise ValueError(f"Joists currently need to have two supports. {element.tag=} | {element.intersections=}")
-    elem_geometry = element.geometry
-    i_end = Point(elem_geometry.coords[0])
-    j_end = Point(elem_geometry.coords[1])
-    length = elem_geometry.length
+    supports = [inter[2] for inter in joist_element.intersections]
+    joist_array = JoistArray(
+        joist_element.tag,
+        joist_element.geometry,
+        supports,
+        joist_element.spacing,
+        initial_offset,
+        joist_at_start,
+        joist_at_end,
+        cantilever_tolerance
+
+)
+    # try:
+    #     r1, r2 = element.intersections
+    # except ValueError:
+    #     raise ValueError(f"Joists currently need to have two supports. {element.tag=} | {element.intersections=}")
+    # elem_geometry = element.geometry
+    # i_end = Point(elem_geometry.coords[0])
+    # j_end = Point(elem_geometry.coords[1])
+    # length = elem_geometry.length
     
-    # R1 should be closest to I-end
-    r1_geom = r1[1]
-    r2_geom = r2[1]
-    if i_end.distance(r1_geom) > i_end.distance(r2_geom):
-        r1, r2 = r2, r1
+    # # R1 should be closest to I-end
+    # r1_geom = r1[1]
+    # r2_geom = r2[1]
+    # if i_end.distance(r1_geom) > i_end.distance(r2_geom):
+    #     r1, r2 = r2, r1
     
-    span = r1_geom.distance(r2_geom)
-    a_cantilever = round(abs(i_end.distance(r1_geom)), 6)
-    b_cantilever = round(abs(r2_geom.distance(j_end)), 6)
-    return Joist(span, a_cantilever, b_cantilever)
+    # span = r1_geom.distance(r2_geom)
+    # a_cantilever = round(abs(i_end.distance(r1_geom)), 6)
+    # b_cantilever = round(abs(r2_geom.distance(j_end)), 6)
+    # return Joist(span, a_cantilever, b_cantilever)

@@ -4,6 +4,7 @@ from shapely.wkt import loads as wkt_loads
 from shapely import Geometry, GeometryCollection, Point
 from papermodels.datatypes.annotation import Annotation
 from papermodels.datatypes.element import Element
+from papermodels.geometry.geom_ops import get_intersection
 from typing import Any, Optional
 import numpy as np
 
@@ -147,22 +148,8 @@ def get_geometry_intersections(
                 # print(f"I tag: {i_attrs['tag']} | J tag: {j_attrs['tag']}")
                 i_geom = i_attrs["geometry"]
                 j_geom = j_attrs["geometry"]
-                intersection_point = (
-                    i_geom & j_geom
-                    if j_geom.geom_type != "Polygon"
-                    else i_geom & j_geom.exterior
-                )
-                if intersection_point.geom_type == "MultiPoint":
-                    intersection_point = Point(
-                        np.array(
-                            [
-                                np.array(geom.coords[0])
-                                for geom in intersection_point.geoms
-                            ]
-                        ).mean(axis=1)
-                    )
-                if not intersection_point.is_empty:
-                    intersection = (j_attrs["tag"], intersection_point)
+                intersection = get_intersection(i_geom, j_geom, j_attrs['tag'])
+                if intersection is not None:
                     intersections.append(intersection)
         i_attrs["intersections"] = intersections
     return intersected_annotations

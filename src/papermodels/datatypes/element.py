@@ -85,7 +85,6 @@ E02 = Element(
 )
 
 
-
 def element_to_beam_model(element: Element) -> FEModel3D:
     """
     Returns an FEModel3D for the data in 'element'

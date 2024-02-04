@@ -28,6 +28,24 @@ class GeometryGraph(nx.DiGraph):
         self.node_hash = None
 
 
+    @classmethod
+    def from_elements(cls, elements: list[Element], floor_elevations: Optional[dict] = None) -> GeometryGraph:
+        """
+        Returns a LoadGraph (networkx.DiGraph) based upon the intersections and correspondents
+        of the 'elements'.
+        """
+        top_down_elements = sorted(elements, key=lambda x: x.page, reverse=True)
+        g = cls()
+        for element in top_down_elements:
+            hash = hashlib.sha256(str(element).encode()).hexdigest()
+            g.add_node(element.tag, element=element, sha256=hash)
+            for correspondent in element.correspondents:
+                g.add_edge(element.tag, correspondent)
+            for intersection in element.intersections:
+                g.add_edge(element.tag, intersection[0])
+        return g
+
+
     def hash_nodes(self):
         """
         Returns None. Sets the value of self.node_hash based on the hashed values of
