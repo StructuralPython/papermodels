@@ -18,9 +18,9 @@ def nbcc_2020_combos():
         "LC4c": {"D": 1.25, "W": 1.4, "S": 0.5},
         "LC4d": {"D": 0.9, "W": 1.4},
         "LC4e": {"D": 0.9, "W": 1.4, "L": 0.5},
-        "LC4f": {"D": 0.9, "W": 1.4, "S": 0.5}, 
+        "LC4f": {"D": 0.9, "W": 1.4, "S": 0.5},
         "LC5a": {"D": 1.0, "E": 1.0},
-        "LC5b": {"D": 1.0, "E": 1.0, "L": 0.5, "S": 0.25}
+        "LC5b": {"D": 1.0, "E": 1.0, "L": 0.5, "S": 0.25},
     }
     return nbcc_2020_combinations
 
@@ -45,11 +45,12 @@ def nbcc_2015_combos():
         "LC4c": {"D": 1.25, "W": 1.4, "S": 0.5},
         "LC4d": {"D": 0.9, "W": 1.4},
         "LC4e": {"D": 0.9, "W": 1.4, "L": 0.5},
-        "LC4f": {"D": 0.9, "W": 1.4, "S": 0.5}, 
+        "LC4f": {"D": 0.9, "W": 1.4, "S": 0.5},
         "LC5a": {"D": 1.0, "E": 1.0},
-        "LC5b": {"D": 1.0, "E": 1.0, "L": 0.5, "S": 0.25}
+        "LC5b": {"D": 1.0, "E": 1.0, "L": 0.5, "S": 0.25},
     }
     return nbcc_2015_combinations
+
 
 def nbcc_2010_combos():
     nbcc_2010_combinations = {
@@ -71,25 +72,30 @@ def nbcc_2010_combos():
         "LC4c": {"D": 1.25, "W": 1.4, "S": 0.5},
         "LC4d": {"D": 0.9, "W": 1.4},
         "LC4e": {"D": 0.9, "W": 1.4, "L": 0.5},
-        "LC4f": {"D": 0.9, "W": 1.4, "S": 0.5}, 
+        "LC4f": {"D": 0.9, "W": 1.4, "S": 0.5},
         "LC5a": {"D": 1.0, "E": 1.0},
-        "LC5b": {"D": 1.0, "E": 1.0, "L": 0.5, "S": 0.25}
+        "LC5b": {"D": 1.0, "E": 1.0, "L": 0.5, "S": 0.25},
     }
     return nbcc_2010_combinations
 
 
 def factor_load(
-    D_load: float = 0.0, D: float = 0.0,
-    L_load: float = 0.0, L: float = 0.0,
-    S_load: float = 0.0, S: float = 0.0,
-    W_load: float = 0.0, W: float = 0.0,
-    E_load: float = 0.0, E: float = 0.0,
-    ) -> float:
+    D_load: float = 0.0,
+    D: float = 0.0,
+    L_load: float = 0.0,
+    L: float = 0.0,
+    S_load: float = 0.0,
+    S: float = 0.0,
+    W_load: float = 0.0,
+    W: float = 0.0,
+    E_load: float = 0.0,
+    E: float = 0.0,
+) -> float:
     """
     Returns the factored load given the load components (e.g. 'D_load', 'L_load', etc.)
     and the load factors (e.g. 'D', 'L', etc.) provided.
     """
-    factored_load = D_load*D + L_load*L + S_load*S + W_load*W + E_load*E
+    factored_load = D_load * D + L_load * L + S_load * S + W_load * W + E_load * E
     return factored_load
 
 
@@ -103,7 +109,7 @@ def max_factored_load(
         and float values representing load magnitudes. +ve/-ve is dependent on the designer's
         sign convention.
     'load_combos' is a dict of str keys (representing the "names" of each load combination)
-        with dict values representing load components and their factors, e.g. 
+        with dict values representing load components and their factors, e.g.
         {"D": 1.25, "L": 1.5, "S": 1.0}
     """
     factored_loads = []
@@ -123,7 +129,7 @@ def min_factored_load(
         and float values representing load magnitudes. +ve/-ve is dependent on the designer's
         sign convention.
     'load_combos' is a dict of str keys (representing the "names" of each load combination)
-        with dict values representing load components and their factors, e.g. 
+        with dict values representing load components and their factors, e.g.
         {"D": 1.25, "L": 1.5, "S": 1.0}
     """
     factored_loads = []
@@ -162,6 +168,7 @@ def envelope_max(result_arrays: dict) -> list[list[float]]:
 #     first_key = list(result_arrays.keys())[0]
 #     return [result_arrays[first_key][0], enveloped]
 
+
 def envelope_min(result_arrays: dict) -> list[list[float]]:
     """
     Returns the minimum factored array across all factored result arrays in 'result_arrays'.
@@ -171,6 +178,8 @@ def envelope_min(result_arrays: dict) -> list[list[float]]:
         are in index 0 and the y-coordinates are in index 1
     """
     stacked_results = [result_array[1] for result_array in result_arrays.values()]
-    enveloped = [min(results_at_station) for results_at_station in zip(*stacked_results)]
+    enveloped = [
+        min(results_at_station) for results_at_station in zip(*stacked_results)
+    ]
     first_key = list(result_arrays.keys())[0]
     return [result_arrays[first_key][0], enveloped]
