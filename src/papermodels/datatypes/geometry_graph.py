@@ -3,13 +3,8 @@ from typing import Optional
 from copy import deepcopy
 import networkx as nx
 import hashlib
-from papermodels.datatypes.element import (
-    Element,
-    element_to_beam_model,
-    element_to_joist_model,
-    get_tag_type,
-    get_normalized_coordinate,
-)
+
+from papermodels.datatypes.element import Element
 from rich.progress import track
 
 

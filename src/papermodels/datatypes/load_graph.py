@@ -14,8 +14,12 @@ from papermodels.datatypes.element import (
     get_normalized_coordinate,
 )
 from papermodels.datatypes.geometry_graph import GeometryGraph
-from papermodels.datatypes.joist import JoistArray, Joist
+from papermodels.datatypes.beam_models import BeamModel
+from papermodels.datatypes.column_models import ColumnModel
+from papermodels.datatypes.wall_models import WallModel
+from papermodels.datatypes.joist_models import JoistArrayModel
 from rich.progress import track
+from rich import print
 
 class LoadGraph(nx.DiGraph):
     """
@@ -33,13 +37,19 @@ class LoadGraph(nx.DiGraph):
     def from_geometry_graph(cls, graph: GeometryGraph):
         g = cls()
         g.geometry_hash = graph.node_hash
-        for node, element in graph.nodes.items():
+        for node, node_data in graph.nodes.items():
+            element = node_data['element']
+            print(node, element)
             if element.type.lower() == "joist":
-                model = element_to_joist_array(element)
+                model = JoistArrayModel(element)
             elif "beam" in element.type.lower():
-                model = element_to_beam_model(element)
+                model = BeamModel(element)
             elif "column" in element.type.lower():
-                model = element_to_column_model(element)
+                model = ColumnModel(element)
+            elif "wall" in element.type.lower():
+                model = WallModel(element)
+            else:
+                print(element.type.lower())
             g.add_node(node, model=model)
 
 
@@ -201,12 +211,12 @@ def element_to_joist_array(
         joist_at_start: bool = True,
         joist_at_end: bool = False,
         cantilever_tolerance: float = 0.01
-        ) -> JoistArray:
+        ) -> JoistArrayModel:
     """
     Returns a Joist object based on the data in 'element'
     """
     supports = [inter[2] for inter in joist_element.intersections]
-    joist_array = JoistArray(
+    joist_array = JoistArrayModel(
         joist_element.tag,
         joist_element.geometry,
         supports,
