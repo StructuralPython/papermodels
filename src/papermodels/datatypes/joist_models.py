@@ -39,7 +39,6 @@ class JoistArrayModel:
         self._extents = get_joist_extents(joist_prototype, joist_supports)
         self._supports = determine_support_order(joist_prototype, joist_supports)
         self._cantilevers = get_cantilever_segments(joist_prototype, self._supports)
-        print(self._cantilevers)
         self.vector_parallel = get_direction_vector(joist_prototype)
         self.vector_normal = rotate_90(self.vector_parallel, ccw=False)
         self.joist_at_start = float(joist_at_start)
@@ -471,7 +470,6 @@ def project_node(node: Point, vector: np.ndarray, magnitude: float):
     """
     scaled_vector = vector * magnitude
     projected_node = np.array(node.xy) + scaled_vector
-    # print(projected_node, scaled_vector)
     return Point(projected_node)
 
 

@@ -82,7 +82,6 @@ def _get_annotations_from_fdf(fdf_str: str) -> list[Annotation]:
     #  the general approach taken.
 
     for line in fdf_str:
-        print(line)
         if "endstream" in line and stream_data:
             stream_properties = _extract_stream_properties(stream_data)
             stream_data = None
@@ -93,14 +92,11 @@ def _get_annotations_from_fdf(fdf_str: str) -> list[Annotation]:
         elif not parse.search("{} 0 obj<<", line) and "stream" not in line:
             continue
         elif "stream" in line:
-            print("stream")
             in_stream_data = True
             continue
         type_and_vertices = _extract_type_and_vertices(line)
-        print(type_and_vertices)
         object_properties = _extract_object_properties(line)
         if annot_type and vertices and stream_properties:
-            print("Here")
             annotation_properties.update(stream_properties)
             annotation = Annotation(
                 object_type=annot_type,

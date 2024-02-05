@@ -145,7 +145,6 @@ def get_geometry_intersections(
             j_rank = j_attrs["rank"]
             j_page = j_annot.page
             if i_rank < j_rank and i_page == j_page:
-                # print(f"I tag: {i_attrs['tag']} | J tag: {j_attrs['tag']}")
                 i_geom = i_attrs["geometry"]
                 j_geom = j_attrs["geometry"]
                 intersection = get_intersection(i_geom, j_geom, j_attrs['tag'])

@@ -60,8 +60,6 @@ def load_pdf_annotations(pdf_path: pathlib.Path | str) -> list[Annotation]:
                 print(f"Cannot read (yet): {annot_type}")
 
             text = str(annot.get("/Contents", ""))
-            # popup = annot.get("/Popup")
-            # print(popup)
             rc = annot.get("/RC")
             text = parse_html_text_content(str(rc)) if rc is not None else ""
             line_color = tuple(annot.get("/C", stream_dict.get("RG", (0, 0, 0))))
