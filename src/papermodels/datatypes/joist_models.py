@@ -1,3 +1,4 @@
+from __future__ import annotations
 from dataclasses import dataclass
 import math
 from typing import Any, Optional
@@ -20,7 +21,7 @@ class JoistArrayModel:
 
     def __init__(
         self,
-        element: Element,
+        element: Optional[Element] = None,
         # joist_id: str,
         # joist_prototype: LineString,
         # spacing: float | int,
@@ -62,6 +63,22 @@ class JoistArrayModel:
         ]
     # def __repr__(self):
     #     return class_representation(self)
+        
+    @classmethod
+    def from_element(
+        cls,   
+        element: Optional[Element],
+        initial_offset: float | int = 0.0,
+        joist_at_start: bool = True,
+        joist_at_end: bool = False,
+        cantilever_tolerance: float = 1e-2) -> JoistArrayModel:
+        return cls(
+            element,
+            initial_offset,
+            joist_at_start,
+            joist_at_end,
+            cantilever_tolerance
+        )
 
     def generate_joist(self, index: int):
         """

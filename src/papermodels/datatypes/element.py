@@ -1,9 +1,7 @@
 from dataclasses import dataclass
 from typing import Optional
 from shapely import Point, Geometry, LineString, Polygon
-import math
 import parse
-from papermodels.datatypes.joist_models import Joist
 
 
 @dataclass(frozen=True)

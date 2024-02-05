@@ -4,6 +4,7 @@ import math
 from copy import deepcopy
 import networkx as nx
 import hashlib
+import pathlib
 
 from shapely import Point
 from PyNite import FEModel3D
@@ -40,6 +41,30 @@ class LoadGraph(nx.DiGraph):
         for node, node_data in graph.nodes.items():
             element = node_data['element']
             if element.type.lower() == "joist":
+                model = JoistArrayModel.from_element(element)
+            elif "beam" in element.type.lower():
+                model = BeamModel.from_element(element)
+            elif "column" in element.type.lower():
+                model = ColumnModel.from_element(element)
+            elif "wall" in element.type.lower():
+                model = WallModel.from_element(element)
+            else:
+                print(element.type.lower())
+            g.add_node(node, model=model)
+
+
+        for u, v in graph.edges:
+            edge_data = graph.edges[(u, v)]
+            g.add_edge(u, v, edge_data=edge_data)
+        return g
+    
+    @classmethod
+    def from_beam_files(cls, beam_file_dir: pathlib.Path):
+        g = cls()
+        g.geometry_hash = graph.node_hash
+        for node, node_data in graph.nodes.items():
+            element = node_data['element']
+            if element.type.lower() == "joist":
                 model = JoistArrayModel(element)
             elif "beam" in element.type.lower():
                 model = BeamModel(element)
@@ -52,15 +77,9 @@ class LoadGraph(nx.DiGraph):
             g.add_node(node, model=model)
 
 
-        for edge, edge_data in graph.edges.data():
-            pass
-        # for element in top_down_elements:
-        #     hash = hashlib.sha256(str(element).encode()).hexdigest()
-        #     g.add_node(element.tag, element=element, sha256=hash)
-        #     for correspondent in element.correspondents:
-        #         g.add_edge(element.tag, correspondent)
-        #     for intersection in element.intersections:
-        #         g.add_edge(element.tag, intersection[0])
+        for u, v in graph.edges:
+            edge_data = graph.edges[(u, v)]
+            g.add_edge(u, v, edge_data=edge_data)
         return g
 
     def hash_nodes(self):
