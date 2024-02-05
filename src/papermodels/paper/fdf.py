@@ -41,7 +41,6 @@ def _read_fdf_file(file_path: pathlib.Path) -> list[str]:
     file_data = []
     for line_no, line in enumerate(fdf.split(b"\n")):
         try:
-            # print(line)
             decoded = line.decode("utf-8")
             file_data.append(decoded)
         except UnicodeDecodeError:

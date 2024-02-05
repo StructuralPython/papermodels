@@ -320,13 +320,11 @@ def get_cantilever_segments(
     Returns a dictionary containing the cantilever lengths over-hanging supports "A" and
     "B", respectively. Returns a length of 0.0 if the length is less than the tolerance.
     """
-    print(ordered_supports)
     splits_a = ops.split(joist_prototype, ordered_supports["A"])
     splits_b = ops.split(joist_prototype, ordered_supports["B"])
     supports = MultiLineString([ordered_supports['A'], ordered_supports['B']])
     cantilever_segments = {"A": 0.0, "B": 0.0}
     for geom_a in splits_a.geoms:
-        print(geom_a & supports)
         if isinstance(geom_a & supports, Point):
             cantilever_segments['A'] = 0.0 if geom_a.length < tolerance else geom_a.length
 

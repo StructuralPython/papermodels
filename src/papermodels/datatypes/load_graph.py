@@ -39,7 +39,6 @@ class LoadGraph(nx.DiGraph):
         g.geometry_hash = graph.node_hash
         for node, node_data in graph.nodes.items():
             element = node_data['element']
-            print(node, element)
             if element.type.lower() == "joist":
                 model = JoistArrayModel(element)
             elif "beam" in element.type.lower():
