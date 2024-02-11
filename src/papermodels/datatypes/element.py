@@ -107,11 +107,16 @@ def get_elements_by_page(elements: list[Element]) -> dict[int, list[Element]]:
 
 def get_normalized_coordinate(element: Element, intersection_point: Point) -> float:
     """
-    Returns a normalized x-coordinate for the given 'coord' as it is located on the geometry
-    of 'element'. Returns None if the 'coord' provided is not colinear with
-    the element geometry.
+    Returns a normalized x-coordinate for the given 'intersection_point' as it is located on the geometry
+    of 'element'. 
     """
     geom = element.geometry
     i_coord = Point(geom.coords[0])
     distance = i_coord.distance(intersection_point)
     return distance
+
+def get_structured_model_data(element: Element) -> dict:
+    """
+    
+    """
+    pass

@@ -3,7 +3,7 @@ from typing import Optional
 import numpy as np
 
 from shapely import Point, MultiPoint, LineString, MultiLineString, Polygon, MultiPolygon, convex_hull
-import shapely.ops as ops
+import shapely.ops as op
 
 
 def get_intersection(i_geom: LineString, j_geom: LineString | Polygon, j_tag: str) -> Optional[tuple[str, Point, LineString]]:
@@ -28,8 +28,6 @@ def get_intersection(i_geom: LineString, j_geom: LineString | Polygon, j_tag: st
         )
     intersection = (j_tag, intersection_point, j_geom)
     return intersection
-
-
 
 
 def get_joist_extents(

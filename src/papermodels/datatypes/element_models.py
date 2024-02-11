@@ -31,6 +31,7 @@ class ElementModel:
     model: Optional[Any] = None
     structured_element_data: Optional[dict] = None
     section: dict = None
+    trib_region: Optional[Polygon] = None
 
     @classmethod
     def from_element(cls, element: Element):
@@ -39,6 +40,21 @@ class ElementModel:
     @classmethod
     def from_file(cls, filepath: pathlib.Path | str):
         raise NotImplemented
+    
+    def project_loads(self, loads: list[dict]) -> None:
+        """
+        Returns None. Performs a geometric intersection with each load present
+        in 'loads' to determine if any of the loads intersect with the 
+        self.trib_area of the element.
+        """
+        if self.trib_area is None:
+            return
+        for load in loads:
+            if load['geometry'].intersects(self.trib_region):
+                applied_load = go.get_applied_load(load['geometry'], self.trib_region)
+                if self.structured_element_data is None:
+                    self.structured_element_data = {}
+                self.structured_element_data['Loads'].append(applied_load)
 
     def get_reactions(self) -> tuple[float]:
         raise NotImplemented
