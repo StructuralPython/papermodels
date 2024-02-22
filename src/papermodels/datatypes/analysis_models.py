@@ -7,10 +7,36 @@ from papermodels.datatypes.element import Element
 from PyNite import FEModel3D
 
 
+@dataclass
+class AnalysisModel:
+    structured_element_data: dict
+    analysis_model: Optional[Any] = None
+    analyzed: bool = False
+    reactions: Optional[dict] = None
+
+
+    def create_model(self):
+        raise NotImplemented
+
+    def add_load(self):
+        raise NotImplemented
+
+    def analyze(self):
+        raise NotImplemented
+
+    def get_reactions(self):
+        raise NotImplemented
+
+    def get_forces(self, force_type: str):
+        raise NotImplemented
+
+    def get_reaction_type(self):
+        raise NotImplemented
+
+
 
 @dataclass
 class PyNiteFEModel:
-    structured_element_data: dict
 
     def create_model(self):
         """
@@ -33,7 +59,7 @@ class PyNiteFEModel:
 
         shear_modulus = calc_shear_modulus(element_data["E"], element_data["nu"])
         beam_model.add_material(
-            "Beam Material",
+            element_data['material_name'],
             element_data["E"],
             shear_modulus,
             element_data["nu"],
@@ -46,16 +72,54 @@ class PyNiteFEModel:
             element_data["Name"],
             "N0",
             node_name,
-            material="Beam Material",
+            material=element_data['material_name'],
             Iy=element_data["Iy"],
             Iz=element_data["Iz"],
             J=element_data["J"],
             A=element_data["A"],
         )
+
+        self.analysis_model = beam_model
+
+    def add_load(self, load_data: dict) -> None:
+        """
+        Adds one load to the model in self.analysis_model.
+        Sets self.analyzed to False to force a re-analysis.
+        """
+        load_cases = list(self.analysis_model.LoadCombos.keys())
+        if load_data['Type'] == "Point":
+            self.analysis_model.add_member_pt_load(
+                self.structured_element_data["Name"],
+                load_data["Direction"],
+                load_data["Magnitude"],
+                load_data["Location"],
+                case=load_data["Case"],
+            )
+            if load_data["Case"] not in load_cases:
+                load_cases.append(load_data["Case"])
+
+        elif load_data["Type"] == "Dist":
+                self.analysis_model.add_member_dist_load(
+                    self.structured_element_data["Name"],
+                    load_data["Direction"],
+                    load_data["Start Magnitude"],
+                    load_data["End Magnitude"],
+                    load_data["Start Location"],
+                    load_data["End Location"],
+                    case=load_data["Case"],
+                )
+                if load_data["Case"] not in load_cases:
+                    load_cases.append(load_data["Case"])
+        self.analyzed = False
+        self.reactions = None
+
+
+    def _add_loads(self) -> None:
+        element_data = self.structured_element_data
         load_cases = []
         for load in element_data["Loads"]:
             if load["Type"] == "Point":
-                beam_model.add_member_pt_load(
+                self.analysis_model.add_member_pt_load(
                     element_data["Name"],
                     load["Direction"],
                     load["Magnitude"],
@@ -65,7 +129,7 @@ class PyNiteFEModel:
                 if load["Case"] not in load_cases:
                     load_cases.append(load["Case"])
             elif load["Type"] == "Dist":
-                beam_model.add_member_dist_load(
+                self.analysis_model.add_member_dist_load(
                     element_data["Name"],
                     load["Direction"],
                     load["Start Magnitude"],
@@ -77,9 +141,55 @@ class PyNiteFEModel:
                 if load["Case"] not in load_cases:
                     load_cases.append(load["Case"])
 
+        # Hack for lack of implementation of load case reporting in PyNite
         for load_case in load_cases:
-            beam_model.add_load_combo(load_case, {load_case: 1.0})
-        return beam_model
+            self.analysis_model.add_load_combo(load_case, {load_case: 1.0})
+
+    
+    def analyze(self, analyze_linear: bool = True, check_stability: bool = True, check_statics=False):
+        if analyze_linear:
+            self.analysis_model.analyze_linear(check_stability=check_stability, check_statics=check_statics)
+        else:
+            self.analysis_model.analyze(check_stability=check_stability, check_statics=check_statics)
+        self.analyzed = True
+        self.reactions = self.get_reactions()
+
+
+    def get_reactions(self):
+        if not self.analyzed:
+            raise UserWarning(f"{self.analyzed=}. Re-run .analyze() to ensure results are current.")
+        model_nodes = self.analysis_model.Nodes
+
+        reactions = {}
+        for node_name, node_obj in model_nodes:
+            reactions[node_name] = {}
+            for reaction_dir in ('Fx', 'Fy', 'Fz', 'Mx', 'My', 'Mz'):
+                reaction_key = f"Rxn{reaction_dir.upper()}"
+                reaction_combos = getattr(node_obj, reaction_key)
+                reactions[reaction_dir] = reaction_combos
+        return reactions
+    
+
+    def get_forces(self, n_points: int = 200):
+        if not self.analyzed:
+            raise UserWarning(f"{self.analyzed=}. Re-run .analyze() to ensure results are current.")
+        member_name = self.structured_element_data['Name']
+        member_obj = self.analysis_model.Members[member_name]
+        load_cases = list(self.analysis_model.LoadCombos.keys())
+
+        forces = {}
+        force_actions = ("N", "Vz", "Vy", "Mz", "My", "T")
+        for force_action in force_action:
+            if force_action == "N":
+                forces[force_action] = member_obj.axial_array(n_points=n_points, )        
+                
+                
+
+            
+
+
+
+        
 
 
 
