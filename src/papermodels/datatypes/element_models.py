@@ -5,6 +5,7 @@ import pathlib
 from typing import Optional, Any
 from shapely import Polygon
 from papermodels.datatypes.element import Element
+from papermodels.datatypes.analysis_models import PyNiteFEModel
 from papermodels.geometry import geom_ops as go
 from papermodels.fileio.model_files import get_structured_beam_data
 from papermodels.fileio.utils import read_csv_file
@@ -35,13 +36,13 @@ class ElementModel:
 
     @classmethod
     def from_element(cls, element: Element):
-        return cls(element)
+        return cls(element=element)
     
     @classmethod
     def from_file(cls, filepath: pathlib.Path | str):
         raise NotImplemented
     
-    def project_loads(self, loads: list[dict]) -> None:
+    def determine_loads(self, loads: list[dict]) -> None:
         """
         Returns None. Performs a geometric intersection with each load present
         in 'loads' to determine if any of the loads intersect with the 
@@ -71,8 +72,14 @@ class BeamModel(ElementModel):
     
     def from_file(cls, filepath: pathlib.Path):
         raw_data = read_csv_file(filepath)
-        beam_data = get_structured_beam_data(raw_data)
-        beam_model = cls(structured_element_data = beam_data)
+        structured_beam_data = get_structured_beam_data(raw_data)
+        analysis_model = PyNiteFEModel(structured_beam_data)
+        analysis_model.create_model()
+        beam_model = cls(
+            structured_element_data=structured_beam_data,
+            reaction_type=ReactionType.POINT,
+
+            )
         return beam_model
         
 

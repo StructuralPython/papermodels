@@ -15,9 +15,9 @@ from papermodels.datatypes.element import (
     get_normalized_coordinate,
 )
 from papermodels.datatypes.geometry_graph import GeometryGraph
-from papermodels.datatypes.beam_models import BeamModel
-from papermodels.datatypes.column_models import ColumnModel
-from papermodels.datatypes.wall_models import WallModel
+from papermodels.datatypes.element_models import BeamModel
+from papermodels.datatypes.element_models import ColumnModel
+from papermodels.datatypes.element_models import WallModel
 from papermodels.datatypes.joist_models import JoistArrayModel
 from rich.progress import track
 from rich import print

@@ -3,7 +3,7 @@ from typing import Optional
 import numpy as np
 
 from shapely import Point, MultiPoint, LineString, MultiLineString, Polygon, MultiPolygon, convex_hull
-import shapely.ops as op
+import shapely.ops as ops
 
 
 def get_intersection(i_geom: LineString, j_geom: LineString | Polygon, j_tag: str) -> Optional[tuple[str, Point, LineString]]:

@@ -37,7 +37,6 @@ class AnalysisModel:
 
 @dataclass
 class PyNiteFEModel:
-
     def create_model(self):
         """
         Returns a FEModel3D of a beam that has the attributes described in 'element_data' and 'A', 'J', 'nu', and 'rho'.
@@ -183,14 +182,6 @@ class PyNiteFEModel:
             if force_action == "N":
                 forces[force_action] = member_obj.axial_array(n_points=n_points, )        
                 
-                
-
-            
-
-
-
-        
-
 
 
 def get_node_locations(
