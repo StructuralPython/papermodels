@@ -41,7 +41,7 @@ class LoadArray(UserDict):
                 load_element_3
             ],
             "page_number_2": [
-                load_element_3, 
+                load_element_3,
                 load_element_4
             ]
         }
