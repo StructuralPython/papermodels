@@ -5,6 +5,7 @@ from shapely import Geometry, GeometryCollection, Point
 from papermodels.datatypes.annotation import Annotation
 from papermodels.datatypes.element import Element
 from papermodels.geometry.geom_ops import get_intersection
+from papermodels.fileio.utils import str_to_int
 from typing import Any, Optional
 import numpy as np
 
@@ -69,9 +70,11 @@ def parse_annotations(
         }
         for annot in matching_annots:
             annot_geom = annotation_to_shapely(annot)
-            annot_attrs = annot_attributes.copy()
+            annot_attrs = {}
             annot_attrs["geometry"] = annot_geom
-            annot_attrs["rank"] = int(annot_attributes["rank"])
+            for annot_key, annot_attr in annot_attributes.items():
+                annot_attrs[annot_key] = str_to_int(annot_attr.split("<")[0]) # .split() to remove trailing HTML tags
+            # annot_attrs["rank"] = int(annot_attributes["rank"])
             parsed_annotations.update({annot: annot_attrs})
     return parsed_annotations
 
