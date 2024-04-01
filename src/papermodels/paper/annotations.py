@@ -1,5 +1,6 @@
 from __future__ import annotations
 from copy import deepcopy
+import dataclasses
 from shapely.wkt import loads as wkt_loads
 from shapely import Geometry, GeometryCollection, Point
 from papermodels.datatypes.annotation import Annotation
@@ -232,7 +233,7 @@ def filter_annotations(annots: list[Annotation], properties: dict) -> list[Annot
     """
     filtered = []
     for annot in annots:
-        if (annot.__dict__.items() & properties.items()) == properties.items():
+        if (dataclasses.asdict(annot) & properties.items()) == properties.items():
             filtered.append(annot)
     return filtered
 
@@ -252,8 +253,7 @@ def scale_annotations(
     """
     scaled_annotations = []
     for annot in annots:
-        new_annot = deepcopy(annot)
-        scaled_annotations.append(scale_annotation(new_annot, scale, paper_origin))
+        scaled_annotations.append(scale_annotation(annot, scale, paper_origin))
     return scaled_annotations
 
 
@@ -273,8 +273,8 @@ def scale_annotation(
         vertices = _translate_vertices(vertices, offset_x, offset_y)
 
     scaled_vertices = [vertex * scale for vertex in vertices]
-    annot.vertices = scaled_vertices
-    return annot
+    new_annot = Annotation(**(dataclasses.asdict(annot) | {"vertices": scaled_vertices}))
+    return new_annot
 
 
 def annotations_by_page(

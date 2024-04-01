@@ -27,6 +27,11 @@ def plot_annotations(
     ax = fig.gca()
     annotation_dict = isinstance(annots, dict)
     has_tags = False
+    minx = float('inf')
+    miny = float('inf')
+    maxx = float("-inf")
+    maxy = float("-inf")
+
     for idx, annot in enumerate(annots):
         if annotation_dict:
             has_tags = "tag" in annots[annot]
@@ -69,9 +74,13 @@ def plot_annotations(
                 centroid * dpi / 72,
                 zorder=100 * len(annots),
             )
+        minx = min(np.min(xy[0]), minx)
+        miny = min(np.min(xy[1]), miny)
+        maxx = max(np.max(xy[0]), maxx)
+        maxy = max(np.max(xy[1]), maxy)
     ax.set_aspect("equal")
-    ax.set_xlim(0, figsize[0] * dpi)
-    ax.set_ylim(0, figsize[1] * dpi)
+    ax.set_xlim(minx * 0.95, maxx * 1.05)
+    ax.set_ylim(miny * 0.95, maxy * 1.05)
     return fig
 
 
