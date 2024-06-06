@@ -1,5 +1,6 @@
 from __future__ import annotations
 from copy import deepcopy
+from dataclasses import asdict
 from shapely.wkt import loads as wkt_loads
 from shapely import Geometry, GeometryCollection, Point
 from papermodels.datatypes.annotation import Annotation
@@ -241,13 +242,15 @@ def scale_annotations(
     """
     scaled_annotations = []
     for annot in annots:
-        new_annot = deepcopy(annot)
-        scaled_annotations.append(scale_annotation(new_annot, scale, paper_origin))
+        annot_dict = asdict(annot).copy()
+        scaled_vertices = scale_vertices(annot.vertices, scale)
+        annot_dict['vertices'] = scaled_vertices
+        scaled_annotations.append(Annotation(**annot_dict))
     return scaled_annotations
 
 
-def scale_annotation(
-    annot: Annotation, scale: float, paper_origin: Optional[tuple[float, float]] = None
+def scale_vertices(
+    vertices: list[float], scale: float, paper_origin: Optional[tuple[float, float]] = None
 ) -> Annotation:
     """
     Scale the annotation. Each vertex in 'annot' will be multiplied
@@ -255,15 +258,13 @@ def scale_annotation(
     If 'paper_origin' is provided, then the annotation coordinates will have their origin reset
     to 'paper_origin'. Note that 'paper_origin' is the unscaled coordinate space (i.e. in points)
     """
-    vertices = annot.vertices
     if paper_origin is not None:
         offset_x = paper_origin[0]
         offset_y = paper_origin[1]
         vertices = _translate_vertices(vertices, offset_x, offset_y)
 
     scaled_vertices = [vertex * scale for vertex in vertices]
-    annot.vertices = scaled_vertices
-    return annot
+    return scaled_vertices
 
 
 def annotations_by_page(
