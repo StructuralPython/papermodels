@@ -1,15 +1,19 @@
+from __future__ import annotations
 from dataclasses import dataclass
 import math
 from typing import Any, Optional
 import pycba as cba
 import numpy as np
-from shapely import LineString, Point, MultiLineString, Polygon, MultiPoint, convex_hull
+from shapely import LineString, Point, MultiLineString, Polygon, MultiPoint, convex_hull, GeometryCollection
 import shapely.ops as ops
 
+from papermodels.datatypes.element import Element
 from papermodels.datatypes.utils import class_representation
 
+from rich import print
+from IPython.display import display
 
-class JoistArray:
+class JoistArrayModel:
     """
     Models a spread of joists over a region where the distance
     between the supports may vary linearly.
@@ -17,17 +21,19 @@ class JoistArray:
 
     def __init__(
         self,
-        joist_id: str,
-        joist_prototype: LineString,
-        joist_supports: list[LineString],
-        spacing: float | int,
+        element: Optional[Element] = None,
+        # joist_id: str,
+        # joist_prototype: LineString,
+        # spacing: float | int,
         initial_offset: float | int = 0.0,
         joist_at_start: bool = True,
         joist_at_end: bool = False,
         cantilever_tolerance: float = 1e-2,
     ):
-        self.id = joist_id
-        self.spacing = float(spacing)
+        joist_supports = [inter[2] for inter in element.intersections]
+        joist_prototype = element.geometry
+        self.id = element.tag
+        self.spacing = 400 # Need to include this in the legend and thus, the Element
         self.initial_offset = float(initial_offset)
         self._joist_prototype = joist_prototype
         self._cantilever_tolerance = cantilever_tolerance
@@ -55,9 +61,24 @@ class JoistArray:
         self.joist_trib_areas = [
             self.generate_trib_area(idx) for idx, _ in enumerate(self.joist_locations)
         ]
-
     # def __repr__(self):
     #     return class_representation(self)
+        
+    @classmethod
+    def from_element(
+        cls,   
+        element: Optional[Element],
+        initial_offset: float | int = 0.0,
+        joist_at_start: bool = True,
+        joist_at_end: bool = False,
+        cantilever_tolerance: float = 1e-2) -> JoistArrayModel:
+        return cls(
+            element,
+            initial_offset,
+            joist_at_start,
+            joist_at_end,
+            cantilever_tolerance
+        )
 
     def generate_joist(self, index: int):
         """
@@ -317,13 +338,16 @@ def get_cantilever_segments(
     """
     splits_a = ops.split(joist_prototype, ordered_supports["A"])
     splits_b = ops.split(joist_prototype, ordered_supports["B"])
+    supports = MultiLineString([ordered_supports['A'], ordered_supports['B']])
+    cantilever_segments = {"A": 0.0, "B": 0.0}
     for geom_a in splits_a.geoms:
-        for geom_b in splits_b.geoms:
-            if not geom_a.buffer(1e-6).intersects(geom_b):
-                return {
-                    "A": 0.0 if geom_a.length < tolerance else geom_a.length,
-                    "B": 0.0 if geom_b.length < tolerance else geom_b.length,
-                }
+        if isinstance(geom_a & supports, Point):
+            cantilever_segments['A'] = 0.0 if geom_a.length < tolerance else geom_a.length
+
+    for geom_b in splits_b.geoms:
+        if isinstance(geom_b & supports, Point):
+            cantilever_segments['B'] = 0.0 if geom_a.length < tolerance else geom_a.length
+    return cantilever_segments
 
 
 def get_system_bounds(
@@ -463,7 +487,6 @@ def project_node(node: Point, vector: np.ndarray, magnitude: float):
     """
     scaled_vector = vector * magnitude
     projected_node = np.array(node.xy) + scaled_vector
-    # print(projected_node, scaled_vector)
     return Point(projected_node)
 
 

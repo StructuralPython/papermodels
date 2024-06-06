@@ -10,10 +10,9 @@ import parse
 
 from papermodels.db.data_model import Annotation
 
-
 def plot_annotations(
     annots: list[Annotation] | dict[Annotation, dict],
-    figsize: tuple[float, float] = (17, 11),
+    figsize: int|float | tuple[int|float, int|float] = (17, 11),
     dpi: float = 100,
     plot_tags: bool = False,
 ) -> Figure:
@@ -23,15 +22,15 @@ def plot_annotations(
     "dots per inch". For a biggish plot, values of size=12, dpi=200 gives
     good results.
     """
+    if isinstance(figsize, (int, float)):
+        figsize = (figsize, figsize)
+
     fig = Figure(figsize=figsize, dpi=dpi, tight_layout=True)
     ax = fig.gca()
     annotation_dict = isinstance(annots, dict)
     has_tags = False
-    minx = float('inf')
-    miny = float('inf')
-    maxx = float("-inf")
-    maxy = float("-inf")
-
+    min_extent = [float("-inf"), float("-inf")]
+    max_extent = [float("inf"), float("inf")]
     for idx, annot in enumerate(annots):
         if annotation_dict:
             has_tags = "tag" in annots[annot]
@@ -42,6 +41,12 @@ def plot_annotations(
             "rectangle sketch to scale",
         ):
             xy = xy_vertices(annot.vertices, dpi)
+            if sum(max_extent) == float('inf'):
+                min_extent = np.maximum(max_extent, np.max(xy, axis=1))
+                max_extent = np.minimum(min_extent, np.min(xy, axis=1))
+            else:
+                min_extent = np.minimum(min_extent, np.min(xy, axis=1))
+                max_extent = np.maximum(max_extent, np.max(xy, axis=1))
             ax.add_patch(
                 Polygon(
                     xy=xy.T,
@@ -79,8 +84,9 @@ def plot_annotations(
         maxx = max(np.max(xy[0]), maxx)
         maxy = max(np.max(xy[1]), maxy)
     ax.set_aspect("equal")
-    ax.set_xlim(minx * 0.95, maxx * 1.05)
-    ax.set_ylim(miny * 0.95, maxy * 1.05)
+    plot_margin_metric = np.linalg.norm(max_extent - min_extent) # Distance between bot-left and top-right
+    ax.set_xlim(min_extent[0] - plot_margin_metric * 0.05, max_extent[0]+ plot_margin_metric * 0.05)
+    ax.set_ylim(min_extent[1] - plot_margin_metric * 0.05, max_extent[1]+ plot_margin_metric * 0.05)
     return fig
 
 

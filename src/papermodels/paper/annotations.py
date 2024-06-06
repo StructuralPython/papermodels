@@ -1,10 +1,12 @@
 from __future__ import annotations
 from copy import deepcopy
-import dataclasses
+from dataclasses import asdict
 from shapely.wkt import loads as wkt_loads
 from shapely import Geometry, GeometryCollection, Point
 from papermodels.datatypes.annotation import Annotation
 from papermodels.datatypes.element import Element
+from papermodels.geometry.geom_ops import get_intersection
+from papermodels.fileio.utils import str_to_int
 from typing import Any, Optional
 import numpy as np
 
@@ -69,9 +71,11 @@ def parse_annotations(
         }
         for annot in matching_annots:
             annot_geom = annotation_to_shapely(annot)
-            annot_attrs = annot_attributes.copy()
+            annot_attrs = {}
             annot_attrs["geometry"] = annot_geom
-            annot_attrs["rank"] = int(annot_attributes["rank"])
+            for annot_key, annot_attr in annot_attributes.items():
+                annot_attrs[annot_key] = str_to_int(annot_attr.split("<")[0]) # .split() to remove trailing HTML tags
+            # annot_attrs["rank"] = int(annot_attributes["rank"])
             parsed_annotations.update({annot: annot_attrs})
     return parsed_annotations
 
@@ -145,25 +149,10 @@ def get_geometry_intersections(
             j_rank = j_attrs["rank"]
             j_page = j_annot.page
             if i_rank < j_rank and i_page == j_page:
-                # print(f"I tag: {i_attrs['tag']} | J tag: {j_attrs['tag']}")
                 i_geom = i_attrs["geometry"]
                 j_geom = j_attrs["geometry"]
-                intersection_point = (
-                    i_geom & j_geom
-                    if j_geom.geom_type != "Polygon"
-                    else i_geom & j_geom.exterior
-                )
-                if intersection_point.geom_type == "MultiPoint":
-                    intersection_point = Point(
-                        np.array(
-                            [
-                                np.array(geom.coords[0])
-                                for geom in intersection_point.geoms
-                            ]
-                        ).mean(axis=1)
-                    )
-                if not intersection_point.is_empty:
-                    intersection = (j_attrs["tag"], intersection_point)
+                intersection = get_intersection(i_geom, j_geom, j_attrs['tag'])
+                if intersection is not None:
                     intersections.append(intersection)
         i_attrs["intersections"] = intersections
     return intersected_annotations
@@ -233,7 +222,7 @@ def filter_annotations(annots: list[Annotation], properties: dict) -> list[Annot
     """
     filtered = []
     for annot in annots:
-        if (dataclasses.asdict(annot) & properties.items()) == properties.items():
+        if (asdict(annot) & properties.items()) == properties.items():
             filtered.append(annot)
     return filtered
 
@@ -253,12 +242,15 @@ def scale_annotations(
     """
     scaled_annotations = []
     for annot in annots:
-        scaled_annotations.append(scale_annotation(annot, scale, paper_origin))
+        annot_dict = asdict(annot).copy()
+        scaled_vertices = scale_vertices(annot.vertices, scale)
+        annot_dict['vertices'] = scaled_vertices
+        scaled_annotations.append(Annotation(**annot_dict))
     return scaled_annotations
 
 
-def scale_annotation(
-    annot: Annotation, scale: float, paper_origin: Optional[tuple[float, float]] = None
+def scale_vertices(
+    vertices: list[float], scale: float, paper_origin: Optional[tuple[float, float]] = None
 ) -> Annotation:
     """
     Scale the annotation. Each vertex in 'annot' will be multiplied
@@ -266,15 +258,13 @@ def scale_annotation(
     If 'paper_origin' is provided, then the annotation coordinates will have their origin reset
     to 'paper_origin'. Note that 'paper_origin' is the unscaled coordinate space (i.e. in points)
     """
-    vertices = annot.vertices
     if paper_origin is not None:
         offset_x = paper_origin[0]
         offset_y = paper_origin[1]
         vertices = _translate_vertices(vertices, offset_x, offset_y)
 
     scaled_vertices = [vertex * scale for vertex in vertices]
-    new_annot = Annotation(**(dataclasses.asdict(annot) | {"vertices": scaled_vertices}))
-    return new_annot
+    return scaled_vertices
 
 
 def annotations_by_page(

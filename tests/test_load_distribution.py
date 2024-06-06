@@ -1,4 +1,4 @@
-from papermodels.models import load_distribution as ld
+from papermodels.loads import load_distribution as ld
 from shapely import Polygon, GeometryCollection
 
 import pytest

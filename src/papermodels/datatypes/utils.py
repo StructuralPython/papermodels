@@ -15,3 +15,6 @@ def class_representation(object: Any) -> str:
             v = f"'{v}'"
         attrs.append(f"{k}={v}")
     return f"{class_name}({', '.join(attrs)})"
+
+
+
