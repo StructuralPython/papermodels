@@ -74,7 +74,6 @@ def project_polygon(
     original: Polygon,
     total_load: Optional[float] = None,
     xy: bool = False,
-    display_progress: bool = False,
 ) -> Polygon | tuple[list[float], list[float]]:
     """
     Returns the 'original' polygon, projected onto a horizontal line so that it maintains
@@ -86,7 +85,7 @@ def project_polygon(
     If 'xy' is True, then instead of a Polygon object being returned, a list of
     x-coordinates and a list of y-coordinates is returned.
     """
-    convex, voids = get_singularity_functions(original, display_progress)
+    convex, voids = get_singularity_functions(original)
     sings = convex + voids
     if total_load is not None:
         scale_ratio = calculate_scale_ratio(convex + voids, total_load)
