@@ -79,6 +79,10 @@ def plot_annotations(
                 centroid * dpi / 72,
                 zorder=100 * len(annots),
             )
+        minx = min(np.min(xy[0]), minx)
+        miny = min(np.min(xy[1]), miny)
+        maxx = max(np.max(xy[0]), maxx)
+        maxy = max(np.max(xy[1]), maxy)
     ax.set_aspect("equal")
     plot_margin_metric = np.linalg.norm(max_extent - min_extent) # Distance between bot-left and top-right
     ax.set_xlim(min_extent[0] - plot_margin_metric * 0.05, max_extent[0]+ plot_margin_metric * 0.05)
