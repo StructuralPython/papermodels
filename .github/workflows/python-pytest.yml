@@ -31,7 +31,7 @@ jobs:
         python -m uv pip install black
     - name: Test black formatted
       run: |
-        black papermodels --check
+        black src --check
     - name: Test with pytest
       run: |
         pytest
