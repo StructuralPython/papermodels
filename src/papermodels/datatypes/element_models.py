@@ -22,7 +22,7 @@ class ReactionType(IntEnum):
 
 class AnalysisModelType(IntEnum):
     PYNITEFEA: 0
-    SAP2000: 0
+    SAP2000: 1
 
 
 @dataclass
