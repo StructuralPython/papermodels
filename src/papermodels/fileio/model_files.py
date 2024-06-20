@@ -64,7 +64,6 @@ def parse_beam_attributes(
     return DEFAULT_ATTRS | beam_attrs
 
 
-
 def parse_kwargs(
     attr_items: list[str], unit_designation: Optional[str] = None
 ) -> dict[str, str | float]:
@@ -248,9 +247,6 @@ def calculate_line_load_from_trib_width(
     if trib_width_end is not None:
         return area_load * trib_width_start, area_load * trib_width_end
     return (area_load * trib_width_start,) * 2
-
-
-
 
 
 def remove_comments(raw_data: list[list[str]]) -> list[list[str]]:

@@ -37,39 +37,39 @@ class ElementModel:
     @classmethod
     def from_element(cls, element: Element):
         return cls(element=element)
-    
+
     @classmethod
     def from_file(cls, filepath: pathlib.Path | str):
         raise NotImplemented
-    
+
     def determine_loads(self, loads: list[dict]) -> None:
         """
         Returns None. Performs a geometric intersection with each load present
-        in 'loads' to determine if any of the loads intersect with the 
+        in 'loads' to determine if any of the loads intersect with the
         self.trib_area of the element.
         """
         if self.trib_area is None:
             return
         for load in loads:
-            if load['geometry'].intersects(self.trib_region):
-                applied_load = go.get_applied_load(load['geometry'], self.trib_region)
+            if load["geometry"].intersects(self.trib_region):
+                applied_load = go.get_applied_load(load["geometry"], self.trib_region)
                 if self.structured_element_data is None:
                     self.structured_element_data = {}
-                self.structured_element_data['Loads'].append(applied_load)
+                self.structured_element_data["Loads"].append(applied_load)
 
     def get_reactions(self) -> tuple[float]:
         raise NotImplemented
-    
+
     def create_model(self) -> None:
         raise NotImplemented
-    
+
     def analyze_model(self) -> None:
         raise NotImplemented
-    
+
 
 @dataclass
 class BeamModel(ElementModel):
-    
+
     def from_file(cls, filepath: pathlib.Path):
         raw_data = read_csv_file(filepath)
         structured_beam_data = get_structured_beam_data(raw_data)
@@ -78,10 +78,9 @@ class BeamModel(ElementModel):
         beam_model = cls(
             structured_element_data=structured_beam_data,
             reaction_type=ReactionType.POINT,
-
-            )
+        )
         return beam_model
-        
+
 
 @dataclass
 class ColumnModel(ElementModel):
@@ -99,16 +98,16 @@ class JoistArrayModel(ElementModel):
     between the supports may vary linearly.
     """
 
-    initial_offset: float | int = 0.0,
-    joist_at_start: bool = True,
-    joist_at_end: bool = False,
-    cantilever_tolerance: float = 1e-2,
+    initial_offset: float | int = (0.0,)
+    joist_at_start: bool = (True,)
+    joist_at_end: bool = (False,)
+    cantilever_tolerance: float = (1e-2,)
 
     def __post_init__(self):
         joist_supports = [inter[2] for inter in self.element.intersections]
         joist_prototype = self.element.geometry
         self.id = self.element.tag
-        self.spacing = 400 # Need to include this in the legend and thus, the Element
+        self.spacing = 400  # Need to include this in the legend and thus, the Element
         self.initial_offset = float(self.initial_offset)
         self._joist_prototype = joist_prototype
         self._cantilever_tolerance = self.cantilever_tolerance
@@ -136,23 +135,21 @@ class JoistArrayModel(ElementModel):
         self.joist_trib_areas = [
             self.generate_trib_area(idx) for idx, _ in enumerate(self.joist_locations)
         ]
+
     # def __repr__(self):
     #     return class_representation(self)
-        
+
     @classmethod
     def from_element(
-        cls,   
+        cls,
         element: Optional[Element],
         initial_offset: float | int = 0.0,
         joist_at_start: bool = True,
         joist_at_end: bool = False,
-        cantilever_tolerance: float = 1e-2) -> JoistArrayModel:
+        cantilever_tolerance: float = 1e-2,
+    ) -> JoistArrayModel:
         return cls(
-            element,
-            initial_offset,
-            joist_at_start,
-            joist_at_end,
-            cantilever_tolerance
+            element, initial_offset, joist_at_start, joist_at_end, cantilever_tolerance
         )
 
     def generate_joist(self, index: int):
@@ -238,9 +235,9 @@ class JoistArrayModel(ElementModel):
         if index < 0:
             # Convert -ve index lookup to a +ve index lookup
             index = len(self.joist_locations) + index
-        if index == 0: # The first joist
+        if index == 0:  # The first joist
             trib_widths = (0.0, self.joist_locations[1] / 2.0)
-        elif index == len(self.joist_locations) - 1: # The last joist
+        elif index == len(self.joist_locations) - 1:  # The last joist
             spacing_left = self.joist_locations[-1] - self.joist_locations[-2]
             trib_widths = (spacing_left / 2.0, 0.0)
         else:
@@ -265,7 +262,9 @@ class JoistArrayModel(ElementModel):
         if trib_left != 0.0:
             i_left = go.project_node(i_node, self.vector_normal, trib_left)
             j_left = go.project_node(j_node, self.vector_normal, trib_left)
-            trib_area_left = go.get_convex_hull(go.create_multipolygon([i_left, j_left, j_node, i_node]))
+            trib_area_left = go.get_convex_hull(
+                go.create_multipolygon([i_left, j_left, j_node, i_node])
+            )
         else:
             trib_area_left = go.create_polygon([])
 

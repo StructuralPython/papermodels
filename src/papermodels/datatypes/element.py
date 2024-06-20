@@ -14,7 +14,7 @@ class Element:
     They are generated in a separate process and are not part of the capability
     of the class. These attributes are simply to keep track of pre-discovered
     intersections and correspondents.
-    
+
     'tag': str, represent a unique name for this element, as per the designer's preference
     'type': str, describing what "type" of element it is. This is not an enumeration
         and can take any designer-defined value. It is for user-level categorization.
@@ -108,15 +108,14 @@ def get_elements_by_page(elements: list[Element]) -> dict[int, list[Element]]:
 def get_normalized_coordinate(element: Element, intersection_point: Point) -> float:
     """
     Returns a normalized x-coordinate for the given 'intersection_point' as it is located on the geometry
-    of 'element'. 
+    of 'element'.
     """
     geom = element.geometry
     i_coord = Point(geom.coords[0])
     distance = i_coord.distance(intersection_point)
     return distance
 
+
 def get_structured_model_data(element: Element) -> dict:
-    """
-    
-    """
+    """ """
     pass

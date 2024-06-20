@@ -6,12 +6,13 @@ from shapely import Polygon
 from papermodels.paper.annotations import Annotation
 from papermodels.units.parsing import parse_unit_system, convert_unit_string, UnitSystem
 
-            
+
 @dataclass
 class LoadElement:
     """
     Represents a loading area extracted from a markup
     """
+
     load_polygon: Polygon
     occupancy: Optional[str] = None
     project_occupancies: Optional[dict] = None
@@ -30,18 +31,18 @@ class LoadElement:
 
     @classmethod
     def from_parsed_annotation(
-        cls, 
-        annotation_props: dict, 
+        cls,
+        annotation_props: dict,
         project_occupancies: Optional[dict] = None,
         unit_system: Optional[str] = None,
-        ):
+    ):
         """
         Returns a LoadElement based on the data from 'annot' and 'annotation_props'
         which is a dictionary of the values resulting from the function
         papermodels.paper.annotations.parse_annotations.
 
         'annot': the Annotation
-        'annotation_props': dict with keys "type" and "geometry", where "type" 
+        'annotation_props': dict with keys "type" and "geometry", where "type"
             corresponds to the legend data associated with the annotation that
             would have been extracted during the parse_annotations function.
 
@@ -51,7 +52,7 @@ class LoadElement:
             [[load_component=load_magnitude]
              [load_component=load_magnitude], etc. ]
 
-             e.g. 
+             e.g.
              Load
              occupancy=Residential
 
@@ -61,25 +62,25 @@ class LoadElement:
              L=4.8
              S=1.2 kPa
 
-             The load component must be on the left-hand side of an "=" 
+             The load component must be on the left-hand side of an "="
              and the load magnitude can either be a str or float representing
              a magnitude. If not convertible to a float, the magnitude will need
              to be parsed.
         'project_occupancies': a dict describine occupancy names and their load components
         'unit_system': one of {'psf', 'ksf', 'psi', 'ksi', 'kPa', 'MPa', 'GPa'}
         """
-        annotation_type = annotation_props['type']
+        annotation_type = annotation_props["type"]
         parsed_load_text = parse_load_text(annotation_type)
-        occupancy = parsed_load_text.pop('occupancy', None)
+        occupancy = parsed_load_text.pop("occupancy", None)
         load_components = parsed_load_text.copy()
         return cls(
-            load_polygon=annotation_props['geometry'],
+            load_polygon=annotation_props["geometry"],
             occupancy=occupancy,
             project_occupancies=project_occupancies,
             load_components=load_components,
-            unit_system=unit_system    
+            unit_system=unit_system,
         )
-    
+
     def parse_load_components(self) -> dict:
         """
         Returns a copy of self.load_components where the values of the keys have
@@ -88,12 +89,8 @@ class LoadElement:
         """
         return {
             component: convert_unit_string(magnitude, self.unit_system)
-              for component, magnitude in self.load_components.items()
+            for component, magnitude in self.load_components.items()
         }
-
-
-
-
 
 
 @dataclass
@@ -101,7 +98,7 @@ class LoadArray(UserDict):
     """
     A type alias to represent LoadElements extracted from the paper model.
 
-    The actual dictionary is also stored under the 'data' attribute, as per the 
+    The actual dictionary is also stored under the 'data' attribute, as per the
     conventional UserDict behaviour.
 
     The dictionary stored within should be in the following structure.
@@ -118,7 +115,6 @@ class LoadArray(UserDict):
         }
     """
 
-
     @classmethod
     def from_annotations(cls, parsed_load_annotations: dict[Annotation]):
         """
@@ -130,12 +126,10 @@ class LoadArray(UserDict):
         legend entry so the use of the user-defined legend will persist.
         """
         for annot, annot_props in parsed_load_annotations.items():
-            annot_type = annot_props['type']
-            annot_geom = annot_props['geometry']
-            
+            annot_type = annot_props["type"]
+            annot_geom = annot_props["geometry"]
 
 
-        
 def parse_load_text(text: str) -> dict:
     """
     Returns a dict representing the parsed load data present in 'text'
@@ -146,11 +140,10 @@ def parse_load_text(text: str) -> dict:
         if "occupancy" in line.lower() and "=" in line.lower():
             lhs, rhs = line.split("=")
             rhs = rhs.strip(" ")
-            parsed_load_data['occupancy'] = rhs
+            parsed_load_data["occupancy"] = rhs
         elif "=" in line.lower():
             lhs, rhs = line.split("=")
             lhs = lhs.rstrip(" ").strip(" ")
             rhs = rhs.strip(" ").rstrip(" ")
-            parsed_load_data[lhs] = rhs      
+            parsed_load_data[lhs] = rhs
     return parsed_load_data
-

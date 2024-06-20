@@ -5,7 +5,9 @@ from typing import Optional
 import forallpeople as si
 
 from papermodels.fileio.utils import str_to_float, str_to_int
+
 si.environment("structural")
+
 
 class UnitSystem(Enum):
     kPa = 0
@@ -106,7 +108,7 @@ def parse_arch_notation(dimension_string: str) -> str:
     else:
         return dimension_string
     if "/" in inch_value:
-        whole_inch, fractional_inch = inch_value.split(" ") # e.g. 4 5/8
+        whole_inch, fractional_inch = inch_value.split(" ")  # e.g. 4 5/8
         whole_inch_magnitude = str_to_float(whole_inch)
         fractional_inch_magnitude = float(Fraction(fractional_inch))
         inch_magnitude = whole_inch_magnitude + fractional_inch_magnitude
