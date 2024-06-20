@@ -22,9 +22,10 @@ class GeometryGraph(nx.DiGraph):
         super().__init__()
         self.node_hash = None
 
-
     @classmethod
-    def from_elements(cls, elements: list[Element], floor_elevations: Optional[dict] = None) -> GeometryGraph:
+    def from_elements(
+        cls, elements: list[Element], floor_elevations: Optional[dict] = None
+    ) -> GeometryGraph:
         """
         Returns a LoadGraph (networkx.DiGraph) based upon the intersections and correspondents
         of the 'elements'.
@@ -39,7 +40,6 @@ class GeometryGraph(nx.DiGraph):
             for intersection in element.intersections:
                 g.add_edge(element.tag, intersection[0])
         return g
-
 
     def hash_nodes(self):
         """
