@@ -222,7 +222,7 @@ def filter_annotations(annots: list[Annotation], properties: dict) -> list[Annot
     """
     filtered = []
     for annot in annots:
-        if (asdict(annot) & properties.items()) == properties.items():
+        if (asdict(annot).items() & properties.items()) == properties.items():
             filtered.append(annot)
     return filtered
 
