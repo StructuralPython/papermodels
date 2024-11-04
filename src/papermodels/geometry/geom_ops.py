@@ -2,28 +2,33 @@ import math
 from typing import Optional
 import numpy as np
 
-from shapely import Point, MultiPoint, LineString, MultiLineString, Polygon, MultiPolygon, convex_hull
+from shapely import (
+    Point,
+    MultiPoint,
+    LineString,
+    MultiLineString,
+    Polygon,
+    MultiPolygon,
+    convex_hull,
+)
 import shapely.ops as ops
 
 
-def get_intersection(i_geom: LineString, j_geom: LineString | Polygon, j_tag: str) -> Optional[tuple[str, Point, LineString]]:
+def get_intersection(
+    i_geom: LineString, j_geom: LineString | Polygon, j_tag: str
+) -> Optional[tuple[str, Point, LineString]]:
     """
-    Returns the details of the intersection 
+    Returns the details of the intersection
     """
     intersection_point = (
-        i_geom & j_geom
-        if j_geom.geom_type != "Polygon"
-        else i_geom & j_geom.exterior
+        i_geom & j_geom if j_geom.geom_type != "Polygon" else i_geom & j_geom.exterior
     )
     if intersection_point.is_empty:
         return
     if intersection_point.geom_type == "MultiPoint":
         intersection_point = Point(
             np.array(
-                [
-                    np.array(geom.coords[0])
-                    for geom in intersection_point.geoms
-                ]
+                [np.array(geom.coords[0]) for geom in intersection_point.geoms]
             ).mean(axis=1)
         )
     intersection = (j_tag, intersection_point, j_geom)
@@ -90,15 +95,19 @@ def get_cantilever_segments(
     """
     splits_a = ops.split(joist_prototype, ordered_supports["A"])
     splits_b = ops.split(joist_prototype, ordered_supports["B"])
-    supports = MultiLineString([ordered_supports['A'], ordered_supports['B']])
+    supports = MultiLineString([ordered_supports["A"], ordered_supports["B"]])
     cantilever_segments = {"A": 0.0, "B": 0.0}
     for geom_a in splits_a.geoms:
         if isinstance(geom_a & supports, Point):
-            cantilever_segments['A'] = 0.0 if geom_a.length < tolerance else geom_a.length
+            cantilever_segments["A"] = (
+                0.0 if geom_a.length < tolerance else geom_a.length
+            )
 
     for geom_b in splits_b.geoms:
         if isinstance(geom_b & supports, Point):
-            cantilever_segments['B'] = 0.0 if geom_a.length < tolerance else geom_a.length
+            cantilever_segments["B"] = (
+                0.0 if geom_a.length < tolerance else geom_a.length
+            )
     return cantilever_segments
 
 
@@ -262,17 +271,22 @@ def rotate_90(v: np.ndarray, precision: int = 6, ccw=True) -> tuple[float, float
     )
     return rot @ v
 
+
 def create_linestring(points: list[tuple]) -> LineString:
     return LineString(points)
+
 
 def create_multipoint(points: list[tuple]) -> MultiPoint:
     return MultiPoint(points)
 
+
 def create_polygon(points: list[tuple]) -> Polygon:
     return Polygon(points)
 
+
 def create_multipolygon(polygons: list[Polygon]) -> MultiPolygon:
     return MultiPolygon(polygons)
+
 
 def create_convex_hull(points: list[Point]) -> Polygon:
     return convex_hull(points)

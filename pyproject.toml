@@ -11,6 +11,7 @@ dynamic = ["version", "description"]
 dependencies = [
     "shapely >= 2.0.0",
     "matplotlib",
+    "numpy >= 2.0.0",
     "pandas >= 2.0.0",
     "pikepdf",
     "sqlalchemy",
@@ -20,8 +21,8 @@ dependencies = [
     "pytest",
     "networkx",
     "numpy",
-    "PyCBA >= 0.4.0",
-    "PyNiteFEA >= 0.0.81",
+    "PyNiteFEA >= 0.0.96",
+    "pycba",
     "rich",
     "forallpeople"
 ]

@@ -11,9 +11,10 @@ import parse
 from papermodels.db.data_model import Annotation
 from loguru import logger
 
+
 def plot_annotations(
     annots: list[Annotation] | dict[Annotation, dict],
-    figsize: int|float | tuple[int|float, int|float] = (17, 11),
+    figsize: int | float | tuple[int | float, int | float] = (17, 11),
     dpi: float = 100,
     plot_tags: bool = False,
 ) -> Figure:
@@ -51,7 +52,13 @@ def plot_annotations(
             "rectangle",
             "rectangle sketch to scale",
         ):
-
+            xy = xy_vertices(annot.vertices, dpi)
+            if sum(max_extent) == float("inf"):
+                min_extent = np.maximum(max_extent, np.max(xy, axis=1))
+                max_extent = np.minimum(min_extent, np.min(xy, axis=1))
+            else:
+                min_extent = np.minimum(min_extent, np.min(xy, axis=1))
+                max_extent = np.maximum(max_extent, np.max(xy, axis=1))
             ax.add_patch(
                 Polygon(
                     xy=xy.T,
@@ -86,9 +93,17 @@ def plot_annotations(
             )
 
     ax.set_aspect("equal")
-    plot_margin_metric = np.linalg.norm(max_extent - min_extent) # Distance between bot-left and top-right
-    ax.set_xlim(min_extent[0] - plot_margin_metric * 0.05, max_extent[0]+ plot_margin_metric * 0.05)
-    ax.set_ylim(min_extent[1] - plot_margin_metric * 0.05, max_extent[1]+ plot_margin_metric * 0.05)
+    plot_margin_metric = np.linalg.norm(
+        max_extent - min_extent
+    )  # Distance between bot-left and top-right
+    ax.set_xlim(
+        min_extent[0] - plot_margin_metric * 0.05,
+        max_extent[0] + plot_margin_metric * 0.05,
+    )
+    ax.set_ylim(
+        min_extent[1] - plot_margin_metric * 0.05,
+        max_extent[1] + plot_margin_metric * 0.05,
+    )
     return fig
 
 

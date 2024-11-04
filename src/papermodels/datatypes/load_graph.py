@@ -22,6 +22,7 @@ from papermodels.datatypes.joist_models import JoistArrayModel
 from rich.progress import track
 from rich import print
 
+
 class LoadGraph(nx.DiGraph):
     """
     A class to represent a load path in a graph. Inherits from networkx.DiGraph
@@ -29,17 +30,17 @@ class LoadGraph(nx.DiGraph):
 
     The node_hash is how changes to the graph nodes can be tracked.
     """
+
     def __init__(self):
         super().__init__()
         self.geometry_hash = None
-
 
     @classmethod
     def from_geometry_graph(cls, graph: GeometryGraph):
         g = cls()
         g.geometry_hash = graph.node_hash
         for node, node_data in graph.nodes.items():
-            element = node_data['element']
+            element = node_data["element"]
             if element.type.lower() == "joist":
                 model = JoistArrayModel.from_element(element)
             elif "beam" in element.type.lower():
@@ -52,18 +53,17 @@ class LoadGraph(nx.DiGraph):
                 print(element.type.lower())
             g.add_node(node, model=model)
 
-
         for u, v in graph.edges:
             edge_data = graph.edges[(u, v)]
             g.add_edge(u, v, edge_data=edge_data)
         return g
-    
+
     @classmethod
     def from_beam_files(cls, beam_file_dir: pathlib.Path):
         g = cls()
         g.geometry_hash = graph.node_hash
         for node, node_data in graph.nodes.items():
-            element = node_data['element']
+            element = node_data["element"]
             if element.type.lower() == "joist":
                 model = JoistArrayModel(element)
             elif "beam" in element.type.lower():
@@ -75,7 +75,6 @@ class LoadGraph(nx.DiGraph):
             else:
                 print(element.type.lower())
             g.add_node(node, model=model)
-
 
         for u, v in graph.edges:
             edge_data = graph.edges[(u, v)]
@@ -90,11 +89,10 @@ class LoadGraph(nx.DiGraph):
         nodes_from_top = nx.topological_sort(self)
         hashes = []
         for node_name in nodes_from_top:
-            element_hash = self.nodes[node_name]['sha256']
+            element_hash = self.nodes[node_name]["sha256"]
             hashes.append(element_hash)
         graph_hash = hashlib.sha256(str(tuple(hashes)).encode()).hexdigest()
         self.node_hash = graph_hash
-
 
     def compile_load_distribution_model(self):
         """
@@ -105,24 +103,23 @@ class LoadGraph(nx.DiGraph):
             for pred in self.pred[node]:
                 dist.update({pred: {}})
                 dist[pred].update(dict(self.succ[node]))
-            self.nodes[node]['load_distribution'] = dist
-
+            self.nodes[node]["load_distribution"] = dist
 
     def compile_distribution_functions(
-            self, 
-            prefix_dict: dict = {
-                "FB": "beam",
-                "DB": "beam",
-                "W": "wall",
-                "CPL": "point_load",
-                "WLL": "line_load",
-                "J": "joist",
-                "C": "column",
-            },
-            track_progress=False,
-        ):
+        self,
+        prefix_dict: dict = {
+            "FB": "beam",
+            "DB": "beam",
+            "W": "wall",
+            "CPL": "point_load",
+            "WLL": "line_load",
+            "J": "joist",
+            "C": "column",
+        },
+        track_progress=False,
+    ):
         """
-        Returns None. Populates the empty 'load_distribution' dict in 
+        Returns None. Populates the empty 'load_distribution' dict in
         each node.
         """
         if not track_progress:
@@ -130,7 +127,7 @@ class LoadGraph(nx.DiGraph):
         else:
             progress_tracker = track
         for node in progress_tracker(self.nodes):
-            element = self.nodes[node]['element']
+            element = self.nodes[node]["element"]
             tag_prefix = get_tag_type(element.tag)
             if prefix_dict[tag_prefix] == "beam":
                 model = element_to_beam_model(element)
@@ -210,13 +207,13 @@ def element_to_beam_model(element: Element) -> FEModel3D:
 #     i_end = Point(elem_geometry.coords[0])
 #     j_end = Point(elem_geometry.coords[1])
 #     length = elem_geometry.length
-    
+
 #     # R1 should be closest to I-end
 #     r1_geom = r1[1]
 #     r2_geom = r2[1]
 #     if i_end.distance(r1_geom) > i_end.distance(r2_geom):
 #         r1, r2 = r2, r1
-    
+
 #     span = r1_geom.distance(r2_geom)
 #     a_cantilever = round(abs(i_end.distance(r1_geom)), 6)
 #     b_cantilever = round(abs(r2_geom.distance(j_end)), 6)
@@ -224,12 +221,12 @@ def element_to_beam_model(element: Element) -> FEModel3D:
 
 
 def element_to_joist_array(
-        joist_element: Element, 
-        initial_offset: int | float = 0,
-        joist_at_start: bool = True,
-        joist_at_end: bool = False,
-        cantilever_tolerance: float = 0.01
-        ) -> JoistArrayModel:
+    joist_element: Element,
+    initial_offset: int | float = 0,
+    joist_at_start: bool = True,
+    joist_at_end: bool = False,
+    cantilever_tolerance: float = 0.01,
+) -> JoistArrayModel:
     """
     Returns a Joist object based on the data in 'element'
     """
@@ -242,9 +239,8 @@ def element_to_joist_array(
         initial_offset,
         joist_at_start,
         joist_at_end,
-        cantilever_tolerance
-
-)
+        cantilever_tolerance,
+    )
     # try:
     #     r1, r2 = element.intersections
     # except ValueError:
@@ -253,13 +249,13 @@ def element_to_joist_array(
     # i_end = Point(elem_geometry.coords[0])
     # j_end = Point(elem_geometry.coords[1])
     # length = elem_geometry.length
-    
+
     # # R1 should be closest to I-end
     # r1_geom = r1[1]
     # r2_geom = r2[1]
     # if i_end.distance(r1_geom) > i_end.distance(r2_geom):
     #     r1, r2 = r2, r1
-    
+
     # span = r1_geom.distance(r2_geom)
     # a_cantilever = round(abs(i_end.distance(r1_geom)), 6)
     # b_cantilever = round(abs(r2_geom.distance(j_end)), 6)

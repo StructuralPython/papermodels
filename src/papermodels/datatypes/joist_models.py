@@ -4,7 +4,15 @@ import math
 from typing import Any, Optional
 import pycba as cba
 import numpy as np
-from shapely import LineString, Point, MultiLineString, Polygon, MultiPoint, convex_hull, GeometryCollection
+from shapely import (
+    LineString,
+    Point,
+    MultiLineString,
+    Polygon,
+    MultiPoint,
+    convex_hull,
+    GeometryCollection,
+)
 import shapely.ops as ops
 
 from papermodels.datatypes.element import Element
@@ -12,6 +20,7 @@ from papermodels.datatypes.utils import class_representation
 
 from rich import print
 from IPython.display import display
+
 
 class JoistArrayModel:
     """
@@ -33,7 +42,7 @@ class JoistArrayModel:
         joist_supports = [inter[2] for inter in element.intersections]
         joist_prototype = element.geometry
         self.id = element.tag
-        self.spacing = 400 # Need to include this in the legend and thus, the Element
+        self.spacing = 400  # Need to include this in the legend and thus, the Element
         self.initial_offset = float(initial_offset)
         self._joist_prototype = joist_prototype
         self._cantilever_tolerance = cantilever_tolerance
@@ -61,23 +70,21 @@ class JoistArrayModel:
         self.joist_trib_areas = [
             self.generate_trib_area(idx) for idx, _ in enumerate(self.joist_locations)
         ]
+
     # def __repr__(self):
     #     return class_representation(self)
-        
+
     @classmethod
     def from_element(
-        cls,   
+        cls,
         element: Optional[Element],
         initial_offset: float | int = 0.0,
         joist_at_start: bool = True,
         joist_at_end: bool = False,
-        cantilever_tolerance: float = 1e-2) -> JoistArrayModel:
+        cantilever_tolerance: float = 1e-2,
+    ) -> JoistArrayModel:
         return cls(
-            element,
-            initial_offset,
-            joist_at_start,
-            joist_at_end,
-            cantilever_tolerance
+            element, initial_offset, joist_at_start, joist_at_end, cantilever_tolerance
         )
 
     def generate_joist(self, index: int):
@@ -163,9 +170,9 @@ class JoistArrayModel:
         if index < 0:
             # Convert -ve index lookup to a +ve index lookup
             index = len(self.joist_locations) + index
-        if index == 0: # The first joist
+        if index == 0:  # The first joist
             trib_widths = (0.0, self.joist_locations[1] / 2.0)
-        elif index == len(self.joist_locations) - 1: # The last joist
+        elif index == len(self.joist_locations) - 1:  # The last joist
             spacing_left = self.joist_locations[-1] - self.joist_locations[-2]
             trib_widths = (spacing_left / 2.0, 0.0)
         else:
@@ -338,15 +345,19 @@ def get_cantilever_segments(
     """
     splits_a = ops.split(joist_prototype, ordered_supports["A"])
     splits_b = ops.split(joist_prototype, ordered_supports["B"])
-    supports = MultiLineString([ordered_supports['A'], ordered_supports['B']])
+    supports = MultiLineString([ordered_supports["A"], ordered_supports["B"]])
     cantilever_segments = {"A": 0.0, "B": 0.0}
     for geom_a in splits_a.geoms:
         if isinstance(geom_a & supports, Point):
-            cantilever_segments['A'] = 0.0 if geom_a.length < tolerance else geom_a.length
+            cantilever_segments["A"] = (
+                0.0 if geom_a.length < tolerance else geom_a.length
+            )
 
     for geom_b in splits_b.geoms:
         if isinstance(geom_b & supports, Point):
-            cantilever_segments['B'] = 0.0 if geom_a.length < tolerance else geom_a.length
+            cantilever_segments["B"] = (
+                0.0 if geom_a.length < tolerance else geom_a.length
+            )
     return cantilever_segments
 
 

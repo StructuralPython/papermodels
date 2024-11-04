@@ -74,7 +74,9 @@ def parse_annotations(
             annot_attrs = {}
             annot_attrs["geometry"] = annot_geom
             for annot_key, annot_attr in annot_attributes.items():
-                annot_attrs[annot_key] = str_to_int(annot_attr.split("<")[0]) # .split() to remove trailing HTML tags
+                annot_attrs[annot_key] = str_to_int(
+                    annot_attr.split("<")[0]
+                )  # .split() to remove trailing HTML tags
             # annot_attrs["rank"] = int(annot_attributes["rank"])
             parsed_annotations.update({annot: annot_attrs})
     return parsed_annotations
@@ -151,7 +153,7 @@ def get_geometry_intersections(
             if i_rank < j_rank and i_page == j_page:
                 i_geom = i_attrs["geometry"]
                 j_geom = j_attrs["geometry"]
-                intersection = get_intersection(i_geom, j_geom, j_attrs['tag'])
+                intersection = get_intersection(i_geom, j_geom, j_attrs["tag"])
                 if intersection is not None:
                     intersections.append(intersection)
         i_attrs["intersections"] = intersections
@@ -244,13 +246,15 @@ def scale_annotations(
     for annot in annots:
         annot_dict = asdict(annot).copy()
         scaled_vertices = scale_vertices(annot.vertices, scale)
-        annot_dict['vertices'] = scaled_vertices
+        annot_dict["vertices"] = scaled_vertices
         scaled_annotations.append(Annotation(**annot_dict))
     return scaled_annotations
 
 
 def scale_vertices(
-    vertices: list[float], scale: float, paper_origin: Optional[tuple[float, float]] = None
+    vertices: list[float],
+    scale: float,
+    paper_origin: Optional[tuple[float, float]] = None,
 ) -> Annotation:
     """
     Scale the annotation. Each vertex in 'annot' will be multiplied
