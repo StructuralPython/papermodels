@@ -9,6 +9,7 @@ import numpy as np
 import parse
 
 from papermodels.db.data_model import Annotation
+from loguru import logger
 
 
 def plot_annotations(
@@ -30,11 +31,21 @@ def plot_annotations(
     ax = fig.gca()
     annotation_dict = isinstance(annots, dict)
     has_tags = False
-    min_extent = [float("-inf"), float("-inf")]
-    max_extent = [float("inf"), float("inf")]
+    min_extent = np.array([float("-inf"), float("-inf")])
+    max_extent = np.array([float("inf"), float("inf")])
     for idx, annot in enumerate(annots):
         if annotation_dict:
             has_tags = "tag" in annots[annot]
+
+        xy = xy_vertices(annot.vertices, dpi)
+        if sum(max_extent) == float('inf'):
+            min_extent = np.maximum(min_extent, np.max(xy, axis=1))
+            max_extent = np.minimum(max_extent, np.min(xy, axis=1))
+        else:
+            min_extent = np.minimum(min_extent, np.min(xy, axis=1))
+            max_extent = np.maximum(max_extent, np.max(xy, axis=1))
+
+
         if annot.object_type.lower() in (
             "polygon",
             "square",
@@ -80,10 +91,7 @@ def plot_annotations(
                 centroid * dpi / 72,
                 zorder=100 * len(annots),
             )
-        minx = min(np.min(xy[0]), minx)
-        miny = min(np.min(xy[1]), miny)
-        maxx = max(np.max(xy[0]), maxx)
-        maxy = max(np.max(xy[1]), maxy)
+
     ax.set_aspect("equal")
     plot_margin_metric = np.linalg.norm(
         max_extent - min_extent

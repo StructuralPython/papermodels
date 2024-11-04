@@ -13,7 +13,7 @@ class GeometryGraph(nx.DiGraph):
     A class to represent a connected geometry system in a graph. Inherits from networkx.DiGraph
     and adds a .node_hash attribute for storing a hash of all the nodes.
 
-    Can be used to generate a LoadGraph.
+    Can be used to generate a GeometryGraph.
 
     The node_hash is how changes to the graph nodes can be tracked.
     """
@@ -27,7 +27,7 @@ class GeometryGraph(nx.DiGraph):
         cls, elements: list[Element], floor_elevations: Optional[dict] = None
     ) -> GeometryGraph:
         """
-        Returns a LoadGraph (networkx.DiGraph) based upon the intersections and correspondents
+        Returns a GeometryGraph (networkx.DiGraph) based upon the intersections and correspondents
         of the 'elements'.
         """
         top_down_elements = sorted(elements, key=lambda x: x.page, reverse=True)
