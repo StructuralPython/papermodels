@@ -51,8 +51,8 @@ def read_csv_file(filename: str) -> str:
         csv_data = list(csv.reader(file))
     return csv_data
 
-  
-  def parse_unit_system(unit_designation: str) -> UnitSystem:
+
+def parse_unit_system(unit_designation: str) -> UnitSystem:
     """
     Returns a UnitSystem enum based on the provided 'unit_designation'.
 
@@ -101,7 +101,7 @@ def parse_unit_string(unit_string: str | float) -> float | si.Physical:
         magnitude_value, unit_value = unit_string.split(" ")
     except ValueError:
         return unit_string
-    
+
     # Str has a space but the left of the space is not a number
     if not isinstance(str_to_float(magnitude_value), float):
         return unit_string

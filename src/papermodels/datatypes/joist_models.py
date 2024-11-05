@@ -33,23 +33,23 @@ class JoistArrayModel:
         element: Optional[Element] = None,
         # joist_id: str,
         # joist_prototype: LineString,
-        # spacing: float | int,
+        spacing: float | int = 16,
         initial_offset: float | int = 0.0,
         joist_at_start: bool = True,
         joist_at_end: bool = False,
         cantilever_tolerance: float = 1e-2,
     ):
-        joist_supports = [inter[2] for inter in element.intersections]
-        joist_prototype = element.geometry
+        self.joist_supports = element.supporting_geometries
+        self.joist_prototype = element.geometry
         self.id = element.tag
-        self.spacing = 400  # Need to include this in the legend and thus, the Element
+        self.spacing = spacing  # Need to include this in the legend and thus, the Element
         self.initial_offset = float(initial_offset)
-        self._joist_prototype = joist_prototype
+        self._joist_prototype = self.joist_prototype
         self._cantilever_tolerance = cantilever_tolerance
-        self._extents = get_joist_extents(joist_prototype, joist_supports)
-        self._supports = determine_support_order(joist_prototype, joist_supports)
-        self._cantilevers = get_cantilever_segments(joist_prototype, self._supports)
-        self.vector_parallel = get_direction_vector(joist_prototype)
+        self._extents = get_joist_extents(self.joist_prototype, self.joist_supports)
+        self._supports = determine_support_order(self.joist_prototype, self.joist_supports)
+        self._cantilevers = get_cantilever_segments(self.joist_prototype, self._supports)
+        self.vector_parallel = get_direction_vector(self.joist_prototype)
         self.vector_normal = rotate_90(self.vector_parallel, ccw=False)
         self.joist_at_start = float(joist_at_start)
         self.joist_at_end = float(joist_at_end)
@@ -70,21 +70,22 @@ class JoistArrayModel:
         self.joist_trib_areas = [
             self.generate_trib_area(idx) for idx, _ in enumerate(self.joist_locations)
         ]
-
+        print(self._cantilevers)
     # def __repr__(self):
     #     return class_representation(self)
 
     @classmethod
     def from_element(
         cls,
-        element: Optional[Element],
+        element: Element,
+        spacing: float,
         initial_offset: float | int = 0.0,
         joist_at_start: bool = True,
         joist_at_end: bool = False,
         cantilever_tolerance: float = 1e-2,
     ) -> JoistArrayModel:
         return cls(
-            element, initial_offset, joist_at_start, joist_at_end, cantilever_tolerance
+            element, spacing, initial_offset, joist_at_start, joist_at_end, cantilever_tolerance
         )
 
     def generate_joist(self, index: int):
@@ -211,6 +212,14 @@ class JoistArrayModel:
         else:
             trib_area_right = Polygon()
         return trib_area_left | trib_area_right
+    
+
+    def show_svg(self, use_ipython_display: bool = True):
+        """
+        Uses IPython.display.SVG to show the elements of the instance visually
+        """
+        return GeometryCollection(self.joists + self.joist_trib_areas + self.joist_supports)
+        
 
 
 @dataclass
@@ -343,18 +352,20 @@ def get_cantilever_segments(
     Returns a dictionary containing the cantilever lengths over-hanging supports "A" and
     "B", respectively. Returns a length of 0.0 if the length is less than the tolerance.
     """
+    print(f"{joist_prototype.length=}")
     splits_a = ops.split(joist_prototype, ordered_supports["A"])
     splits_b = ops.split(joist_prototype, ordered_supports["B"])
     supports = MultiLineString([ordered_supports["A"], ordered_supports["B"]])
     cantilever_segments = {"A": 0.0, "B": 0.0}
     for geom_a in splits_a.geoms:
-        if isinstance(geom_a & supports, Point):
+        if isinstance(geom_a & supports, Point) or geom_a.distance(supports) < tolerance:
+            print("Passes")
             cantilever_segments["A"] = (
                 0.0 if geom_a.length < tolerance else geom_a.length
             )
 
     for geom_b in splits_b.geoms:
-        if isinstance(geom_b & supports, Point):
+        if isinstance(geom_b & supports, Point) or geom_b.distance(supports) < tolerance:
             cantilever_segments["B"] = (
                 0.0 if geom_a.length < tolerance else geom_a.length
             )
