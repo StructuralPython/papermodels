@@ -15,7 +15,7 @@ import shapely.ops as ops
 
 
 def get_intersection(
-    i_geom: LineString, j_geom: LineString | Polygon
+    i_geom: LineString, j_geom: LineString | Polygon, j_tag: str
 ) -> Optional[tuple[str, Point, LineString]]:
     """
     Returns the details of the intersection
@@ -31,7 +31,7 @@ def get_intersection(
                 [np.array(geom.coords[0]) for geom in intersection_point.geoms]
             ).mean(axis=1)
         )
-    intersection = (intersection_point, j_geom)
+    intersection = (intersection_point, j_geom, j_tag)
     return intersection
 
 

@@ -122,8 +122,8 @@ def get_structural_elements(
     for annot, annot_attrs in corresponding_annotations.items():
         element = Element(
             tag=annot_attrs["tag"],
-            type=annot_attrs["type"],
-            page=annot.page,
+            # type=annot_attrs["type"],
+            # page=annot.page,
             geometry=annot_attrs["geometry"],
             intersections=tuple(annot_attrs["intersections"]),
             correspondents=tuple(annot_attrs["correspondents"]),
