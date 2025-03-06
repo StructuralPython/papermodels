@@ -12,8 +12,7 @@ class LoadElement:
     """
     Represents a loading area extracted from a markup
     """
-
-    load_polygon: Polygon
+    geometry: Polygon
     occupancy: Optional[str] = None
     project_occupancies: Optional[dict] = None
     load_components: Optional[dict] = None
