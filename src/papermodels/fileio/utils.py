@@ -52,7 +52,7 @@ def read_csv_file(filename: str) -> str:
     return csv_data
 
   
-  def parse_unit_system(unit_designation: str) -> UnitSystem:
+def parse_unit_system(unit_designation: str) -> UnitSystem:
     """
     Returns a UnitSystem enum based on the provided 'unit_designation'.
 
