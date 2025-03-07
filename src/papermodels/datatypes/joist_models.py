@@ -31,6 +31,7 @@ class JoistArrayModel:
     def __init__(
         self,
         element: Optional[Element] = None,
+        spacing: float = 1,
         # joist_id: str,
         # joist_prototype: LineString,
         spacing: float | int = 16,
@@ -361,8 +362,10 @@ def get_cantilever_segments(
     Returns a dictionary containing the cantilever lengths over-hanging supports "A" and
     "B", respectively. Returns a length of 0.0 if the length is less than the tolerance.
     """
+    # HERE: The darn cantilever bits are not intersecting with the supports
     splits_a = ops.split(joist_prototype, ordered_supports["A"])
     splits_b = ops.split(joist_prototype, ordered_supports["B"])
+    print(f"{splits_a=} | {splits_b=}")
     supports = MultiLineString([ordered_supports["A"], ordered_supports["B"]])
     cantilever_segments = {"A": 0.0, "B": 0.0}
     for geom_a in splits_a.geoms:
@@ -377,6 +380,7 @@ def get_cantilever_segments(
             cantilever_segments["B"] = (
                 0.0 if geom_a.length < tolerance else geom_a.length
             )
+    print(cantilever_segments)
     return cantilever_segments
 
 
@@ -432,7 +436,6 @@ def get_joist_locations(
         joist_locs.append(distance - distance_remaining)
     else:
         joist_locs.append(distance)
-
     return joist_locs
 
 
