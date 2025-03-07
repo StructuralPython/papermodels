@@ -38,13 +38,12 @@ def plot_annotations(
             has_tags = "tag" in annots[annot]
 
         xy = xy_vertices(annot.vertices, dpi)
-        if sum(max_extent) == float('inf'):
+        if sum(max_extent) == float("inf"):
             min_extent = np.maximum(min_extent, np.max(xy, axis=1))
             max_extent = np.minimum(max_extent, np.min(xy, axis=1))
         else:
             min_extent = np.minimum(min_extent, np.min(xy, axis=1))
             max_extent = np.maximum(max_extent, np.max(xy, axis=1))
-
 
         if annot.object_type.lower() in (
             "polygon",

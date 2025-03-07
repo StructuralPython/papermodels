@@ -31,7 +31,7 @@ def get_intersection(
                 [np.array(geom.coords[0]) for geom in intersection_point.geoms]
             ).mean(axis=1)
         )
-    intersection = (j_tag, intersection_point, j_geom)
+    intersection = (intersection_point, j_geom, j_tag)
     return intersection
 
 

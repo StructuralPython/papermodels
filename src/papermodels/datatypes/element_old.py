@@ -1,8 +1,6 @@
 from dataclasses import dataclass
 from typing import Optional
 from shapely import Point, Geometry, LineString, Polygon
-from .annotation import Annotation
-from ..geometry import geom_ops
 import parse
 
 
@@ -35,66 +33,21 @@ class Element:
     'page_label': A designer-defined str label for the page (e.g. "Ground Floor" or "L03", etc.)
     """
 
+    tag: str
+    type: str
+    page: int
     geometry: Geometry
-    tag: Optional[str] = None
-    isjoist: bool = False
-    annotation: Optional[Annotation] = None
-    intersections: Optional[dict[str | int, Point]] = None
-    correspondents: Optional[dict[str | int, Geometry]] = None
+    intersections: list[tuple[str, Point]]
+    correspondents: list[tuple[str, Geometry]]
+    page_label: Optional[str] = None
 
-    @classmethod
-    def from_geometries(
-        cls,
-        subject_geom: Geometry,
-        supporting_geoms: list[Geometry] | dict[str, Geometry],
-        subject_tag: Optional[str] = None,
-        corresponding_geoms: Optional[list[Geometry] | dict[str, Geometry]] = None,
-        isjoist: bool = False
-    ):
+    def get_intersection(self, tag: str) -> Point | None:
         """
-        Returns an Element instance created from the main 'subject' geometry
-        and 'supporting' geometries which represent structural supporting
-        members.
-
-        subject_geom: The structural element that is the subject of study.
-            Any singular shapely Geometry type.
-        supporting: A list of any singular shapely Geometry types. If a dict
-            is passed, then the keys will be used as identifying tags for the
-            provided supporting geometries. The supporting geometries must
-            intersect with the subject geometry _on the same plane_.
-        subject_tag: a unique str label to identify the subject element.
-        corresponding_geoms: A list of any singular shapely Geometry types.
-            If a dict is passed, then the keys will be used as identifying
-            tags for the provided corresponding geometries.
-            The
+        Returns the corresponding Point object for 'tag' if 'tag' is in the tuple of
+        self.intersections. Returns None if not.
         """
-        if isinstance(supporting_geoms, list):
-            supporting_geoms = {
-                idx: supporting_geom
-                for idx, supporting_geom in enumerate(supporting_geoms)
-            }
-
-        intersections = {}
-        for support_tag, support_geom in supporting_geoms.items():
-            intersection = geom_ops.get_intersection(
-                subject_geom, support_geom
-            )
-            if intersection is not None:
-                intersections.update({support_tag: intersection})
-
-        return cls(
-            tag=subject_tag,
-            geometry=subject_geom,
-            intersections=intersections,
-            correspondents=corresponding_geoms,
-        )
-    
-    @property
-    def supporting_geometries(self):
-        acc = []
-        for intersection_tuple in self.intersections.values():
-            acc.append(intersection_tuple[1])
-        return acc
+        lookup = dict(self.intersections)
+        return lookup.get(tag, None)
 
 
 # Examples
@@ -102,31 +55,31 @@ class Element:
 ## and with that column having a correspondent on the page below
 E00 = Element(
     tag="FB1.1",
-    # type="Flush Beam",
-    # page=1,
+    type="Flush Beam",
+    page=1,
     geometry=LineString([[101.5, 52.0], [101.5, 85.3]]),
     intersections=[("J1.1", Point([101.5, 65.2]))],
-    # correspondents=[],
+    correspondents=[],
 )
 
 E01 = Element(
     tag="C1.1",
-    # type="Column",
-    # page=1,
+    type="Column",
+    page=1,
     geometry=Polygon([[100.0, 100.0], [100.0, 103.0], [103.0, 103.0], [103.0, 100.0]]),
     intersections=[("FB1.1", Point([101.5, 53.5]))],
     correspondents=["C0.1"],
-    # page_label="L02",
+    page_label="L02",
 )
 
 E02 = Element(
     tag="C0.1",
-    # type="Column",
-    # page=0,
+    type="Column",
+    page=0,
     geometry=Polygon([[100.0, 100.0], [100.0, 103.0], [103.0, 103.0], [103.0, 100.0]]),
     intersections=[],
     correspondents=["C1.1"],
-    # page_label="L01",
+    page_label="L01",
 )
 
 

@@ -83,7 +83,7 @@ def parse_annotations(
 
 
 def tag_parsed_annotations(
-    parsed_annots: dict[Annotation, dict]
+    parsed_annots: dict[Annotation, dict],
 ) -> dict[Annotation, dict]:
     """
     Adds an identifying tag to the annotation based on the page number of the annotation and
@@ -122,8 +122,8 @@ def get_structural_elements(
     for annot, annot_attrs in corresponding_annotations.items():
         element = Element(
             tag=annot_attrs["tag"],
-            type=annot_attrs["type"],
-            page=annot.page,
+            # type=annot_attrs["type"],
+            # page=annot.page,
             geometry=annot_attrs["geometry"],
             intersections=tuple(annot_attrs["intersections"]),
             correspondents=tuple(annot_attrs["correspondents"]),
@@ -134,7 +134,7 @@ def get_structural_elements(
 
 
 def get_geometry_intersections(
-    tagged_annotations: dict[Annotation, dict]
+    tagged_annotations: dict[Annotation, dict],
 ) -> dict[Annotation, dict]:
     """
     Returns a dictionary of
@@ -161,7 +161,7 @@ def get_geometry_intersections(
 
 
 def get_geometry_correspondents(
-    tagged_annotations: dict[Annotation, dict]
+    tagged_annotations: dict[Annotation, dict],
 ) -> dict[Annotation, dict]:
     """
     Returns a copy of 'tagged_annotations' with a 'correspondents' field added to that

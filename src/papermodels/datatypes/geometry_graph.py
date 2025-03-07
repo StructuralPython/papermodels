@@ -5,6 +5,7 @@ import networkx as nx
 import hashlib
 
 from papermodels.datatypes.element import Element
+from .loads import LoadElement, LoadArray
 from rich.progress import track
 
 
@@ -30,15 +31,16 @@ class GeometryGraph(nx.DiGraph):
         Returns a GeometryGraph (networkx.DiGraph) based upon the intersections and correspondents
         of the 'elements'.
         """
-        top_down_elements = sorted(elements, key=lambda x: x.page, reverse=True)
         g = cls()
-        for element in top_down_elements:
+        for element in elements:
             hash = hashlib.sha256(str(element).encode()).hexdigest()
             g.add_node(element.tag, element=element, sha256=hash)
-            for correspondent in element.correspondents:
-                g.add_edge(element.tag, correspondent)
-            for intersection in element.intersections:
-                g.add_edge(element.tag, intersection[0])
+            if element.correspondents is not None:
+                for correspondent in element.correspondents:
+                    g.add_edge(element.tag, correspondent)
+            if element.intersections is not None:
+                for intersecting_element_tag in element.intersections.keys():
+                    g.add_edge(element.tag, intersecting_element_tag)
         return g
 
     def hash_nodes(self):
@@ -53,3 +55,10 @@ class GeometryGraph(nx.DiGraph):
             hashes.append(element_hash)
         graph_hash = hashlib.sha256(str(tuple(hashes)).encode()).hexdigest()
         self.node_hash = graph_hash
+
+
+
+    def apply_loading(self, loads: list[LoadElement] | dict[str, LoadElement]) -> None:
+        """
+        Mutates the graph to include the loads applied.
+        """

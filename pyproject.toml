@@ -21,7 +21,7 @@ dependencies = [
     "pytest",
     "networkx",
     "numpy",
-    "PyNiteFEA >= 0.0.96",
+    "PyNiteFEA >= 1.0.0",
     "pycba",
     "rich",
     "forallpeople"

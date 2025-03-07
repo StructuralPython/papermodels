@@ -69,7 +69,6 @@ class ElementModel:
 
 @dataclass
 class BeamModel(ElementModel):
-
     def from_file(cls, filepath: pathlib.Path):
         raw_data = read_csv_file(filepath)
         structured_beam_data = get_structured_beam_data(raw_data)

@@ -2,14 +2,13 @@ import csv
 import math
 from typing import Optional
 
-from PyNite import FEModel3D
 from papermodels.fileio.utils import str_to_float, str_to_int
 
 
 import csv
 from typing import Optional
 import math
-from PyNite import FEModel3D
+from Pynite import FEModel3D
 from papermodels.fileio.utils import (
     str_to_int,
     str_to_float,

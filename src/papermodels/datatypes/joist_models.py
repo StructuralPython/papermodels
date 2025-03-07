@@ -31,25 +31,26 @@ class JoistArrayModel:
     def __init__(
         self,
         element: Optional[Element] = None,
+        spacing: float = 1,
         # joist_id: str,
         # joist_prototype: LineString,
-        # spacing: float | int,
+        spacing: float | int = 16,
         initial_offset: float | int = 0.0,
         joist_at_start: bool = True,
         joist_at_end: bool = False,
         cantilever_tolerance: float = 1e-2,
     ):
-        joist_supports = [inter[2] for inter in element.intersections]
-        joist_prototype = element.geometry
+        self.joist_supports = element.supporting_geometries
+        self.joist_prototype = element.geometry
         self.id = element.tag
-        self.spacing = 400  # Need to include this in the legend and thus, the Element
+        self.spacing = spacing  # Need to include this in the legend and thus, the Element
         self.initial_offset = float(initial_offset)
-        self._joist_prototype = joist_prototype
+        self._joist_prototype = self.joist_prototype
         self._cantilever_tolerance = cantilever_tolerance
-        self._extents = get_joist_extents(joist_prototype, joist_supports)
-        self._supports = determine_support_order(joist_prototype, joist_supports)
-        self._cantilevers = get_cantilever_segments(joist_prototype, self._supports)
-        self.vector_parallel = get_direction_vector(joist_prototype)
+        self._extents = get_joist_extents(self.joist_prototype, self.joist_supports)
+        self._supports = determine_support_order(self.joist_prototype, self.joist_supports)
+        self._cantilevers = get_cantilever_segments(self.joist_prototype, self._supports)
+        self.vector_parallel = get_direction_vector(self.joist_prototype)
         self.vector_normal = rotate_90(self.vector_parallel, ccw=False)
         self.joist_at_start = float(joist_at_start)
         self.joist_at_end = float(joist_at_end)
@@ -60,8 +61,8 @@ class JoistArrayModel:
             self.initial_offset,
             self.joist_at_start,
         )
-        self.joists = [
-            self.generate_joist(idx) for idx, _ in enumerate(self.joist_locations)
+        self.joist_geoms = [
+            self.generate_joist_geom(idx) for idx, _ in enumerate(self.joist_locations)
         ]
         self.joist_trib_widths = [
             self.get_joist_trib_widths(idx)
@@ -70,24 +71,24 @@ class JoistArrayModel:
         self.joist_trib_areas = [
             self.generate_trib_area(idx) for idx, _ in enumerate(self.joist_locations)
         ]
-
     # def __repr__(self):
     #     return class_representation(self)
 
     @classmethod
     def from_element(
         cls,
-        element: Optional[Element],
+        element: Element,
+        spacing: float,
         initial_offset: float | int = 0.0,
         joist_at_start: bool = True,
         joist_at_end: bool = False,
         cantilever_tolerance: float = 1e-2,
     ) -> JoistArrayModel:
         return cls(
-            element, initial_offset, joist_at_start, joist_at_end, cantilever_tolerance
+            element, spacing, initial_offset, joist_at_start, joist_at_end, cantilever_tolerance
         )
 
-    def generate_joist(self, index: int):
+    def generate_joist_geom(self, index: int):
         """
         Returns i, j coordinates of the joist in the JoistArray at the position
         of 'index'. Raises IndexError if 'index' is not within the joist array
@@ -105,7 +106,9 @@ class JoistArrayModel:
                 f"Last index is {len(self.joist_locations) - 1} @ {self.joist_locations[-1]}"
             ) from None
 
+        print(f"{index=} | {len(self.joist_locations) - 1=}")
         if index != 0 and index != len(self.joist_locations) - 1:
+            print("First clause")
             new_centroid = project_node(
                 start_centroid, -self.vector_normal, joist_distance
             )
@@ -122,6 +125,7 @@ class JoistArrayModel:
                 new_centroid, self.vector_parallel, projection_distance
             )
             ray_b = LineString([new_centroid, ray_bj])
+            print(f"{self._supports['A']=} | {ray_a=} | {new_centroid=}")
             support_a_loc = ray_a.intersection(self._supports["A"])
             support_b_loc = ray_b.intersection(self._supports["B"])
 
@@ -138,10 +142,12 @@ class JoistArrayModel:
             end_b = support_b_loc = self._extents["B"][1]
 
         if self._cantilevers["A"]:
+            print(f"{support_a_loc=}, {-self.vector_parallel=}, {self._cantilevers["A"]=}")
             end_a = project_node(
                 support_a_loc, -self.vector_parallel, self._cantilevers["A"]
             )
         if self._cantilevers["B"]:
+            print(f"{support_b_loc=}, {self.vector_parallel=}, {self._cantilevers["B"]=}")
             end_b = project_node(
                 support_b_loc, self.vector_parallel, self._cantilevers["B"]
             )
@@ -188,7 +194,7 @@ class JoistArrayModel:
         Returns a tuple of Polygon representing the tributary area of the 'joist' based on the
         given 'trib_widths'
         """
-        joist = self.joists[index]
+        joist = self.joist_geoms[index]
         trib_widths = self.joist_trib_widths[index]
         i_node, j_node = joist.boundary.geoms  # Point, Point
         trib_left, trib_right = trib_widths  # float, float
@@ -211,6 +217,19 @@ class JoistArrayModel:
         else:
             trib_area_right = Polygon()
         return trib_area_left | trib_area_right
+    
+
+    def show_svg(self, use_ipython_display: bool = True):
+        """
+        Returns a GeometryCollection containing:
+            - Joists
+            - Joist Trib Areas
+            - Joist Supports
+
+        For manual visual review
+        """
+        return GeometryCollection(self.joist_geoms + self.joist_trib_areas + self.joist_supports)
+        
 
 
 @dataclass
@@ -343,21 +362,25 @@ def get_cantilever_segments(
     Returns a dictionary containing the cantilever lengths over-hanging supports "A" and
     "B", respectively. Returns a length of 0.0 if the length is less than the tolerance.
     """
+    # HERE: The darn cantilever bits are not intersecting with the supports
     splits_a = ops.split(joist_prototype, ordered_supports["A"])
     splits_b = ops.split(joist_prototype, ordered_supports["B"])
+    print(f"{splits_a=} | {splits_b=}")
     supports = MultiLineString([ordered_supports["A"], ordered_supports["B"]])
     cantilever_segments = {"A": 0.0, "B": 0.0}
     for geom_a in splits_a.geoms:
-        if isinstance(geom_a & supports, Point):
+        if isinstance(geom_a & supports, Point) or geom_a.distance(supports) < tolerance:
+            print("Passes")
             cantilever_segments["A"] = (
                 0.0 if geom_a.length < tolerance else geom_a.length
             )
 
     for geom_b in splits_b.geoms:
-        if isinstance(geom_b & supports, Point):
+        if isinstance(geom_b & supports, Point) or geom_b.distance(supports) < tolerance:
             cantilever_segments["B"] = (
                 0.0 if geom_a.length < tolerance else geom_a.length
             )
+    print(cantilever_segments)
     return cantilever_segments
 
 
@@ -413,7 +436,6 @@ def get_joist_locations(
         joist_locs.append(distance - distance_remaining)
     else:
         joist_locs.append(distance)
-
     return joist_locs
 
 
@@ -444,7 +466,7 @@ def determine_support_order(
 
     all_supports = MultiLineString(supports)
     joist_a_node, joist_b_node = order_nodes_positive(
-        *(joist_prototype & all_supports).geoms
+        (joist_prototype & all_supports).geoms
     )
     support_a, support_b = supports
     if joist_a_node.buffer(1e-6).intersects(support_a):
@@ -463,10 +485,10 @@ def get_start_end_nodes(ls: LineString) -> tuple[Point, Point]:
     """
     first_coord = Point(ls.coords[0])
     last_coord = Point(ls.coords[-1])
-    return order_nodes_positive(first_coord, last_coord)
+    return order_nodes_positive([first_coord, last_coord])
 
 
-def order_nodes_positive(i_node: Point, j_node: Point) -> tuple[Point, Point]:
+def order_nodes_positive(nodes: list[Point]) -> list[Point]:
     """
     Returns the 'i_node' and 'j_node' in the order of "A" and "B" node where "A"
     and "B" node generate a +ve vector when B - A.
@@ -475,16 +497,17 @@ def order_nodes_positive(i_node: Point, j_node: Point) -> tuple[Point, Point]:
     the following range: -pi / 2 < theta <= pi/2. This can also be thought of as a vector
     with a "positive x bias" because such a vector will never point in the -ve x direction.
     """
-    ix, iy = i_node.coords[0]
-    jx, jy = j_node.coords[0]
+    return sorted(nodes, key=lambda x: x.coords[0][0])
+    # ix, iy = i_node.coords[0]
+    # jx, jy = j_node.coords[0]
 
-    delta_y = jy - iy
-    delta_x = jx - ix
+    # delta_y = jy - iy
+    # delta_x = jx - ix
 
-    if -math.pi / 2 < math.atan2(delta_y, delta_x) <= math.pi / 2:
-        return i_node, j_node
-    else:
-        return j_node, i_node
+    # if -math.pi / 2 < math.atan2(delta_y, delta_x) <= math.pi / 2:
+    #     return i_node, j_node
+    # else:
+    #     return j_node, i_node
 
 
 def project_node(node: Point, vector: np.ndarray, magnitude: float):
@@ -498,6 +521,7 @@ def project_node(node: Point, vector: np.ndarray, magnitude: float):
     """
     scaled_vector = vector * magnitude
     projected_node = np.array(node.xy) + scaled_vector
+    print(projected_node)
     return Point(projected_node)
 
 
