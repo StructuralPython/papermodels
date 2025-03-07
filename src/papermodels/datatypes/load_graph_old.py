@@ -7,7 +7,7 @@ import hashlib
 import pathlib
 
 from shapely import Point
-from PyNite import FEModel3D
+from Pynite import FEModel3D
 
 from papermodels.datatypes.element import (
     Element,

@@ -4,7 +4,7 @@ import pathlib
 from typing import Optional, Any
 from papermodels.datatypes.element import Element
 
-from PyNite import FEModel3D
+from Pynite import FEModel3D
 
 
 @dataclass
