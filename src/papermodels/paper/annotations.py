@@ -5,7 +5,7 @@ from shapely.wkt import loads as wkt_loads
 from shapely import Geometry, GeometryCollection, Point
 from papermodels.datatypes.annotation import Annotation
 from papermodels.datatypes.element import Element
-from papermodels.geometry.geom_ops import get_intersection
+from papermodels.geometry.geom_ops import get_intersection, check_corresponds
 from papermodels.fileio.utils import str_to_int
 from typing import Any, Optional
 import numpy as np
@@ -145,18 +145,25 @@ def get_geometry_intersections(
         i_attrs = intersected_annotations[i_annot]
         i_rank = i_attrs["rank"]
         i_page = i_annot.page
-        intersections = []
+        intersections_above = []
+        intersections_below = []
         for j_annot in annots:
             j_attrs = intersected_annotations[j_annot]
             j_rank = j_attrs["rank"]
             j_page = j_annot.page
-            if i_rank < j_rank and i_page == j_page:
-                i_geom = i_attrs["geometry"]
-                j_geom = j_attrs["geometry"]
-                intersection = get_intersection(i_geom, j_geom, j_attrs["tag"])
-                if intersection is not None:
-                    intersections.append(intersection)
-        i_attrs["intersections"] = intersections
+            i_geom = i_attrs["geometry"]
+            j_geom = j_attrs["geometry"]
+            if i_page != j_page: 
+                continue
+            intersection = get_intersection(i_geom, j_geom, j_attrs['tag'])
+            if intersection is None: 
+                continue
+            if i_rank < j_rank:
+                intersections_below.append(intersection)
+            elif i_rank > j_rank:
+                intersections_above.append(intersection)
+        i_attrs["intersections_above"] = intersections_above
+        i_attrs["intersections_below"] = intersections_below
     return intersected_annotations
 
 
@@ -170,29 +177,50 @@ def get_geometry_correspondents(
     annots_by_page = annotations_by_page(tagged_annotations)
     descending_pages = sorted(annots_by_page.keys(), reverse=True)
     last_page = descending_pages[-1]
-    corresponding_annotations = {}
+    corresponding_annotations = tagged_annotations.copy()
+    prev_page = None
     for page in descending_pages:
         if page != last_page:
             next_page = page - 1
             annots_here = annots_by_page[page]
             annots_below = annots_by_page[next_page]
+            correspondents_above = {j_attrs['tag']: [] for j_attrs in annots_below.values()}
+
             for i_annot, i_attrs in annots_here.items():
                 i_page = i_annot.page
-                correspondents = []
+                correspondents_below = []
                 for j_annot, j_attrs in annots_below.items():
                     j_attrs = annots_below[j_annot]
                     j_page = j_annot.page
                     i_geom = i_attrs["geometry"]
                     j_geom = j_attrs["geometry"]
-                    if j_page in (i_page + 1, i_page - 1) and i_geom.contains(j_geom):
-                        correspondents.append(j_attrs["tag"])
-                i_attrs["correspondents"] = correspondents
-                corresponding_annotations.update({i_annot: i_attrs})
+                    i_tag = i_attrs['tag']
+                    j_tag = j_attrs['tag']
+                    # HERE: the correspondence ratio should only reflect sketching inconsistency
+                    # and not percentage of load transfer. That should occur with intersections.
+                    # The correspondence should allow for a tolerance distance between parallel lines
+                    # but have to think about how to make sure lines are not end-to-end:
+                    # e.g.
+                    # print(f"{ls1.distance(ls3) < tol=} and {ls1.centroid.distance(ls3.centroid) < tol=}")
+                    #
+                    # Intersections:
+                    # e.g. a beam line to the top of a column poly
+                    # e.g. the bottom of a column poly to the top of a beam line
+                    # e.g. a wall line transferring onto a beam line
+                    correspondence_ratio = check_corresponds(i_geom, j_geom)
+                    if correspondence_ratio:
+                        correspondents_below.append({j_tag: (correspondence_ratio, j_geom)})
+                        correspondents_above[j_attrs['tag']].append({i_attrs['tag']: i_geom})
+                corresponding_annotations[i_annot]["correspondents_above"] = correspondents_above.get(i_attrs['tag'], [])
+                corresponding_annotations[i_annot]["correspondents_below"] = correspondents_below
+                
         else:
             annots_here = annots_by_page[page]
             for i_annot, i_attrs in annots_here.items():
-                i_attrs["correspondents"] = []
-                corresponding_annotations.update({i_annot: i_attrs})
+                corresponding_annotations[i_annot]["correspondents_below"] = []
+                corresponding_annotations[i_annot]["correspondents_above"] = correspondents_above.get(i_attrs['tag'], [])
+        if prev_page is None:
+            prev_page = page
     return corresponding_annotations
 
 

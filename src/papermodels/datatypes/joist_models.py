@@ -34,7 +34,6 @@ class JoistArrayModel:
         spacing: float = 1,
         # joist_id: str,
         # joist_prototype: LineString,
-        spacing: float | int = 16,
         initial_offset: float | int = 0.0,
         joist_at_start: bool = True,
         joist_at_end: bool = False,

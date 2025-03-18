@@ -1,5 +1,5 @@
 import math
-from typing import Optional
+from typing import Optional, Union
 import numpy as np
 
 from shapely import (
@@ -10,6 +10,7 @@ from shapely import (
     Polygon,
     MultiPolygon,
     convex_hull,
+    Geometry
 )
 import shapely.ops as ops
 
@@ -33,6 +34,36 @@ def get_intersection(
         )
     intersection = (intersection_point, j_geom, j_tag)
     return intersection
+
+
+def check_corresponds(above: Union[LineString, Polygon], below: Union[LineString, Polygon]) -> float:
+    """
+    Returns the ratio of overlap between geometry above and the geometry below.
+
+    A return value of 1.0 represents full correspondence with above and below
+    A return value of 0.0 indicates no correspondence with above and below
+    A return value in between represents an off-set between the two
+
+    If 'above' and 'below' are Polygons: the ratio represents (above & below).area / below.area.
+    If 'above' and 'below' are LineString: the ratio represents (above & below).length / below.length.
+    If 'above' is a Polygon and 'below' is a LineString: the ratio represents the 1.0 - distance(above.centroid, below)
+
+    In all cases, a return value of 1.0 
+    """
+    intersecting_region = above.intersection(below)
+    a_type = above.geom_type
+    b_type = below.geom_type
+    c_type = intersecting_region.geom_type
+    if intersecting_region is None:
+        return 0.0
+    elif a_type == b_type == c_type == 'LineString':
+        return intersecting_region.length / below.length
+    elif a_type == b_type == c_type == "Polygon" :
+        return intersecting_region.area / below.area
+    elif a_type == 'Polygon' and b_type == 'LineString' and c_type == "LineString":
+        return 1.0 - above.centroid.distance(below)
+    else:
+        return 0.0
 
 
 def get_joist_extents(
