@@ -89,6 +89,7 @@ class Element:
         cls,
         annots: list[Annotation], 
         legend: list[Annotation],
+        correspond_with_like_only: bool = True,
     ) -> list["Element"]:
         """
         Returns a list of Element generated from the annotations in 'annots' according to the element
@@ -98,18 +99,24 @@ class Element:
         sorted_by_page_annotations = sorted(annots, key=lambda x: x.page, reverse=True)
         parsed_annotations = parse_annotations(sorted_by_page_annotations, legend)
         tagged_annotations = tag_parsed_annotations(parsed_annotations)
-        intersecting_annotations = get_geometry_intersections(tagged_annotations)
-        corresponding_annotations = get_geometry_correspondents(intersecting_annotations)
+        annotations_w_intersect = get_geometry_intersections(tagged_annotations)
+        annotations_w_intersect_corrs = get_geometry_correspondents(annotations_w_intersect)
         # print(corresponding_annotations)
+
         elements = []
-        for annot_attrs in corresponding_annotations.values():
+        for annot_attrs in annotations_w_intersect_corrs.values():
+            if correspond_with_like_only:
+                corrs_a = annot_attrs['correspondents_above']
+                corrs_b = annot_attrs['correspondents_below']
+                corrs_a = tuple(cor for cor in corrs_a if next(iter(cor.keys()))[0] == annot_attrs['tag'][0])
+                corrs_b = tuple(cor for cor in corrs_b if next(iter(cor.keys()))[0] == annot_attrs['tag'][0])
             element = cls(
                 tag=annot_attrs["tag"],
                 geometry=annot_attrs["geometry"],
                 intersections_above=tuple(annot_attrs["intersections_above"]),
                 intersections_below=tuple(annot_attrs["intersections_below"]),
-                correspondents_above=tuple(annot_attrs['correspondents_above']),
-                correspondents_below=tuple(annot_attrs["correspondents_below"]),
+                correspondents_above=corrs_a,
+                correspondents_below=corrs_b,
                 plane_id=annot_attrs.get("page_label", None),
             )
             elements.append(element)

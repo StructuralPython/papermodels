@@ -198,7 +198,8 @@ class JoistArrayModel:
         i_node, j_node = joist.boundary.geoms  # Point, Point
         trib_left, trib_right = trib_widths  # float, float
 
-        # Left
+        # Left - # TODO: Can I not just buffer the joist? I guess that if the joist is on an 
+        # angle then extents won't capture the angle.
         if trib_left != 0.0:
             i_left = project_node(i_node, self.vector_normal, trib_left)
             j_left = project_node(j_node, self.vector_normal, trib_left)

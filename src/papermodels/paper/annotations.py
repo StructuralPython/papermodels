@@ -4,7 +4,6 @@ from dataclasses import asdict
 from shapely.wkt import loads as wkt_loads
 from shapely import Geometry, GeometryCollection, Point
 from papermodels.datatypes.annotation import Annotation
-from papermodels.datatypes.element import Element
 from papermodels.geometry.geom_ops import get_intersection, check_corresponds
 from papermodels.fileio.utils import str_to_int
 from typing import Any, Optional
@@ -64,7 +63,8 @@ def parse_annotations(
             prop: getattr(legend_item, prop) for prop in properties_to_match
         }
         matching_annots = filter_annotations(annots, legend_properties)
-        legend_data = legend_item.text.replace("Legend\n", "").split("\n")
+        legend_data = legend_item.text.replace("\r", "\n").replace("Legend\n", "").split("\n")
+        legend_data = [elem for elem in legend_data if elem]
         annot_attributes = {
             legend_attr.split(": ")[0].lower(): legend_attr.split(": ")[1]
             for legend_attr in legend_data
@@ -103,34 +103,6 @@ def tag_parsed_annotations(
         annot_attrs["tag"] = tag
         counts[tag_prefix] += 1
     return annots_to_tag
-
-
-def get_structural_elements(
-    annots: list[Annotation], legend: list[Annotation]
-) -> list[Element]:
-    """
-    Returns a list of Element generated from the annotations in 'annots' according to the element
-    types described in the 'legend'. If an annotation is not described in the legend then it will
-    not be included in the result list of Elements.
-    """
-    sorted_by_page_annotations = sorted(annots, key=lambda x: x.page, reverse=True)
-    parsed_annotations = parse_annotations(sorted_by_page_annotations, legend)
-    tagged_annotations = tag_parsed_annotations(parsed_annotations)
-    intersecting_annotations = get_geometry_intersections(tagged_annotations)
-    corresponding_annotations = get_geometry_correspondents(intersecting_annotations)
-    elements = []
-    for annot, annot_attrs in corresponding_annotations.items():
-        element = Element(
-            tag=annot_attrs["tag"],
-            # type=annot_attrs["type"],
-            # page=annot.page,
-            geometry=annot_attrs["geometry"],
-            intersections=tuple(annot_attrs["intersections"]),
-            correspondents=tuple(annot_attrs["correspondents"]),
-            page_label=annot_attrs.get("page_label", None),
-        )
-        elements.append(element)
-    return elements
 
 
 def get_geometry_intersections(
@@ -196,17 +168,6 @@ def get_geometry_correspondents(
                     j_geom = j_attrs["geometry"]
                     i_tag = i_attrs['tag']
                     j_tag = j_attrs['tag']
-                    # HERE: the correspondence ratio should only reflect sketching inconsistency
-                    # and not percentage of load transfer. That should occur with intersections.
-                    # The correspondence should allow for a tolerance distance between parallel lines
-                    # but have to think about how to make sure lines are not end-to-end:
-                    # e.g.
-                    # print(f"{ls1.distance(ls3) < tol=} and {ls1.centroid.distance(ls3.centroid) < tol=}")
-                    #
-                    # Intersections:
-                    # e.g. a beam line to the top of a column poly
-                    # e.g. the bottom of a column poly to the top of a beam line
-                    # e.g. a wall line transferring onto a beam line
                     correspondence_ratio = check_corresponds(i_geom, j_geom)
                     if correspondence_ratio:
                         correspondents_below.append({j_tag: (correspondence_ratio, j_geom)})
@@ -232,7 +193,7 @@ def _annotation_to_wkt(annot: Annotation) -> str:
     if annot.object_type == "PolyLine" or annot.object_type == "Line":
         grouped_vertices = _group_vertices_str(annot.vertices)
         return f"LINESTRING({grouped_vertices})"
-    elif annot.object_type == "Polygon" or annot.object_type == "Rectangle":
+    elif annot.object_type in ("Polygon", "Rectangle", "Square"):
         grouped_vertices = _group_vertices_str(annot.vertices, close=True)
         return f"POLYGON(({grouped_vertices}))"
 

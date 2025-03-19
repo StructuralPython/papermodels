@@ -58,10 +58,9 @@ def load_pdf_annotations(pdf_path: pathlib.Path | str) -> list[Annotation]:
                 vertices = list(annot.get("/L", []))
             else:
                 print(f"Cannot read (yet): {annot_type}")
-
             text = str(annot.get("/Contents", ""))
             rc = annot.get("/RC")
-            text = parse_html_text_content(str(rc)) if rc is not None else ""
+            text = parse_html_text_content(str(rc)) if rc is not None else text
             line_color = tuple(annot.get("/C", stream_dict.get("RG", (0, 0, 0))))
             fill_color = tuple(annot.get("/IC", stream_dict.get("rg", (1, 1, 1))))
             fill_opacity = annot.get("/FillOpacity", Decimal("1.0"))

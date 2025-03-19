@@ -17,21 +17,25 @@ Geometry = Union[LineString, Polygon]
 IntersectingGeometry = Union[Point, LineString]
 
 def get_intersection(
-    i_geom: Geometry, j_geom: Geometry, j_tag: str, abs_tol: float = 1e-3
+    above: Geometry, below: Geometry, j_tag: str
 ) -> Optional[tuple[str, IntersectingGeometry, Geometry]]:
     """
     Returns the details of the intersection
     """
-    # elif a_type == 'Polygon' and b_type == 'LineString' and c_type == "LineString":
-    #     return 1.0 - above.centroid.distance(below)
-    above = i_geom
-    below = j_geom
-    intersecting_region = i_geom.intersection(j_geom)
-    i_type = i_geom.geom_type
-    j_type = j_geom.geom_type
+    # intersecting_region = above.intersection(below)
+    i_type = above.geom_type
+    j_type = below.geom_type
+    
+    if i_type == "LineString" and j_type == "Polygon":
+        intersecting_region = above.intersection(below.exterior)
+    elif i_type == "Polygon" and j_type == "LineString":
+        intersecting_region = below.intersection(above.exterior)
+    else:
+        intersecting_region = above.intersection(below)
+
     all_linestrings = i_type == j_type == "LineString"
     if intersecting_region.geom_type == "Point" and all_linestrings:
-        return (intersecting_region, j_geom, j_tag)
+        return (intersecting_region, below, j_tag)
     elif intersecting_region.geom_type == "MultiPoint": # Line enters and exits a polygon boundary
         if (
             (i_type == "Polygon" and j_type == "LineString")
@@ -39,50 +43,33 @@ def get_intersection(
             (i_type == "LineString" and j_type == "Polygon")
         ):
             point = intersecting_region.centroid
-            return (point, j_geom, j_tag)
+            assert above.contains(point)
+            return (point, below, j_tag)
         else:
             raise ValueError(
                 "Could not get intersecting region for MultiPoint. Should not see this error.\n"
-                f"{i_geom.wkt=} | {j_geom.wkt=}"
+                f"{above.wkt=} | {below.wkt=}"
             )
     elif intersecting_region.geom_type == "Point": # LineString and Polygon intersection @ boundary
             if i_type == "Polygon" and j_type == "LineString":
-                j_i, j_j = j_geom.coords
-                if i_geom.touches(j_i): # Need to test that this works
-                    return (j_i, j_geom, j_tag)
-                elif i_geom.touches(j_j):
-                    return (j_j, j_geom, j_tag)
+                j_i, j_j = below.coords
+                print(j_i, j_j)
+                if above.touches(Point(j_i)): # Need to test that this works
+                    return (j_i, below, j_tag)
+                elif above.touches(Point(j_j)):
+                    return (j_j, below, j_tag)
             elif i_type == "LineString" and j_type == "Polygon":
-                i_i, i_j = i_geom.coords
-                if j_geom.touches(i_i):
-                    return (i_i, j_geom, j_tag)
-                elif j_geom.touches(i_j):
-                    return (i_j, j_geom, j_tag)
-    elif all_linestrings and intersecting_region.geom_type == "LineString":
-        return (intersecting_region, j_geom, j_tag)
-    elif intersecting_region.is_empty and (i_type == j_type == "LineString"):
-        # If two lines are very close to creating an overlap intersection (e.g. wall over beam)
-        # but not creating an intersecting region, try buffering and snapping
-        i_buff = i_geom.buffer(abs_tol, cap_style='flat')
-        j_buff = j_geom.buffer(abs_tol, cap_style='flat')
-        buffered_intersection = i_buff.intersection(j_buff)
-        overlap_ratio = buffered_intersection.area / (i_buff + j_buff).area
-        if overlap_ratio >= 0.10: # An arbitrary value intended to avoid perpendicular line overlaps
-            # HERE: Create behaviour for an almost overlap and snapping the points in i_geom to j_geom.
-            pass
-
-        
+                i_i, i_j = above.coords
+                print(i_i, i_j)
+                if below.touches(Point(i_i)):
+                    return (i_i, below, j_tag)
+                elif below.touches(Point(i_j)):
+                    return (i_j, below, j_tag)
+            else:
+                raise ValueError("Above geometry did not touch below geometry")
+    else:
         return None
-    elif intersecting_region:
 
-    if intersection_point.geom_type == "MultiPoint":
-        intersection_point = Point(
-            np.array(
-                [np.array(geom.coords[0]) for geom in intersection_point.geoms]
-            ).mean(axis=1)
-        )
-    intersection = (intersection_point, j_geom, j_tag)
-    return intersection
 
 def check_corresponds(above: Union[LineString, Polygon], below: Union[LineString, Polygon]) -> float:
     """
