@@ -39,7 +39,7 @@ class JoistArrayModel:
         joist_at_end: bool = False,
         cantilever_tolerance: float = 1e-2,
     ):
-        self.joist_supports = element.supporting_geometries
+        self.joist_supports = [ib[1] for ib in element.intersections_below.values()]
         self.joist_prototype = element.geometry
         self.id = element.tag
         self.spacing = spacing  # Need to include this in the legend and thus, the Element
@@ -105,9 +105,7 @@ class JoistArrayModel:
                 f"Last index is {len(self.joist_locations) - 1} @ {self.joist_locations[-1]}"
             ) from None
 
-        print(f"{index=} | {len(self.joist_locations) - 1=}")
         if index != 0 and index != len(self.joist_locations) - 1:
-            print("First clause")
             new_centroid = project_node(
                 start_centroid, -self.vector_normal, joist_distance
             )
@@ -124,7 +122,6 @@ class JoistArrayModel:
                 new_centroid, self.vector_parallel, projection_distance
             )
             ray_b = LineString([new_centroid, ray_bj])
-            print(f"{self._supports['A']=} | {ray_a=} | {new_centroid=}")
             support_a_loc = ray_a.intersection(self._supports["A"])
             support_b_loc = ray_b.intersection(self._supports["B"])
 
@@ -141,15 +138,14 @@ class JoistArrayModel:
             end_b = support_b_loc = self._extents["B"][1]
 
         if self._cantilevers["A"]:
-            print(f"{support_a_loc=}, {-self.vector_parallel=}, {self._cantilevers["A"]=}")
             end_a = project_node(
                 support_a_loc, -self.vector_parallel, self._cantilevers["A"]
             )
         if self._cantilevers["B"]:
-            print(f"{support_b_loc=}, {self.vector_parallel=}, {self._cantilevers["B"]=}")
             end_b = project_node(
                 support_b_loc, self.vector_parallel, self._cantilevers["B"]
             )
+        print(self._cantilevers)
         return LineString([end_a, end_b])
 
     def get_extent_edge(self, edge: str = "start"):
@@ -362,25 +358,14 @@ def get_cantilever_segments(
     Returns a dictionary containing the cantilever lengths over-hanging supports "A" and
     "B", respectively. Returns a length of 0.0 if the length is less than the tolerance.
     """
-    # HERE: The darn cantilever bits are not intersecting with the supports
-    splits_a = ops.split(joist_prototype, ordered_supports["A"])
-    splits_b = ops.split(joist_prototype, ordered_supports["B"])
-    print(f"{splits_a=} | {splits_b=}")
-    supports = MultiLineString([ordered_supports["A"], ordered_supports["B"]])
+    joist_interior = convex_hull(MultiLineString([geom for geom in ordered_supports.values()]))
+    cantilevers = ops.split(joist_prototype, joist_interior) - joist_interior
     cantilever_segments = {"A": 0.0, "B": 0.0}
-    for geom_a in splits_a.geoms:
-        if isinstance(geom_a & supports, Point) or geom_a.distance(supports) < tolerance:
-            print("Passes")
-            cantilever_segments["A"] = (
-                0.0 if geom_a.length < tolerance else geom_a.length
-            )
-
-    for geom_b in splits_b.geoms:
-        if isinstance(geom_b & supports, Point) or geom_b.distance(supports) < tolerance:
-            cantilever_segments["B"] = (
-                0.0 if geom_a.length < tolerance else geom_a.length
-            )
-    print(cantilever_segments)
+    split_a, split_b = cantilevers.geoms
+    if split_a.distance(ordered_supports['A']) < split_a.distance(ordered_supports['B']):
+        cantilever_segments = {"A": split_a.length, "B": split_b.length}
+    else:
+        cantilever_segments = {"A": split_b.length, "B": split_a.length}
     return cantilever_segments
 
 
@@ -521,7 +506,6 @@ def project_node(node: Point, vector: np.ndarray, magnitude: float):
     """
     scaled_vector = vector * magnitude
     projected_node = np.array(node.xy) + scaled_vector
-    print(projected_node)
     return Point(projected_node)
 
 

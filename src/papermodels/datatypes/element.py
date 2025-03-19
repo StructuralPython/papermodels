@@ -56,32 +56,32 @@ class Element:
         cls,
         elem_geom: Geometry,
         elem_tag: str | int,
-        intersections_above: Optional[dict[str | int, Geometry]],
-        intersections_below: Optional[dict[str | int, Geometry]],
-        correspondents_above: Optional[dict[str | int, Geometry]],
-        correspondents_below: Optional[dict[str | int, Geometry]],
+        intersections_above: Optional[dict[str | int, Geometry]] = None,
+        intersections_below: Optional[dict[str | int, Geometry]] = None,
+        correspondents_above: Optional[dict[str | int, Geometry]] = None,
+        correspondents_below: Optional[dict[str | int, Geometry]] = None,
         plane_id: Optional[str | int] = None
     ):
         """
         Generates an Element from provided geometries
         """
         inters_above = {
-            above_tag: geom_ops.get_intersection(elem_geom, above_geom, above_tag)[1:]
+            above_tag: geom_ops.get_intersection(elem_geom, above_geom, above_tag)
             for above_tag, above_geom in intersections_above.items()
 
-        }
+        } if intersections_above is not None else {}
         inters_below = {
-            below_tag: geom_ops.get_intersection(elem_geom, below_geom, below_tag)[1:]
+            below_tag: geom_ops.get_intersection(elem_geom, below_geom, below_tag)
             for below_tag, below_geom in intersections_below.items()
-        }
+        } if intersections_below is not None else {}
 
         return cls(
             tag=elem_tag,
             geometry=elem_geom,
             intersections_above=inters_above,
-            intersection_below=inters_below,
-            correspondents_above=correspondents_above,
-            correspondents_below=correspondents_below,
+            intersections_below=inters_below,
+            correspondents_above=correspondents_above or {},
+            correspondents_below=correspondents_below or {},
         )
 
     @classmethod
