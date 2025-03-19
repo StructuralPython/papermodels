@@ -1,93 +1,126 @@
 from dataclasses import dataclass
-from typing import Optional
-from shapely import Point, Geometry, LineString, Polygon
+from typing import Optional, Union
+from shapely import Point, LineString, Polygon
 from .annotation import Annotation
+from ..paper.annotations import (
+    parse_annotations,
+    tag_parsed_annotations,
+    get_geometry_intersections,
+    get_geometry_correspondents
+)
 from ..geometry import geom_ops
 import parse
+
+Geometry = Union[LineString, Polygon]
 
 
 @dataclass(frozen=True)
 class Element:
     """
-    A dataclass to generically represent a structural element on a PDF page
-    whether it is a beam, column, joist, or otherwise.
+    A class to generically represent a connected 2D geometry within a 3D "geometry graph".
 
-    Note: each Element has no "knowledge" of its intersections and correspondents.
-    They are generated in a separate process and are not part of the capability
-    of the class. These attributes are simply to keep track of pre-discovered
-    intersections and correspondents.
+    The 2D geometry can exist independent of an interconnected 3D graph by not having
+    any 'intersections' or 'correspondents'. The existence of 'intersections' and/or
+    'correspondents' indicates that the 2D geometry is part of a graph.
 
-    'tag': str, represent a unique name for this element, as per the designer's preference
-    'type': str, describing what "type" of element it is. This is not an enumeration
-        and can take any designer-defined value. It is for user-level categorization.
-    'page': int, describing the page index of the PDF that this element is found on
-    'geometry': the shapely geometry that represents this element in 2D space
-    'intersections': list[tuple[str, Point]], where each 2-tuple represents the tag
-        of the other Element that this element intersects with on plan and the point
-        of intersection. Intersections exist only between elements that are on the same PDF page
-        and thus are used to describe connections that occur on the horizontal plane.
-    'correspondents': list[str], where each item in the list represents the tag of another
-        Element that is approximately in the exact same position as this element but on the
-        adjacent page. Correspondents exist only between elements that are on adjacent PDF
-        pages and thus are used to describe connections that occur on the vertical plane
-        such as the the top and bottom of a wall or column (the bottom may be on page 0 and
-        the top may be on page 1)
-    'page_label': A designer-defined str label for the page (e.g. "Ground Floor" or "L03", etc.)
+    'intersections' describe interconnectivity on the same 2D plane.
+    'correspondents' describe interconnectivity between adjacent 2D planes,
+        whether above or below.
+
+    geometry: Union[LineString, Polygon], The geometry for the Element
+    tag: str | int,  An optional unique name or integer ID for the Element.
+    intersections_above/below: a dict whose keys are the 'tag' of an intersecting
+        Element and the values are the Point within self.geometry
+        where the intersection occurs. _above represents geometries that occur
+        "above" the element in the directed geoemtry graph and while _below
+        represents those "below". 
+    correspondents_above/below: a dict whose keys are the 'tag' of a corresponding
+        geometry on an adjacent 2D plane and the values are the corresponding
+        Geometry on the adjacent plane. _above represents geometries that occur
+        "above" the element in the directed geoemtry graph and while _below
+        represents those "below".
+    plane_id: Optional[str | int] = None, An optional unique identifier for the 2D
+        plane that this Element resides on
     """
 
     geometry: Geometry
-    tag: Optional[str] = None
-    isjoist: bool = False
-    annotation: Optional[Annotation] = None
-    intersections: Optional[dict[str | int, Point]] = None
-    correspondents: Optional[dict[str | int, Geometry]] = None
+    tag: Optional[str | int] = None
+    intersections_above: Optional[dict[str | int, (Point, Geometry)]] = None
+    intersections_below: Optional[dict[str | int, (Point, Geometry)]] = None
+    correspondents_above: Optional[dict[str | int, Geometry]] = None
+    correspondents_below: Optional[dict[str | int, Geometry]] = None
+    plane_id: Optional[str | int] = None
 
     @classmethod
     def from_geometries(
         cls,
-        subject_geom: Geometry,
-        supporting_geoms: list[Geometry] | dict[str, Geometry],
-        subject_tag: Optional[str] = None,
-        corresponding_geoms: Optional[list[Geometry] | dict[str, Geometry]] = None,
-        isjoist: bool = False
+        elem_geom: Geometry,
+        elem_tag: str | int,
+        intersections_above: Optional[dict[str | int, Geometry]] = None,
+        intersections_below: Optional[dict[str | int, Geometry]] = None,
+        correspondents_above: Optional[dict[str | int, Geometry]] = None,
+        correspondents_below: Optional[dict[str | int, Geometry]] = None,
+        plane_id: Optional[str | int] = None
     ):
         """
-        Returns an Element instance created from the main 'subject' geometry
-        and 'supporting' geometries which represent structural supporting
-        members.
-
-        subject_geom: The structural element that is the subject of study.
-            Any singular shapely Geometry type.
-        supporting: A list of any singular shapely Geometry types. If a dict
-            is passed, then the keys will be used as identifying tags for the
-            provided supporting geometries. The supporting geometries must
-            intersect with the subject geometry _on the same plane_.
-        subject_tag: a unique str label to identify the subject element.
-        corresponding_geoms: A list of any singular shapely Geometry types.
-            If a dict is passed, then the keys will be used as identifying
-            tags for the provided corresponding geometries.
-            The
+        Generates an Element from provided geometries
         """
-        if isinstance(supporting_geoms, list):
-            supporting_geoms = {
-                idx: supporting_geom
-                for idx, supporting_geom in enumerate(supporting_geoms)
-            }
+        inters_above = {
+            above_tag: geom_ops.get_intersection(elem_geom, above_geom, above_tag)
+            for above_tag, above_geom in intersections_above.items()
 
-        intersections = {}
-        for support_tag, support_geom in supporting_geoms.items():
-            intersection = geom_ops.get_intersection(
-                subject_geom, support_geom
-            )
-            if intersection is not None:
-                intersections.update({support_tag: intersection})
+        } if intersections_above is not None else {}
+        inters_below = {
+            below_tag: geom_ops.get_intersection(elem_geom, below_geom, below_tag)
+            for below_tag, below_geom in intersections_below.items()
+        } if intersections_below is not None else {}
 
         return cls(
-            tag=subject_tag,
-            geometry=subject_geom,
-            intersections=intersections,
-            correspondents=corresponding_geoms,
+            tag=elem_tag,
+            geometry=elem_geom,
+            intersections_above=inters_above,
+            intersections_below=inters_below,
+            correspondents_above=correspondents_above or {},
+            correspondents_below=correspondents_below or {},
         )
+
+    @classmethod
+    def from_annotations(
+        cls,
+        annots: list[Annotation], 
+        legend: list[Annotation],
+        correspond_with_like_only: bool = True,
+    ) -> list["Element"]:
+        """
+        Returns a list of Element generated from the annotations in 'annots' according to the element
+        types described in the 'legend'. If an annotation is not described in the legend then it will
+        not be included in the result list of Elements.
+        """
+        sorted_by_page_annotations = sorted(annots, key=lambda x: x.page, reverse=True)
+        parsed_annotations = parse_annotations(sorted_by_page_annotations, legend)
+        tagged_annotations = tag_parsed_annotations(parsed_annotations)
+        annotations_w_intersect = get_geometry_intersections(tagged_annotations)
+        annotations_w_intersect_corrs = get_geometry_correspondents(annotations_w_intersect)
+        # print(corresponding_annotations)
+
+        elements = []
+        for annot_attrs in annotations_w_intersect_corrs.values():
+            if correspond_with_like_only:
+                corrs_a = annot_attrs['correspondents_above']
+                corrs_b = annot_attrs['correspondents_below']
+                corrs_a = tuple(cor for cor in corrs_a if next(iter(cor.keys()))[0] == annot_attrs['tag'][0])
+                corrs_b = tuple(cor for cor in corrs_b if next(iter(cor.keys()))[0] == annot_attrs['tag'][0])
+            element = cls(
+                tag=annot_attrs["tag"],
+                geometry=annot_attrs["geometry"],
+                intersections_above=tuple(annot_attrs["intersections_above"]),
+                intersections_below=tuple(annot_attrs["intersections_below"]),
+                correspondents_above=corrs_a,
+                correspondents_below=corrs_b,
+                plane_id=annot_attrs.get("page_label", None),
+            )
+            elements.append(element)
+        return elements
     
     @property
     def supporting_geometries(self):
@@ -98,36 +131,37 @@ class Element:
 
 
 # Examples
-## This example shows a beam that is connected to a joist and a column on the same page
-## and with that column having a correspondent on the page below
 E00 = Element(
     tag="FB1.1",
     # type="Flush Beam",
     # page=1,
     geometry=LineString([[101.5, 52.0], [101.5, 85.3]]),
-    intersections=[("J1.1", Point([101.5, 65.2]))],
+    intersections_above={
+        "J1.1": (Point([101.5, 65.2]), LineString([(84.2, 65.2), (120.0, 65.2)]))
+    },
     # correspondents=[],
 )
+# ## This example shows a beam that is connected to a joist and a column on the same page
+# ## and with that column having a correspondent on the page below
+# E01 = Element(
+#     tag="C1.1",
+#     # type="Column",
+#     # page=1,
+#     geometry=Polygon([[100.0, 100.0], [100.0, 103.0], [103.0, 103.0], [103.0, 100.0]]),
+#     intersections_below=[("FB1.1", Point([101.5, 53.5]))],
+#     correspondents_below=["C0.1"],
+#     # page_label="L02",
+# )
 
-E01 = Element(
-    tag="C1.1",
-    # type="Column",
-    # page=1,
-    geometry=Polygon([[100.0, 100.0], [100.0, 103.0], [103.0, 103.0], [103.0, 100.0]]),
-    intersections=[("FB1.1", Point([101.5, 53.5]))],
-    correspondents=["C0.1"],
-    # page_label="L02",
-)
-
-E02 = Element(
-    tag="C0.1",
-    # type="Column",
-    # page=0,
-    geometry=Polygon([[100.0, 100.0], [100.0, 103.0], [103.0, 103.0], [103.0, 100.0]]),
-    intersections=[],
-    correspondents=["C1.1"],
-    # page_label="L01",
-)
+# E02 = Element(
+#     tag="C0.1",
+#     # type="Column",
+#     # page=0,
+#     geometry=Polygon([[100.0, 100.0], [100.0, 103.0], [103.0, 103.0], [103.0, 100.0]]),
+#     intersections=[],
+#     correspondents=["C1.1"],
+#     # page_label="L01",
+# )
 
 
 def get_tag_type(this_element_tag: str) -> str:

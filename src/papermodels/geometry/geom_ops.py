@@ -1,5 +1,5 @@
 import math
-from typing import Optional
+from typing import Optional, Union
 import numpy as np
 
 from shapely import (
@@ -13,26 +13,93 @@ from shapely import (
 )
 import shapely.ops as ops
 
+Geometry = Union[LineString, Polygon]
+IntersectingGeometry = Union[Point, LineString]
 
 def get_intersection(
-    i_geom: LineString, j_geom: LineString | Polygon, j_tag: str
-) -> Optional[tuple[str, Point, LineString]]:
+    above: Geometry, below: Geometry, j_tag: str
+) -> Optional[tuple[str, IntersectingGeometry, Geometry]]:
     """
     Returns the details of the intersection
     """
-    intersection_point = (
-        i_geom & j_geom if j_geom.geom_type != "Polygon" else i_geom & j_geom.exterior
-    )
-    if intersection_point.is_empty:
-        return
-    if intersection_point.geom_type == "MultiPoint":
-        intersection_point = Point(
-            np.array(
-                [np.array(geom.coords[0]) for geom in intersection_point.geoms]
-            ).mean(axis=1)
-        )
-    intersection = (intersection_point, j_geom, j_tag)
-    return intersection
+    # intersecting_region = above.intersection(below)
+    i_type = above.geom_type
+    j_type = below.geom_type
+    
+    if i_type == "LineString" and j_type == "Polygon":
+        intersecting_region = above.intersection(below.exterior)
+    elif i_type == "Polygon" and j_type == "LineString":
+        intersecting_region = below.intersection(above.exterior)
+    else:
+        intersecting_region = above.intersection(below)
+
+    all_linestrings = i_type == j_type == "LineString"
+    if intersecting_region.geom_type == "Point" and all_linestrings:
+        return (intersecting_region, below, j_tag)
+    elif intersecting_region.geom_type == "MultiPoint": # Line enters and exits a polygon boundary
+        if (
+            (i_type == "Polygon" and j_type == "LineString")
+            or
+            (i_type == "LineString" and j_type == "Polygon")
+        ):
+            point = intersecting_region.centroid
+            assert above.contains(point)
+            return (point, below, j_tag)
+        else:
+            raise ValueError(
+                "Could not get intersecting region for MultiPoint. Should not see this error.\n"
+                f"{above.wkt=} | {below.wkt=}"
+            )
+    elif intersecting_region.geom_type == "Point": # LineString and Polygon intersection @ boundary
+            if i_type == "Polygon" and j_type == "LineString":
+                j_i, j_j = below.coords
+                if above.touches(Point(j_i)): # Need to test that this works
+                    return (j_i, below, j_tag)
+                elif above.touches(Point(j_j)):
+                    return (j_j, below, j_tag)
+            elif i_type == "LineString" and j_type == "Polygon":
+                i_i, i_j = above.coords
+                if below.touches(Point(i_i)):
+                    return (i_i, below, j_tag)
+                elif below.touches(Point(i_j)):
+                    return (i_j, below, j_tag)
+            else:
+                raise ValueError("Above geometry did not touch below geometry")
+    else:
+        return None
+
+
+def check_corresponds(above: Union[LineString, Polygon], below: Union[LineString, Polygon]) -> float:
+    """
+    Returns the ratio of overlap between geometry above and the geometry below.
+
+    A return value of 1.0 represents full correspondence with above and below
+    A return value of 0.0 indicates no correspondence with above and below
+    A return value in between represents an off-set between the two
+
+    If 'above' and 'below' are Polygons: the ratio represents (above & below).area / below.area.
+    If 'above' and 'below' are LineString: the ratio represents (above & below).length / below.length.
+    If 'above' is a Polygon and 'below' is a LineString: the ratio represents the 1.0 - distance(above.centroid, below)
+
+    In all cases, a return value of 1.0 represents a "full bearing ratio" (100% of the area of the
+    element corresponds with the element on the plane below).  This ratio represents the accuracy
+    of the alignment of the sketch from plane to plane and does not necessarily represent the
+    bearing area at a connection. For example, a ratio of 1.0 between two polygons representing
+    columns may indicate that there is no "slope" in the column and that the bottom of the column has
+    been sketched so that it is directly under the top of the column. 
+    """
+    intersecting_region = above.intersection(below)
+    a_type = above.geom_type
+    b_type = below.geom_type
+    c_type = intersecting_region.geom_type
+    if intersecting_region is None:
+        return 0.0
+    elif a_type == b_type == c_type == 'LineString':
+        return intersecting_region.length / below.length
+    elif a_type == b_type == c_type == "Polygon" :
+        return intersecting_region.area / below.area
+    else:
+        return 0.0
 
 
 def get_joist_extents(
