@@ -35,12 +35,16 @@ class GeometryGraph(nx.DiGraph):
         for element in elements:
             hash = hashlib.sha256(str(element).encode()).hexdigest()
             g.add_node(element.tag, element=element, sha256=hash)
-            if element.correspondents is not None:
-                for correspondent in element.correspondents:
-                    g.add_edge(element.tag, correspondent)
-            if element.intersections is not None:
-                for intersecting_element_tag in element.intersections.keys():
-                    g.add_edge(element.tag, intersecting_element_tag)
+            print(element.tag)
+            if element.correspondents_below is not None:
+                for correspondent in element.correspondents_below:
+                    j_tag, j_geom = tuple(correspondent.items())[0]
+                    print("correspondent: ", j_tag)
+                    g.add_edge(element.tag, j_tag)
+            if element.intersections_below is not None:
+                for point, j_geom, j_tag in element.intersections_below:
+                    print("intersection: ", j_tag)
+                    g.add_edge(element.tag, j_tag)
         return g
 
     def hash_nodes(self):

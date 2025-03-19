@@ -25,7 +25,6 @@ def get_intersection(
     # intersecting_region = above.intersection(below)
     i_type = above.geom_type
     j_type = below.geom_type
-    
     if i_type == "LineString" and j_type == "Polygon":
         intersecting_region = above.intersection(below.exterior)
     elif i_type == "Polygon" and j_type == "LineString":
@@ -34,9 +33,13 @@ def get_intersection(
         intersecting_region = above.intersection(below)
 
     all_linestrings = i_type == j_type == "LineString"
+    if j_tag == "WT2.1": 
+        print(locals())
     if intersecting_region.geom_type == "Point" and all_linestrings:
+        print(f"{j_tag=} - Clause 1")
         return (intersecting_region, below, j_tag)
     elif intersecting_region.geom_type == "MultiPoint": # Line enters and exits a polygon boundary
+        print(f"{j_tag=} | Clause 2")
         if (
             (i_type == "Polygon" and j_type == "LineString")
             or
@@ -51,20 +54,7 @@ def get_intersection(
                 f"{above.wkt=} | {below.wkt=}"
             )
     elif intersecting_region.geom_type == "Point": # LineString and Polygon intersection @ boundary
-            if i_type == "Polygon" and j_type == "LineString":
-                j_i, j_j = below.coords
-                if above.touches(Point(j_i)): # Need to test that this works
-                    return (j_i, below, j_tag)
-                elif above.touches(Point(j_j)):
-                    return (j_j, below, j_tag)
-            elif i_type == "LineString" and j_type == "Polygon":
-                i_i, i_j = above.coords
-                if below.touches(Point(i_i)):
-                    return (i_i, below, j_tag)
-                elif below.touches(Point(i_j)):
-                    return (i_j, below, j_tag)
-            else:
-                raise ValueError("Above geometry did not touch below geometry")
+        return (intersecting_region, below, j_tag)
     else:
         return None
 

@@ -73,6 +73,7 @@ def parse_annotations(
             annot_geom = annotation_to_shapely(annot)
             annot_attrs = {}
             annot_attrs["geometry"] = annot_geom
+            annot_attrs['page_label'] = annot.page
             for annot_key, annot_attr in annot_attributes.items():
                 annot_attrs[annot_key] = str_to_int(
                     annot_attr.split("<")[0]
@@ -127,12 +128,13 @@ def get_geometry_intersections(
             j_geom = j_attrs["geometry"]
             if i_page != j_page: 
                 continue
-            intersection = get_intersection(i_geom, j_geom, j_attrs['tag'])
-            if intersection is None: 
-                continue
             if i_rank < j_rank:
+                intersection = get_intersection(i_geom, j_geom, j_attrs['tag'])
+                if intersection is None: continue
                 intersections_below.append(intersection)
             elif i_rank > j_rank:
+                intersection = get_intersection(j_geom, i_geom, j_attrs['tag'])
+                if intersection is None: continue
                 intersections_above.append(intersection)
         i_attrs["intersections_above"] = intersections_above
         i_attrs["intersections_below"] = intersections_below
