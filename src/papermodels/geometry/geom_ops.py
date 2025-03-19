@@ -53,14 +53,12 @@ def get_intersection(
     elif intersecting_region.geom_type == "Point": # LineString and Polygon intersection @ boundary
             if i_type == "Polygon" and j_type == "LineString":
                 j_i, j_j = below.coords
-                print(j_i, j_j)
                 if above.touches(Point(j_i)): # Need to test that this works
                     return (j_i, below, j_tag)
                 elif above.touches(Point(j_j)):
                     return (j_j, below, j_tag)
             elif i_type == "LineString" and j_type == "Polygon":
                 i_i, i_j = above.coords
-                print(i_i, i_j)
                 if below.touches(Point(i_i)):
                     return (i_i, below, j_tag)
                 elif below.touches(Point(i_j)):
