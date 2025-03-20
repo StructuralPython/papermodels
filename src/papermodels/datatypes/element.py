@@ -167,6 +167,71 @@ E00 = Element(
     # correspondents=[],
 )
 
+@dataclass
+class LoadedElement(Element):
+    trib_area: Optional[list[Polygon]] = None
+    loading_areas: Optional[dict[Polygon, dict]] = None
+    applied_loading_areas: Optional[dict[Polygon, dict]] = None
+
+    """
+    'trib_area' - Optional trib area for this element. If a list[Polygon] then
+        maybe this could work well with the joist arrays
+    'loading_areas' - A dict of Polygon/attributes that exist on the same 2D plane
+        as the Element
+    'applied_loading_areas' - A dict of Polygon/attributes that intersect with the
+        trib area of this Element. The Polygons in the dict represent the intersecting
+        area of the loading area and the trib area.
+
+    TODO: Need to figure out what is going-to-be/could-be in the dict values of the loading_areas
+    TODO: Need to figure out how this will relate to a JoistArray
+    """
+    
+    def __post_init__(self):
+        # Tasks:
+        # Compile bulk loading_areas (everything on the floor) into applied_loading_areas
+        pass
+
+    def dump_analysis_model(self) -> dict:
+        """
+        Returns the structured beam data dict to go to analysis model
+        """
+        return {}
+    
+    def dump_model(self) -> dict:
+        """
+        Returns the structured beam dict for serialization
+        """
+        return {}
+        # Runs the load distribution functions to convert applied_loading_areas
+        # into distributed loads
+
+    @classmethod
+    def load_model(cls):
+        """
+        Returns a LoadedElement generated from the output of 'dump_model'
+        """
+        return cls()
+    
+    @classmethod
+    def from_element_with_loads(cls, elem: Element, trib_area: Polygon, loading_areas: dict[Polygon, dict]):
+        """
+        Returns a LoadedElement
+        """
+        return cls(
+            elem.geometry,
+            elem.tag,
+            elem.intersections_above,
+            elem.intersections_below,
+            elem.correspondents_above,
+            elem.correspondents_below,
+            elem.plane_id,
+            trib_area,
+            loading_areas,
+        )
+
+
+
+
 
 # ## This example shows a beam that is connected to a joist and a column on the same page
 # ## and with that column having a correspondent on the page below
