@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Optional, Union
+from typing import Optional, Union, NamedTuple
 from shapely import Point, LineString, Polygon
 from .annotation import Annotation
 from ..paper.annotations import (
@@ -14,7 +14,26 @@ import parse
 Geometry = Union[LineString, Polygon]
 
 
-@dataclass(frozen=True)
+class Intersection(NamedTuple):
+    """
+    A class to represent an intersection of geometries
+    """
+    intersecting_region: Union[Point, LineString]
+    other_geometry: Union[LineString, Polygon]
+    other_tag: str
+    other_index: Optional[int] = None
+
+
+class Correspondent(NamedTuple):
+    """
+    A class to represent the correspondence of two Polygons
+    """
+    overlap_ratio: float
+    other_geometry: Polygon
+    other_tag: str
+
+
+@dataclass
 class Element:
     """
     A class to generically represent a connected 2D geometry within a 3D "geometry graph".
@@ -45,11 +64,19 @@ class Element:
 
     geometry: Geometry
     tag: Optional[str | int] = None
-    intersections_above: Optional[dict[str | int, (Point, Geometry)]] = None
-    intersections_below: Optional[dict[str | int, (Point, Geometry)]] = None
-    correspondents_above: Optional[dict[str | int, Geometry]] = None
-    correspondents_below: Optional[dict[str | int, Geometry]] = None
+    intersections_above: Optional[list[tuple]] = None
+    intersections_below: Optional[list[tuple]] = None
+    correspondents_above: Optional[list[dict]] = None
+    correspondents_below: Optional[list[dict]] = None
     plane_id: Optional[str | int] = None
+
+    def __post_init__(self):
+        if self.geometry.geom_type == "LineString" and len(self.geometry.coords) != 2:
+            raise ValueError(
+                "Element objects of LineStrings must have LineStrings containing only one segment.\n"
+                f"Element with {self.tag} has {len(self.geometry.coords -1)} segments."
+            )
+ 
 
     @classmethod
     def from_geometries(
@@ -106,15 +133,13 @@ class Element:
         elements = []
         for annot_attrs in annotations_w_intersect_corrs.values():
             if correspond_with_like_only:
-                corrs_a = annot_attrs['correspondents_above']
-                corrs_b = annot_attrs['correspondents_below']
-                corrs_a = tuple(cor for cor in corrs_a if next(iter(cor.keys()))[0] == annot_attrs['tag'][0])
-                corrs_b = tuple(cor for cor in corrs_b if next(iter(cor.keys()))[0] == annot_attrs['tag'][0])
+                corrs_a = [cor for cor in annot_attrs['correspondents_above'] if annot_attrs['tag'][0] == cor.other_tag[0]]
+                corrs_b = [cor for cor in annot_attrs['correspondents_below'] if annot_attrs['tag'][0] == cor.other_tag[0]]
             element = cls(
                 tag=annot_attrs["tag"],
                 geometry=annot_attrs["geometry"],
-                intersections_above=tuple(annot_attrs["intersections_above"]),
-                intersections_below=tuple(annot_attrs["intersections_below"]),
+                intersections_above=annot_attrs["intersections_above"],
+                intersections_below=annot_attrs["intersections_below"],
                 correspondents_above=corrs_a,
                 correspondents_below=corrs_b,
                 plane_id=annot_attrs.get("page_label", None),
@@ -136,11 +161,13 @@ E00 = Element(
     # type="Flush Beam",
     # page=1,
     geometry=LineString([[101.5, 52.0], [101.5, 85.3]]),
-    intersections_above={
-        "J1.1": (Point([101.5, 65.2]), LineString([(84.2, 65.2), (120.0, 65.2)]))
-    },
+    intersections_above=[
+        (Point([101.5, 65.2]), LineString([(84.2, 65.2), (120.0, 65.2)]), "J1.1")
+    ],
     # correspondents=[],
 )
+
+
 # ## This example shows a beam that is connected to a joist and a column on the same page
 # ## and with that column having a correspondent on the page below
 # E01 = Element(

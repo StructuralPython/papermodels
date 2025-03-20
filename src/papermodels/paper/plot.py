@@ -9,7 +9,6 @@ import numpy as np
 import parse
 
 from papermodels.db.data_model import Annotation
-from loguru import logger
 
 
 def plot_annotations(
