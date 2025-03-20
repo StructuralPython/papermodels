@@ -4,6 +4,7 @@ from dataclasses import asdict
 from shapely.wkt import loads as wkt_loads
 from shapely import Geometry, GeometryCollection, Point
 from papermodels.datatypes.annotation import Annotation
+from papermodels.datatypes.element import Correspondent
 from papermodels.geometry.geom_ops import get_intersection, check_corresponds
 from papermodels.fileio.utils import str_to_int
 from typing import Any, Optional
@@ -159,6 +160,7 @@ def get_geometry_correspondents(
             annots_here = annots_by_page[page]
             annots_below = annots_by_page[next_page]
             correspondents_above = {j_attrs['tag']: [] for j_attrs in annots_below.values()}
+            correspondents_below = []
 
             for i_annot, i_attrs in annots_here.items():
                 i_page = i_annot.page
@@ -172,8 +174,8 @@ def get_geometry_correspondents(
                     j_tag = j_attrs['tag']
                     correspondence_ratio = check_corresponds(i_geom, j_geom)
                     if correspondence_ratio:
-                        correspondents_below.append({j_tag: (correspondence_ratio, j_geom)})
-                        correspondents_above[j_attrs['tag']].append({i_attrs['tag']: i_geom})
+                        correspondents_below.append(Correspondent(correspondence_ratio, j_geom, j_tag))
+                        correspondents_above[j_attrs['tag']].append(Correspondent(correspondence_ratio, i_geom, i_attrs['tag']))
                 corresponding_annotations[i_annot]["correspondents_above"] = correspondents_above.get(i_attrs['tag'], [])
                 corresponding_annotations[i_annot]["correspondents_below"] = correspondents_below
                 

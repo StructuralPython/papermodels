@@ -5,7 +5,9 @@ import networkx as nx
 import hashlib
 
 from papermodels.datatypes.element import Element
-from .loads import LoadElement, LoadArray
+from shapely import Point, LineString, Polygon
+from ..geometry import geom_ops as geom
+from ..datatypes.element import Correspondent, Intersection
 from rich.progress import track
 
 
@@ -25,7 +27,7 @@ class GeometryGraph(nx.DiGraph):
 
     @classmethod
     def from_elements(
-        cls, elements: list[Element], floor_elevations: Optional[dict] = None
+        cls, elements: list[Element]
     ) -> GeometryGraph:
         """
         Returns a GeometryGraph (networkx.DiGraph) based upon the intersections and correspondents
@@ -34,18 +36,100 @@ class GeometryGraph(nx.DiGraph):
         g = cls()
         for element in elements:
             hash = hashlib.sha256(str(element).encode()).hexdigest()
-            g.add_node(element.tag, element=element, sha256=hash)
-            print(element.tag)
+            start_coord = None
+            if element.geometry.geom_type == "LineString":
+                coords_a, coords_b = element.geometry.coords
+                ordered_coords = geom.order_nodes_positive(Point(coords_a), Point(coords_b))
+                start_coord = ordered_coords[0]
+            g.add_node(
+                element.tag, 
+                element=element, 
+                sha256=hash,
+                start_coord=start_coord,
+                # b_coord=ordered_coords[1]
+            )
             if element.correspondents_below is not None:
                 for correspondent in element.correspondents_below:
-                    j_tag, j_geom = tuple(correspondent.items())[0]
-                    print("correspondent: ", j_tag)
+                    j_tag = correspondent.other_tag
+                    # print("correspondent: ", j_tag)
                     g.add_edge(element.tag, j_tag)
             if element.intersections_below is not None:
-                for point, j_geom, j_tag in element.intersections_below:
-                    print("intersection: ", j_tag)
+                for intersection in element.intersections_below:
+                    j_tag = intersection.other_tag
                     g.add_edge(element.tag, j_tag)
+        # HERE: SEEM TO BE MISSING INDEXES ON POLYGON BOTTOMS HITTING LINES
+        g.add_intersection_indexes_below()
+        g.add_intersection_indexes_above()
         return g
+    
+    def add_intersection_indexes_below(self):
+        sorted_nodes = nx.topological_sort(self)
+        for node in sorted_nodes:
+            node_attrs = self.nodes[node]
+            if node_attrs['start_coord'] is None: continue # HERE IS THE PROBLEM
+            start_coord = Point(node_attrs['start_coord'])
+            intersection_below_local_coords = []
+            for intersection in node_attrs['element'].intersections_below:
+                below_local_coord = start_coord.distance(intersection.intersecting_region)
+                intersection_below_local_coords.append((below_local_coord, intersection.other_tag))
+            sorted_below_ints = sorted(intersection_below_local_coords, key=lambda x: x[0])
+            _, other_tags_below = zip(*sorted_below_ints)
+            updated_intersections_below = []
+            element = node_attrs['element']
+            for intersection in element.intersections_below:
+                other_tag = intersection.other_tag
+                local_index = other_tags_below.index(other_tag)
+                new_intersection = Intersection(
+                    intersection.intersecting_region,
+                    intersection.other_geometry,
+                    intersection.other_tag,
+                    local_index
+                )
+                updated_intersections_below.append(new_intersection)
+            element.intersections_below = updated_intersections_below
+            self.nodes[node]['element'] = element
+
+
+    def add_intersection_indexes_above(self):
+        sorted_nodes = nx.topological_sort(self)
+        transfer_elements = [node for node in sorted_nodes if list(self.predecessors(node))]
+
+        for node in transfer_elements:
+            indexed_intersections_above = []
+            element = self.nodes[node]['element']
+            element_tag = element.tag
+            for intersection in self.nodes[node]['element'].intersections_above:
+                other_tag = intersection.other_tag
+                element_above = self.nodes[other_tag]['element']
+                above_intersections_below = {
+                    intersection_below.other_tag: intersection_below.other_index
+                    for intersection_below in element_above.intersections_below
+                }
+                local_index = above_intersections_below[element_tag]
+                new_intersection = Intersection(
+                    intersection.intersecting_region,
+                    intersection.other_geometry,
+                    intersection.other_tag,
+                    local_index
+                )
+                indexed_intersections_above.append(new_intersection)
+            element.intersections_above = indexed_intersections_above
+            self.nodes[node]['element'] = element
+                
+            
+
+                
+
+
+            
+
+
+            
+            
+
+
+
+
 
     def hash_nodes(self):
         """
