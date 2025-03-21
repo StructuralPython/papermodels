@@ -1,6 +1,9 @@
 from dataclasses import dataclass
 from typing import Optional, Union, NamedTuple
+import numpy as np
+import numpy.typing as npt
 from shapely import Point, LineString, Polygon
+import shapely
 from .annotation import Annotation
 from ..paper.annotations import (
     parse_annotations,
@@ -169,41 +172,154 @@ E00 = Element(
 
 @dataclass
 class LoadedElement(Element):
-    trib_area: Optional[list[Polygon]] = None
-    loading_areas: Optional[dict[Polygon, dict]] = None
-    applied_loading_areas: Optional[dict[Polygon, dict]] = None
+    trib_area: Polygon = None
+    loading_areas: Optional[list[tuple[Polygon, npt.ArrayLike]]] = None
+    applied_loading_areas: Optional[list[tuple[Polygon, npt.ArrayLike]]] = None
+    model: Optional[dict] = None
 
     """
     'trib_area' - Optional trib area for this element. If a list[Polygon] then
         maybe this could work well with the joist arrays
-    'loading_areas' - A dict of Polygon/attributes that exist on the same 2D plane
-        as the Element
+    'loading_areas' - A list of tuples. Each tuple consists of a Polygon and a dict of
+        attributes associated with that Polygon. If no attributes are desired,
+        pass a tuple with an empty dict.
     'applied_loading_areas' - A dict of Polygon/attributes that intersect with the
         trib area of this Element. The Polygons in the dict represent the intersecting
-        area of the loading area and the trib area.
+        area of the loading area and the trib area. These are computed from the provided
+        'loading_areas' during initialization. The designer is not expected to populate
+        this parameter.
+    'model' - A dictionary that describes the LoadedElement in terms of a structural
+        element. Populated during initialization. The designer is not expected to populate
+        this parameter.
 
-    TODO: Need to figure out what is going-to-be/could-be in the dict values of the loading_areas
+
     TODO: Need to figure out how this will relate to a JoistArray
     """
-    
     def __post_init__(self):
-        # Tasks:
-        # Compile bulk loading_areas (everything on the floor) into applied_loading_areas
-        pass
+        """
+        Populates self.applied_loading_areas
+        """
+        for idx, loading_area in enumerate(self.loading_areas):
+            try:
+                assert len(loading_area) == 2 and isinstance(loading_area[1], dict)
+            except AssertionError:
+                raise ValueError(
+                    "All supplied loading areas must be a tuple of length 2 and be populated"
+                    " with a dict as the second element of the tuple. Provide an empty dict "
+                    "in this position if no attributes are desired.\n"
+                    f"Erroneous value found at index: {idx}"
+                    )
+            
+        self.applied_loading_areas = self._get_intersecting_loads()
+        self.model = self._build_model()
+            
+        
+    def _get_intersecting_loads(self) -> list[tuple[Polygon, dict]]:
+        loading_array = np.array([loading_area[0] for loading_area in self.loading_areas])
+        intersecting_loads = self.trib_area.intersection(loading_array)
+        applied_loading_areas = []
+        for idx, intersecting_load in enumerate(intersecting_loads):
+            if intersecting_load.is_empty or intersecting_load.area == 0: 
+                continue
+            applied_loading_areas.append(
+                (intersecting_load, self.loading_areas[idx][1])
+            )
+        return applied_loading_areas 
 
+        
     def dump_analysis_model(self) -> dict:
         """
         Returns the structured beam data dict to go to analysis model
         """
         return {}
     
-    def dump_model(self) -> dict:
+    def _build_model(self) -> dict:
         """
         Returns the structured beam dict for serialization
         """
-        return {}
-        # Runs the load distribution functions to convert applied_loading_areas
-        # into distributed loads
+        orientation = "unknown"
+        if any(self.intersections_below, self.intersections_above):
+            orientation = "horizontal"
+        elif any(self.correspondents_above, self.correspondents_below):
+            orientation = "vertical"
+
+        support_locations = self._get_support_locations(self)
+        transfer_loads = self._get_transfer_loads(self)
+        distributed_loads = self._get_distributed_loads(self)
+
+        model = {
+            "element_attributes":
+                {
+                    "tag": self.tag,
+                    "length": self.geometry.length,
+                    "orientation": orientation,
+                },
+            "supports": support_locations,
+            "loads": {
+                "point_loads": transfer_loads,
+                "distributed_loads": distributed_loads
+            }
+        }
+        return model
+
+
+    def _get_support_locations(self):
+        """
+        Calculates the support locations from the intersections below
+        """
+        coords_a, coords_b = self.geometry.coords
+        coords_a, coords_b = Point(coords_a), Point(coords_b)
+        ordered_coords = geom_ops.order_nodes_positive(coords_a, coords_b)
+        start_coord = ordered_coords[0]
+        support_locations = geom_ops.get_local_intersection_ordinates(
+            start_coord,
+            [intersection[0] for intersection in self.intersections_below]
+        )
+        return [
+            {"location": support_location, "fixity": None}
+            for support_location in support_locations
+        ]
+    
+    def _get_transfer_loads(self):
+        """
+        Calculates the transfer load locations from the intersections above
+        """
+        coords_a, coords_b = self.geometry.coords
+        coords_a, coords_b = Point(coords_a), Point(coords_b)
+        ordered_coords = geom_ops.order_nodes_positive(coords_a, coords_b)
+        start_coord = ordered_coords[0]
+        transfer_locations = geom_ops.get_local_intersection_ordinates(
+            start_coord,
+            [intersection[0] for intersection in self.intersections_above]
+        )
+        transfer_loads = []
+        for idx, transfer_location in enumerate(transfer_locations):
+            intersection_data = self.intersections_above[idx]
+            source_member = intersection_data.other_tag
+            reaction_idx = intersection_data.other_index
+            if reaction_idx is None:
+                raise ValueError(
+                    "The .other_index attribute within the .intersections_above list"
+                    " is not calculated. Generate LoadedElement objects through the GeometryGraph"
+                    " interface in order to populate this necessary index."
+                )
+            transfer_loads.append(
+                {
+                    "location": transfer_location,
+                    "magnitude": None,
+                    "transfer_source": f"{source_member}",
+                    "transfer_reaction_idx": reaction_idx,
+                    "direction": "gravity"
+                }
+            )
+        return transfer_loads
+    
+    def _get_distributed_loads(self):
+        """
+        Computes the resulting distributed loads from the applied
+        loading areas
+        """
+
 
     @classmethod
     def load_model(cls):

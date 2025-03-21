@@ -1,11 +1,30 @@
 from __future__ import annotations
 from typing import Optional
 from dataclasses import dataclass
+import numpy.typing as npt
+from ..geometry import geom_ops
 from shapely.geometry import (
     Polygon,
     MultiPolygon,
+    LineString
 )
 import itertools
+
+
+@dataclass
+class DistributedLoad:
+    """
+    Represents a trapezoidal distributed load applied to a framing member
+
+    'x0': The start load location (as local ordinate along the member)
+    'x1': The end load location
+    'w0': The starting magnitude
+    'w1': The end magnitude
+    """
+    x0: float
+    x1: float
+    w0: float
+    w1: float
 
 
 @dataclass
@@ -68,7 +87,22 @@ class Singularity:
 
     def __neg__(self):
         return Singularity(self.x0, self.x1, -self.m, -self.y0, self.precision)
+    
 
+def get_distributed_loads_from_projected_polygons(
+    member: LineString,
+    applied_loading_areas: list[tuple[Polygon, npt.ArrayLike]],
+) -> list[DistributedLoad]:
+    """
+    Returns a list of DistributedLoad representing the projected areas
+    """
+    distributed_loads = []
+    for loading_area, load_components in applied_loading_areas:
+        member_start_node = geom_ops.get_linestring_start_node(member)
+        for load_component in load_components:
+            project_polygon(loading_area, load_component, xy=True)
+            
+            geom_ops.get_local_intersection_ordinates(member_start_node, )
 
 def project_polygon(
     original: Polygon,

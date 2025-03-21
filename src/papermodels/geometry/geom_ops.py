@@ -86,7 +86,26 @@ def check_corresponds(above: Union[LineString, Polygon], below: Union[LineString
         return intersecting_region.area / below.area
     else:
         return 0.0
+    
 
+def get_local_intersection_ordinates(start_node: Point, intersections: list[Point]) -> list[float]:
+    """
+    Returns the relative distances of the Points in 'intersections' relative to the 'start_node'.
+    """
+    return [
+        start_node.distance(intersection) for intersection in intersections
+    ]
+
+
+def get_linestring_start_node(ls: LineString) -> Point:
+    """
+    Returns a Point representing the starting node of the 'ls' LineString
+    when the nodes are ordered with a +ve X bias.
+    """
+    coords_a, coords_b = ls.coords
+    ordered_coords = order_nodes_positive(Point(coords_a), Point(coords_b))
+    start_coord = ordered_coords[0]
+    return start_coord
 
 def get_joist_extents(
     joist_prototype: LineString, joist_supports: list[LineString]
