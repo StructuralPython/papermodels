@@ -337,8 +337,8 @@ def rotate_to_horizontal(line: LineString, geoms: list[Geometry]):
 
     angle = math.atan2(delta_y, delta_x)
 
-    rotated_line = aff.rotate(line, -angle, origin=i_end, use_radians=True)
-    rotated_geoms = [aff.rotate(geom, -angle, origin=i_end, use_radians=True) for geom in geoms]
+    rotated_line = aff.translate(aff.rotate(line, -angle, origin=i_end, use_radians=True), xoff=-ix)
+    rotated_geoms = [aff.translate(aff.rotate(geom, -angle, origin=i_end, use_radians=True), xoff=-ix) for geom in geoms]
 
     return rotated_line, rotated_geoms
 
