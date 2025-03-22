@@ -12,6 +12,7 @@ from shapely import (
     convex_hull,
 )
 import shapely.ops as ops
+import shapely.affinity as aff
 from ..datatypes.element import Intersection, Correspondent
 Geometry = Union[LineString, Polygon]
 IntersectingGeometry = Union[Point, LineString]
@@ -321,6 +322,26 @@ def project_node(node: Point, vector: np.ndarray, magnitude: float):
     scaled_vector = vector * magnitude
     projected_node = np.array(node.xy) + scaled_vector
     return Point(projected_node)
+
+
+def rotate_to_horizontal(line: LineString, geoms: list[Geometry]):
+    """
+    Rotate the line so that it is horizonatla. Bring the geomswiith it
+    """
+    i_end, j_end = get_start_end_nodes(line)
+    ix, iy = i_end.coords[0]
+    jx, jy = j_end.coords[0]
+
+    delta_y = jy - iy
+    delta_x = jx - ix
+
+    angle = math.atan2(delta_y, delta_x)
+
+    rotated_line = aff.rotate(line, -angle, origin=i_end, use_radians=True)
+    rotated_geoms = [aff.rotate(geom, -angle, origin=i_end, use_radians=True) for geom in geoms]
+
+    return rotated_line, rotated_geoms
+
 
 
 def rotate_90(v: np.ndarray, precision: int = 6, ccw=True) -> tuple[float, float]:

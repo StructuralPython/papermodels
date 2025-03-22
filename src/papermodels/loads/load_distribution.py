@@ -96,13 +96,27 @@ def get_distributed_loads_from_projected_polygons(
     """
     Returns a list of DistributedLoad representing the projected areas
     """
+    # Rotate member and applied loading areas
+    area_polys, load_components = zip(*applied_loading_areas)
+    horiz_member, rotated_polys = geom_ops.rotate_to_horizontal(member, area_polys)
+    rot_applied_loading_areas = zip(rotated_polys, load_components)
     distributed_loads = []
-    for loading_area, load_components in applied_loading_areas:
-        member_start_node = geom_ops.get_linestring_start_node(member)
+    for loading_area, load_components in rot_applied_loading_areas:
         for load_component in load_components:
-            project_polygon(loading_area, load_component, xy=True)
-            
-            geom_ops.get_local_intersection_ordinates(member_start_node, )
+            poly_xy = project_polygon(loading_area, load_component, xy=True)
+            projected_poly_coords = list(zip(*poly_xy))
+            dist_loads = []
+            inner = []
+            for idx, coord in enumerate(projected_poly_coords[1:-1]):
+                if idx % 2 == 1:
+                    inner.append(coord)
+                    dist_loads.append(inner)
+                    inner = []
+                else:
+                    inner.append(coord)
+        distributed_loads.append(dist_loads)
+    return distributed_loads
+
 
 def project_polygon(
     original: Polygon,

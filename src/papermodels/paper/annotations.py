@@ -4,8 +4,6 @@ from dataclasses import asdict
 from shapely.wkt import loads as wkt_loads
 from shapely import Geometry, GeometryCollection, Point
 from papermodels.datatypes.annotation import Annotation
-from papermodels.datatypes.element import Correspondent
-from papermodels.geometry.geom_ops import get_intersection, check_corresponds
 from papermodels.fileio.utils import str_to_int
 from typing import Any, Optional
 import numpy as np
@@ -107,87 +105,6 @@ def tag_parsed_annotations(
     return annots_to_tag
 
 
-def get_geometry_intersections(
-    tagged_annotations: dict[Annotation, dict],
-) -> dict[Annotation, dict]:
-    """
-    Returns a dictionary of
-    """
-    annots = list(tagged_annotations.keys())
-    intersected_annotations = tagged_annotations.copy()
-    for i_annot in annots:
-        i_attrs = intersected_annotations[i_annot]
-        i_rank = i_attrs["rank"]
-        i_page = i_annot.page
-        intersections_above = []
-        intersections_below = []
-        for j_annot in annots:
-            j_attrs = intersected_annotations[j_annot]
-            j_rank = j_attrs["rank"]
-            j_page = j_annot.page
-            i_geom = i_attrs["geometry"]
-            j_geom = j_attrs["geometry"]
-            if i_page != j_page: 
-                continue
-            if i_rank < j_rank:
-                intersection = get_intersection(i_geom, j_geom, j_attrs['tag'])
-                if intersection is None: continue
-                intersections_below.append(intersection)
-            elif i_rank > j_rank:
-                intersection = get_intersection(j_geom, i_geom, j_attrs['tag'])
-                if intersection is None: continue
-                intersections_above.append(intersection)
-        i_attrs["intersections_above"] = intersections_above
-        i_attrs["intersections_below"] = intersections_below
-    return intersected_annotations
-
-
-def get_geometry_correspondents(
-    tagged_annotations: dict[Annotation, dict],
-) -> dict[Annotation, dict]:
-    """
-    Returns a copy of 'tagged_annotations' with a 'correspondents' field added to that
-    attributes dictionary of each Annotation key.
-    """
-    annots_by_page = annotations_by_page(tagged_annotations)
-    descending_pages = sorted(annots_by_page.keys(), reverse=True)
-    last_page = descending_pages[-1]
-    corresponding_annotations = tagged_annotations.copy()
-    prev_page = None
-    for page in descending_pages:
-        if page != last_page:
-            next_page = page - 1
-            annots_here = annots_by_page[page]
-            annots_below = annots_by_page[next_page]
-            correspondents_above = {j_attrs['tag']: [] for j_attrs in annots_below.values()}
-            correspondents_below = []
-
-            for i_annot, i_attrs in annots_here.items():
-                i_page = i_annot.page
-                correspondents_below = []
-                for j_annot, j_attrs in annots_below.items():
-                    j_attrs = annots_below[j_annot]
-                    j_page = j_annot.page
-                    i_geom = i_attrs["geometry"]
-                    j_geom = j_attrs["geometry"]
-                    i_tag = i_attrs['tag']
-                    j_tag = j_attrs['tag']
-                    correspondence_ratio = check_corresponds(i_geom, j_geom)
-                    if correspondence_ratio:
-                        correspondents_below.append(Correspondent(correspondence_ratio, j_geom, j_tag))
-                        correspondents_above[j_attrs['tag']].append(Correspondent(correspondence_ratio, i_geom, i_attrs['tag']))
-                corresponding_annotations[i_annot]["correspondents_above"] = correspondents_above.get(i_attrs['tag'], [])
-                corresponding_annotations[i_annot]["correspondents_below"] = correspondents_below
-                
-        else:
-            annots_here = annots_by_page[page]
-            for i_annot, i_attrs in annots_here.items():
-                corresponding_annotations[i_annot]["correspondents_below"] = []
-                corresponding_annotations[i_annot]["correspondents_above"] = correspondents_above.get(i_attrs['tag'], [])
-        if prev_page is None:
-            prev_page = page
-    return corresponding_annotations
-
 
 def _annotation_to_wkt(annot: Annotation) -> str:
     """
@@ -263,19 +180,6 @@ def scale_vertices(
     scaled_vertices = [vertex * scale for vertex in vertices]
     return scaled_vertices
 
-
-def annotations_by_page(
-    annots: dict[Annotation, dict], ascending=False
-) -> dict[int, dict[Annotation, dict]]:
-    """
-    Returns 'annots' in a dictionary keyed by page number
-    """
-    annots_by_page = {}
-    for annot, annot_attrs in annots.items():
-        annots_on_page = annots_by_page.get(annot.page, {})
-        annots_on_page.update({annot: annot_attrs})
-        annots_by_page[annot.page] = annots_on_page
-    return annots_by_page
 
 
 def _translate_vertices(
