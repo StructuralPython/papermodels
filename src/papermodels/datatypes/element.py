@@ -95,12 +95,12 @@ class Element:
         Generates an Element from provided geometries
         """
         inters_above = {
-            above_tag: geom_ops.get_intersection(elem_geom, above_geom, above_tag)
+            above_tag: Intersection(*geom_ops.get_intersection(elem_geom, above_geom, above_tag))
             for above_tag, above_geom in intersections_above.items()
 
         } if intersections_above is not None else {}
         inters_below = {
-            below_tag: geom_ops.get_intersection(elem_geom, below_geom, below_tag)
+            below_tag: Intersection(*geom_ops.get_intersection(elem_geom, below_geom, below_tag))
             for below_tag, below_geom in intersections_below.items()
         } if intersections_below is not None else {}
 
@@ -172,7 +172,7 @@ E00 = Element(
 @dataclass
 class LoadedElement(Element):
     trib_area: Polygon = None
-    loading_areas: Optional[list[tuple[Polygon, npt.ArrayLike]]] = None
+    loading_areas: Optional[list[tuple[Polygon, Union[str, npt.ArrayLike]]]] = None
     applied_loading_areas: Optional[list[tuple[Polygon, npt.ArrayLike]]] = None
     model: Optional[dict] = None
 
@@ -334,7 +334,7 @@ class LoadedElement(Element):
         return cls()
     
     @classmethod
-    def from_element_with_loads(cls, elem: Element, trib_area: Polygon, loading_areas: dict[Polygon, dict]):
+    def from_element_with_loads(cls, elem: Element, loading_areas: dict[Polygon, Union[str | npt.ArrayLike]], trib_area: Optional[Polygon] = None):
         """
         Returns a LoadedElement
         """
@@ -402,11 +402,11 @@ def get_geometry_intersections(
             if i_rank < j_rank:
                 intersection = geom_ops.get_intersection(i_geom, j_geom, j_attrs['tag'])
                 if intersection is None: continue
-                intersections_below.append(intersection)
+                intersections_below.append(Intersection(*intersection))
             elif i_rank > j_rank:
                 intersection = geom_ops.get_intersection(j_geom, i_geom, j_attrs['tag'])
                 if intersection is None: continue
-                intersections_above.append(intersection)
+                intersections_above.append(Intersection(*intersection))
         i_attrs["intersections_above"] = intersections_above
         i_attrs["intersections_below"] = intersections_below
     return intersected_annotations

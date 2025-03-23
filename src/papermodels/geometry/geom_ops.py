@@ -13,7 +13,7 @@ from shapely import (
 )
 import shapely.ops as ops
 import shapely.affinity as aff
-from ..datatypes.element import Intersection, Correspondent
+
 Geometry = Union[LineString, Polygon]
 IntersectingGeometry = Union[Point, LineString]
 
@@ -35,7 +35,7 @@ def get_intersection(
 
     all_linestrings = i_type == j_type == "LineString"
     if intersecting_region.geom_type == "Point" and all_linestrings:
-        return Intersection(intersecting_region, below, j_tag)
+        return (intersecting_region, below, j_tag)
     elif intersecting_region.geom_type == "MultiPoint": # Line enters and exits a polygon boundary
         if (
             (i_type == "Polygon" and j_type == "LineString")
@@ -44,14 +44,14 @@ def get_intersection(
         ):
             point = intersecting_region.centroid
             assert above.contains(point)
-            return Intersection(point, below, j_tag)
+            return (point, below, j_tag)
         else:
             raise ValueError(
                 "Could not get intersecting region for MultiPoint. Should not see this error.\n"
                 f"{above.wkt=} | {below.wkt=}"
             )
     elif intersecting_region.geom_type == "Point": # LineString and Polygon intersection @ boundary
-        return Intersection(intersecting_region, below, j_tag)
+        return (intersecting_region, below, j_tag)
     else:
         return None
 

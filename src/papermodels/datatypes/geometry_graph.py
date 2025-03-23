@@ -4,11 +4,12 @@ from copy import deepcopy
 import networkx as nx
 import hashlib
 
-from papermodels.datatypes.element import Element
+from papermodels.datatypes.element import Element, LoadedElement
 from shapely import Point, LineString, Polygon
 from ..geometry import geom_ops as geom
 from ..datatypes.element import Correspondent, Intersection
 from rich.progress import track
+import numpy.typing as npt
 
 
 class GeometryGraph(nx.DiGraph):
@@ -115,7 +116,24 @@ class GeometryGraph(nx.DiGraph):
                 indexed_intersections_above.append(new_intersection)
             element.intersections_above = indexed_intersections_above
             self.nodes[node]['element'] = element
-                
+
+
+    def create_loaded_elements(self, loading_areas: list[tuple[Polygon, npt.ArrayLike]]) -> list[LoadedElement]:
+        """
+        Returns a list of LoadedElement, each with 'loading_areas' applied.
+        
+        # TODO: Is there a way to include trib areas? A dict of trib areas where the key is the Element.geometry
+        # and the value is the trib area Polygon? Perhaps a way to specify a buffer value (or a left/right) value
+        # to generate one from thg Element.geometry and some integers?
+
+        # HERE: Need to find a way to add raw load annotations to the graph so that they cann
+        # automatically sort themselves by plane_id so that the right loads go to the right Elements
+        """
+        loaded_elements = []
+        for node in self.nodes:
+            le = LoadedElement.from_element_with_loads(node['element'], loading_areas=loading_areas)
+            loaded_elements.append(le)
+        return loaded_elements
             
 
                 
