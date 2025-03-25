@@ -40,9 +40,10 @@ class JoistArrayModel:
         joist_at_end: bool = False,
         cantilever_tolerance: float = 1e-2,
     ):
-        self.joist_supports = [ib.other_geometry for ib in element.intersections_below]
-        self.joist_support_tags = [ib.other_tag for ib in element.intersections_below]
         self.joist_prototype = element.geometry
+        self.joist_supports = self.clean_polygon_supports([ib.other_geometry for ib in element.intersections_below])
+        print(f"{self.joist_supports=}")
+        self.joist_support_tags = [ib.other_tag for ib in element.intersections_below]
         self.id = element.tag
         self.plane_id = element.plane_id
         self.spacing = spacing  # Need to include this in the legend and thus, the Element
@@ -50,6 +51,8 @@ class JoistArrayModel:
         self._joist_prototype = self.joist_prototype
         self._cantilever_tolerance = cantilever_tolerance
         self._extents = get_joist_extents(self.joist_prototype, self.joist_supports)
+        print(f"{self._extents=}")
+
         self._supports = determine_support_order(self.joist_prototype, self.joist_supports)
         self._cantilevers = get_cantilever_segments(self.joist_prototype, self._supports)
         self.vector_parallel = get_direction_vector(self.joist_prototype)
@@ -63,6 +66,7 @@ class JoistArrayModel:
             self.initial_offset,
             self.joist_at_start,
         )
+        print(self.joist_supports)
         self.joist_geoms = [
             self.generate_joist_geom(idx) for idx, _ in enumerate(self.joist_locations)
         ]
@@ -115,6 +119,38 @@ class JoistArrayModel:
             )
             subelements.append(element)
         return subelements
+    
+
+    def clean_polygon_supports(self, support_geoms: list[LineString | Polygon]):
+        """
+        Converts any Polygon in support_geoms into LineStrings. The LineStrings
+        are created depending on where the joist prototype lands within the polygon.
+
+        Assumption: the Polygon represents a single rectangle which represents a 
+        wall or something similar.
+
+        The resulting LineString will either be located on the inside face of the
+        rectangle support or along the centerline.
+
+        Generating the centerline assumes that the Polygon is a rectangle. Results
+        will be unpredictable for Polygons of other shapes.
+        """
+        cleaned_supports = []
+        for support_geom in support_geoms:
+            if support_geom.geom_type == "Polygon":
+                support_lines = geom_ops.explode_polygon(support_geom)
+                support_intersections = self.joist_prototype.intersects(np.array(support_lines))
+                if sum(support_intersections) == 1: # Intersects on one edge only
+                    intersecting_line_index = int(support_intersections.nonzero()[0][0])
+                    support_line = support_lines[intersecting_line_index]
+                    assert support_line.intersects(self.joist_prototype)
+                elif sum(support_intersections) == 2:
+                    support_line = geom_ops.get_rectangle_centerline(support_geom)
+                    assert support_line.intersects(self.joist_prototype)
+                cleaned_supports.append(support_line)
+            else:
+                cleaned_supports.append(support_geom)
+        return cleaned_supports
 
     def generate_joist_geom(self, index: int):
         """
@@ -151,8 +187,12 @@ class JoistArrayModel:
                 new_centroid, self.vector_parallel, projection_distance
             )
             ray_b = LineString([new_centroid, ray_bj])
+
+            display(GeometryCollection([ray_a, self._supports['A']]))
             support_a_loc = ray_a.intersection(self._supports["A"])
+            print(f"{support_a_loc=} | {ray_a=} | {self._supports['A']}")
             support_b_loc = ray_b.intersection(self._supports["B"])
+            print(f"{support_b_loc=}")
 
             end_a = support_a_loc
             end_b = support_b_loc
@@ -256,76 +296,76 @@ class JoistArrayModel:
         
 
 
-@dataclass
-class Joist:
-    """
-    Models a joist with a uniform load of
-    'w' on all spans of the joist that exist.
+# @dataclass
+# class Joist:
+#     """
+#     Models a joist with a uniform load of
+#     'w' on all spans of the joist that exist.
 
-                 w
-    ||||||||||||||||||||||||||||
-    ----------------------------
-        ^                  ^
-        R1                 R2
-    < a ><      span      >< b >
-    """
+#                  w
+#     ||||||||||||||||||||||||||||
+#     ----------------------------
+#         ^                  ^
+#         R1                 R2
+#     < a ><      span      >< b >
+#     """
 
-    span: float | Any
-    a: float | Any = 0.0
-    b: float | Any = 0.0
+#     span: float | Any
+#     a: float | Any = 0.0
+#     b: float | Any = 0.0
 
-    def __post_init__(self):
-        L = [self.a, self.span, self.b]
-        EI = [1e3, 1e3, 1e3]
-        R = [
-            0.0,
-            0.0,
-            -1.0,
-            0.0,
-            -1.0,
-            0.0,
-            0.0,
-            0.0,
-        ]
+#     def __post_init__(self):
+#         L = [self.a, self.span, self.b]
+#         EI = [1e3, 1e3, 1e3]
+#         R = [
+#             0.0,
+#             0.0,
+#             -1.0,
+#             0.0,
+#             -1.0,
+#             0.0,
+#             0.0,
+#             0.0,
+#         ]
 
-        if self.a == 0:
-            L.pop(0)
-            EI.pop(0)
-            R.pop(0)
-            R.pop(0)
-        if self.b == 0:
-            L.pop()
-            EI.pop()
-            R.pop()
-            R.pop()
+#         if self.a == 0:
+#             L.pop(0)
+#             EI.pop(0)
+#             R.pop(0)
+#             R.pop(0)
+#         if self.b == 0:
+#             L.pop()
+#             EI.pop()
+#             R.pop()
+#             R.pop()
 
-        self._pycba_model = cba.BeamAnalysis(
-            L,
-            EI,
-            R,
-        )
-        for idx, _ in enumerate(L):
-            self._pycba_model.add_udl(idx + 1, 1)  # 1-based idx
+#         self._pycba_model = cba.BeamAnalysis(
+#             L,
+#             EI,
+#             R,
+#         )
+#         for idx, _ in enumerate(L):
+#             self._pycba_model.add_udl(idx + 1, 1)  # 1-based idx
 
-    def get_r1(self):
-        self._pycba_model.analyze()
-        total_r1 = self._pycba_model._beam_results.R[0]
-        total_load = self.get_total_load()
-        return round(total_r1 / total_load, 9)
+#     def get_r1(self):
+#         self._pycba_model.analyze()
+#         total_r1 = self._pycba_model._beam_results.R[0]
+#         total_load = self.get_total_load()
+#         return round(total_r1 / total_load, 9)
 
-    def get_r2(self):
-        self._pycba_model.analyze()
-        total_r2 = self._pycba_model._beam_results.R[1]
-        total_load = self.get_total_load()
-        return round(total_r2 / total_load, 9)
+#     def get_r2(self):
+#         self._pycba_model.analyze()
+#         total_r2 = self._pycba_model._beam_results.R[1]
+#         total_load = self.get_total_load()
+#         return round(total_r2 / total_load, 9)
 
-    def get_total_load(self):
-        w = 1
-        total_load_a = w * self.a
-        total_load_span = w * self.span
-        total_load_b = w * self.b
-        total_load = sum([total_load_a, total_load_span, total_load_b])
-        return total_load
+#     def get_total_load(self):
+#         w = 1
+#         total_load_a = w * self.a
+#         total_load_span = w * self.span
+#         total_load_b = w * self.b
+#         total_load = sum([total_load_a, total_load_span, total_load_b])
+#         return total_load
 
 
 def get_joist_extents(
@@ -340,6 +380,7 @@ def get_joist_extents(
         (the relevant line segment which provides the support to 'joist_prototype')
     """
     supports_bbox = get_system_bounds(joist_prototype, joist_supports)
+    
     magnitude_max = get_magnitude(supports_bbox)
     joist_vector = get_direction_vector(joist_prototype)
     ordered_supports = determine_support_order(joist_prototype, joist_supports)
@@ -486,6 +527,7 @@ def determine_support_order(
         (joist_prototype & all_supports).geoms
     )
     support_a, support_b = supports
+    print(f"{support_a=} | {support_b=}")
     if joist_a_node.buffer(1e-6).intersects(support_a):
         return {"A": support_a, "B": support_b}
     elif joist_b_node.buffer(1e-6).intersects(support_a):
@@ -538,6 +580,7 @@ def project_node(node: Point, vector: np.ndarray, magnitude: float):
     """
     scaled_vector = vector * magnitude
     projected_node = np.array(node.xy) + scaled_vector
+    print(f"{node=} | {vector=}  | {magnitude=}")
     return Point(projected_node)
 
 

@@ -342,6 +342,26 @@ def rotate_to_horizontal(line: LineString, geoms: list[Geometry]):
 
     return rotated_line, rotated_geoms
 
+def explode_polygon(p: Polygon) -> list[LineString]:
+    """
+    Explodes the exterior of the polygon in to a list of individual line segments
+    """
+    ext_ls = LineString(p.exterior)
+    exploded = [LineString(tup) for tup in zip(ext_ls.coords, ext_ls.coords[1:])]
+    return exploded
+
+def get_rectangle_centerline(p: Polygon) -> LineString:
+    """
+    Returns the centerline of the Polygon 'p' assuming that 'p' represents
+    a regular rectangle with a long dimension and a short dimension
+    """
+    rectangle_edges = explode_polygon(p)
+    sorted_edges = sorted(rectangle_edges, key=lambda x: x.length)
+    short_edges = sorted_edges[:2]
+    edge1, edge2 = short_edges
+    center_line = LineString([edge1.centroid, edge2.centroid])
+    return center_line
+    
 
 
 def rotate_90(v: np.ndarray, precision: int = 6, ccw=True) -> tuple[float, float]:
