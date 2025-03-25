@@ -26,7 +26,6 @@ class GeometryGraph(nx.DiGraph):
         super().__init__()
         self.node_hash = None
 
-
     @property
     def collector_elements(self):
         return [
@@ -72,8 +71,10 @@ class GeometryGraph(nx.DiGraph):
                 for intersection in element.intersections_below:
                     j_tag = intersection.other_tag
                     g.add_edge(element.tag, j_tag)
+                
         g.add_intersection_indexes_below()
         g.add_intersection_indexes_above()
+
         return g
     
     def add_intersection_indexes_below(self):
@@ -140,6 +141,25 @@ class GeometryGraph(nx.DiGraph):
             element.intersections_above = indexed_intersections_above
             self.nodes[node]['element'] = element
 
+
+    def generate_subelements(self, subelement_constructor: callable, *args, **kwargs) -> list[Element]:
+        """
+        Returns a list of Element to be assigned to element.subelements for elements
+        that have element_type == "collector".
+
+        'subelement_class': This should be a callable with the following signature:
+            def subelement_constructor(element: Element, [*args, **kwargs]) -> list[Element]
+
+            Where *args, and **kwargs can be any additional parameters that are defined
+            for the callable.
+        '*args' and '**kwargs': These are passed through to 'subelement_constructor'
+        """
+        collectors = self.collector_elements
+        for node in collectors:
+            node_attrs = self.nodes[node]
+            node_element = node_attrs['element']
+            subs = subelement_constructor(node_element, *args, **kwargs)
+            node_element.subelements = subs
 
 
     def create_loaded_elements(self, loading_areas: list[tuple[Polygon, npt.ArrayLike]]) -> list[LoadedElement]:

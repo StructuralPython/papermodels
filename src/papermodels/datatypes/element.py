@@ -62,6 +62,12 @@ class Element:
         represents those "below".
     plane_id: Optional[str | int] = None, An optional unique identifier for the 2D
         plane that this Element resides on
+    element_type: One of {"collector", "transfer"} or None. Assigned within the
+        GeometryGraph.
+    subelements: list[Element] or None. Assigned within the GeometryGraph.
+    trib_area: Optional[Polygon] or None. # Not sure if adding this here is the right
+        thing to do. Currently in use for the creation of collector subelements and for storing
+        their trib areas.
     """
 
     geometry: Geometry
@@ -71,6 +77,9 @@ class Element:
     correspondents_above: Optional[list[dict]] = None
     correspondents_below: Optional[list[dict]] = None
     plane_id: Optional[str | int] = None
+    element_type: Optional[str] = None
+    subelements: list["Element"] = None
+    trib_area: Optional[Polygon] = None
 
     def __post_init__(self):
         if self.geometry.geom_type == "LineString" and len(self.geometry.coords) != 2:
@@ -171,14 +180,11 @@ E00 = Element(
 
 @dataclass
 class LoadedElement(Element):
-    trib_area: Polygon = None
     loading_areas: Optional[ld.LoadingGeometry] = None
     applied_loading_areas: Optional[list[tuple[Polygon, npt.ArrayLike]]] = None
     model: Optional[dict] = None
 
     """
-    'trib_area' - Optional trib area for this element. If a list[Polygon] then
-        maybe this could work well with the joist arrays
     'loading_areas' - A list of tuples. Each tuple consists of a Polygon and a dict of
         attributes associated with that Polygon. If no attributes are desired,
         pass a tuple with an empty dict.

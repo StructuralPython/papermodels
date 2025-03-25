@@ -17,6 +17,7 @@ import shapely.ops as ops
 
 from papermodels.datatypes.element import Element
 from papermodels.datatypes.utils import class_representation
+from papermodels.geometry import geom_ops
 
 from rich import print
 from IPython.display import display
@@ -39,9 +40,11 @@ class JoistArrayModel:
         joist_at_end: bool = False,
         cantilever_tolerance: float = 1e-2,
     ):
-        self.joist_supports = [ib[1] for ib in element.intersections_below.values()]
+        self.joist_supports = [ib.other_geometry for ib in element.intersections_below]
+        self.joist_support_tags = [ib.other_tag for ib in element.intersections_below]
         self.joist_prototype = element.geometry
         self.id = element.tag
+        self.plane_id = element.plane_id
         self.spacing = spacing  # Need to include this in the legend and thus, the Element
         self.initial_offset = float(initial_offset)
         self._joist_prototype = self.joist_prototype
@@ -74,7 +77,7 @@ class JoistArrayModel:
     #     return class_representation(self)
 
     @classmethod
-    def from_element(
+    def create_subelements(
         cls,
         element: Element,
         spacing: float,
@@ -83,9 +86,35 @@ class JoistArrayModel:
         joist_at_end: bool = False,
         cantilever_tolerance: float = 1e-2,
     ) -> JoistArrayModel:
-        return cls(
+        joist_array = cls(
             element, spacing, initial_offset, joist_at_start, joist_at_end, cantilever_tolerance
         )
+        return joist_array.to_subelements()
+    
+
+    def to_subelements(self) -> list[Element]:
+        """
+        Returns the sub-joists in the JoistArray (self) as Element
+        """
+        subelements = []
+        for idx, joist_geom in enumerate(self.joist_geoms):
+            trib_area = self.joist_trib_areas[idx]
+            other_tag = self.joist_support_tags[idx]
+            intersections_below = []
+            for support_geom in self.joist_supports:
+                intersection_below = geom_ops.get_intersection(joist_geom,  support_geom, other_tag)
+                intersections_below.append(intersection_below)
+            element = Element(
+                joist_geom,
+                self.id,
+                intersections_below=intersections_below,
+                plane_id=self.plane_id,
+                element_type="collector",
+                subelements=None,
+                trib_area = trib_area,
+            )
+            subelements.append(element)
+        return subelements
 
     def generate_joist_geom(self, index: int):
         """
@@ -145,7 +174,6 @@ class JoistArrayModel:
             end_b = project_node(
                 support_b_loc, self.vector_parallel, self._cantilevers["B"]
             )
-        print(self._cantilevers)
         return LineString([end_a, end_b])
 
     def get_extent_edge(self, edge: str = "start"):
@@ -448,6 +476,10 @@ def determine_support_order(
     between them is going to be in the +ve direction (positive X bias). See the
     docstring for get_start_end_nodes for more explanation of the +ve vector direction.
     """
+    # TODO: THIS FUNCTION CAN ENABLE HAVING JOISTS WITH MORE THAN TWO SUPPORTS
+    # This function should still return the {"A": .., "B": ...} dict but should
+    # ignore supports in between A and B. The intermediate supports are re-captured
+    # in .to_subelements().
 
     all_supports = MultiLineString(supports)
     joist_a_node, joist_b_node = order_nodes_positive(
