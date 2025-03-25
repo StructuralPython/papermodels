@@ -63,7 +63,7 @@ def load_pdf_annotations(pdf_path: pathlib.Path | str) -> list[Annotation]:
             text = parse_html_text_content(str(rc)) if rc is not None else text
             line_color = tuple(annot.get("/C", stream_dict.get("RG", (0, 0, 0))))
             fill_color = tuple(annot.get("/IC", stream_dict.get("rg", (1, 1, 1))))
-            fill_opacity = annot.get("/FillOpacity", Decimal("1.0"))
+            fill_opacity = annot.get("/CA", Decimal("1.0"))
             line_width = stream_dict.get("w", [1])[0]
             line_type = None
             line_opacity = 1

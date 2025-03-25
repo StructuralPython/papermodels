@@ -1,14 +1,16 @@
 from dataclasses import dataclass
 from typing import Optional, Union, NamedTuple
+import numpy as np
+import numpy.typing as npt
 from shapely import Point, LineString, Polygon
+import shapely
 from .annotation import Annotation
 from ..paper.annotations import (
     parse_annotations,
     tag_parsed_annotations,
-    get_geometry_intersections,
-    get_geometry_correspondents
 )
 from ..geometry import geom_ops
+from ..loads import load_distribution as ld
 import parse
 
 Geometry = Union[LineString, Polygon]
@@ -93,12 +95,12 @@ class Element:
         Generates an Element from provided geometries
         """
         inters_above = {
-            above_tag: geom_ops.get_intersection(elem_geom, above_geom, above_tag)
+            above_tag: Intersection(*geom_ops.get_intersection(elem_geom, above_geom, above_tag))
             for above_tag, above_geom in intersections_above.items()
 
         } if intersections_above is not None else {}
         inters_below = {
-            below_tag: geom_ops.get_intersection(elem_geom, below_geom, below_tag)
+            below_tag: Intersection(*geom_ops.get_intersection(elem_geom, below_geom, below_tag))
             for below_tag, below_geom in intersections_below.items()
         } if intersections_below is not None else {}
 
@@ -167,6 +169,198 @@ E00 = Element(
     # correspondents=[],
 )
 
+@dataclass
+class LoadedElement(Element):
+    trib_area: Polygon = None
+    loading_areas: Optional[ld.LoadingGeometry] = None
+    applied_loading_areas: Optional[list[tuple[Polygon, npt.ArrayLike]]] = None
+    model: Optional[dict] = None
+
+    """
+    'trib_area' - Optional trib area for this element. If a list[Polygon] then
+        maybe this could work well with the joist arrays
+    'loading_areas' - A list of tuples. Each tuple consists of a Polygon and a dict of
+        attributes associated with that Polygon. If no attributes are desired,
+        pass a tuple with an empty dict.
+    'applied_loading_areas' - A dict of Polygon/attributes that intersect with the
+        trib area of this Element. The Polygons in the dict represent the intersecting
+        area of the loading area and the trib area. These are computed from the provided
+        'loading_areas' during initialization. The designer is not expected to populate
+        this parameter.
+    'model' - A dictionary that describes the LoadedElement in terms of a structural
+        element. Populated during initialization. The designer is not expected to populate
+        this parameter.
+
+
+    TODO: Need to figure out how this will relate to a JoistArray
+    """
+    def __post_init__(self):
+        """
+        Populates self.applied_loading_areas
+        """
+
+            
+        self.applied_loading_areas = self._get_intersecting_loads()
+        self.model = self._build_model()
+                
+        
+    def _get_intersecting_loads(self) -> list[tuple[Polygon, dict]]:
+        loading_array = np.array([loading_area.geometry for loading_area in self.loading_areas])
+        applied_loading_areas = []
+        if self.trib_area is not None:
+            intersecting_loads = self.trib_area.intersection(loading_array)
+            for idx, intersecting_load in enumerate(intersecting_loads):
+                if intersecting_load.is_empty or intersecting_load.area == 0: 
+                    continue
+                applied_loading_areas.append(
+                    (intersecting_load, self.loading_areas[idx][1])
+                )
+        return applied_loading_areas 
+
+        
+    def dump_analysis_model(self) -> dict:
+        """
+        Returns the structured beam data dict to go to analysis model
+        """
+        return {}
+    
+    def _build_model(self) -> dict:
+        """
+        Returns the structured beam dict for serialization
+        """
+        orientation = "unknown"
+        if self.geometry.geom_type == "LineString": 
+            orientation = "horizontal"
+        elif self.geometry.geom_type == "Polygon":
+            orientation = "vertical"
+
+        support_locations = self._get_support_locations()
+        transfer_loads = self._get_transfer_loads()
+        distributed_loads = self._get_distributed_loads()
+
+        model = {
+            "element_attributes":
+                {
+                    "tag": self.tag,
+                    "length": self.geometry.length if self.geometry.geom_type == "LineString" else None,
+                    "orientation": orientation,
+                },
+            "supports": support_locations,
+            "loads": {
+                "point_loads": transfer_loads,
+                "distributed_loads": distributed_loads or []
+            }
+        }
+        return model
+
+
+    def _get_support_locations(self):
+        """
+        Calculates the support locations from the intersections below
+        """
+        if self.geometry.geom_type == "LineString":
+            coords_a, coords_b = self.geometry.coords
+            coords_a, coords_b = Point(coords_a), Point(coords_b)
+            ordered_coords = geom_ops.order_nodes_positive(coords_a, coords_b)
+            start_coord = ordered_coords[0]
+            support_locations = geom_ops.get_local_intersection_ordinates(
+                start_coord,
+                [intersection[0] for intersection in self.intersections_below]
+            )
+            return [
+                {"location": support_location, "fixity": None}
+                for support_location in support_locations
+            ]
+        else:
+            return []
+    
+    def _get_transfer_loads(self):
+        """
+        Calculates the transfer load locations from the intersections above
+        """
+        transfer_loads = []
+        if self.geometry.geom_type == "LineString":
+            coords_a, coords_b = self.geometry.coords
+            coords_a, coords_b = Point(coords_a), Point(coords_b)
+            ordered_coords = geom_ops.order_nodes_positive(coords_a, coords_b)
+            start_coord = ordered_coords[0]
+            transfer_locations = geom_ops.get_local_intersection_ordinates(
+                start_coord,
+                [intersection[0] for intersection in self.intersections_above]
+            )
+            for idx, transfer_location in enumerate(transfer_locations):
+                intersection_data = self.intersections_above[idx]
+                source_member = intersection_data.other_tag
+                reaction_idx = intersection_data.other_index
+                if reaction_idx is None:
+                    print(self)
+                    raise ValueError(
+                        "The .other_index attribute within the .intersections_above list"
+                        " is not calculated. Generate LoadedElement objects through the GeometryGraph"
+                        " interface in order to populate this necessary index."
+                    )
+                transfer_loads.append(
+                    {
+                        "location": transfer_location,
+                        "magnitude": None,
+                        "transfer_source": f"{source_member}",
+                        "transfer_reaction_idx": reaction_idx,
+                        "direction": "gravity"
+                    }
+                )
+        elif self.geometry.geom_type == "Polygon":
+            for intersection in self.intersections_above:
+                transfer_loads.append(
+                    {
+                        "location": None,
+                        "magnitude": None,
+                        "transfer_source": intersection.other_tag,
+                        "transfer_reaction_idx": intersection.other_index,
+                        "direction": "gravity"
+                    }
+                )
+        return transfer_loads
+    
+    def _get_distributed_loads(self):
+        """
+        Computes the resulting distributed loads from the applied
+        loading areas
+        """
+        if self.geometry.geom_type == "LineString":
+            distributed_loads = ld.get_distributed_loads_from_projected_polygons(
+                self.geometry,
+                self.applied_loading_areas
+            )
+            return distributed_loads
+
+
+    @classmethod
+    def load_model(cls):
+        """
+        Returns a LoadedElement generated from the output of 'dump_model'
+        """
+        return cls()
+    
+    @classmethod
+    def from_element_with_loads(cls, elem: Element, loading_areas: dict[Polygon, Union[str | npt.ArrayLike]], trib_area: Optional[Polygon] = None):
+        """
+        Returns a LoadedElement
+        """
+        return cls(
+            elem.geometry,
+            elem.tag,
+            elem.intersections_above,
+            elem.intersections_below,
+            elem.correspondents_above,
+            elem.correspondents_below,
+            elem.plane_id,
+            trib_area,
+            loading_areas,
+        )
+
+
+
+
 
 # ## This example shows a beam that is connected to a joist and a column on the same page
 # ## and with that column having a correspondent on the page below
@@ -189,6 +383,102 @@ E00 = Element(
 #     correspondents=["C1.1"],
 #     # page_label="L01",
 # )
+
+
+def get_geometry_intersections(
+    tagged_annotations: dict[Annotation, dict],
+) -> dict[Annotation, dict]:
+    """
+    Returns a dictionary of
+    """
+    annots = list(tagged_annotations.keys())
+    intersected_annotations = tagged_annotations.copy()
+    for i_annot in annots:
+        i_attrs = intersected_annotations[i_annot]
+        i_rank = i_attrs["rank"]
+        i_page = i_annot.page
+        intersections_above = []
+        intersections_below = []
+        for j_annot in annots:
+            j_attrs = intersected_annotations[j_annot]
+            j_rank = j_attrs["rank"]
+            j_page = j_annot.page
+            i_geom = i_attrs["geometry"]
+            j_geom = j_attrs["geometry"]
+            if i_page != j_page: 
+                continue
+            if i_rank < j_rank:
+                intersection = geom_ops.get_intersection(i_geom, j_geom, j_attrs['tag'])
+                if intersection is None: continue
+                intersections_below.append(Intersection(*intersection))
+            elif i_rank > j_rank:
+                intersection = geom_ops.get_intersection(j_geom, i_geom, j_attrs['tag'])
+                if intersection is None: continue
+                intersections_above.append(Intersection(*intersection))
+        i_attrs["intersections_above"] = intersections_above
+        i_attrs["intersections_below"] = intersections_below
+    return intersected_annotations
+
+
+def get_geometry_correspondents(
+    tagged_annotations: dict[Annotation, dict],
+) -> dict[Annotation, dict]:
+    """
+    Returns a copy of 'tagged_annotations' with a 'correspondents' field added to that
+    attributes dictionary of each Annotation key.
+    """
+    annots_by_page = annotations_by_page(tagged_annotations)
+    descending_pages = sorted(annots_by_page.keys(), reverse=True)
+    last_page = descending_pages[-1]
+    corresponding_annotations = tagged_annotations.copy()
+    prev_page = None
+    for page in descending_pages:
+        if page != last_page:
+            next_page = page - 1
+            annots_here = annots_by_page[page]
+            annots_below = annots_by_page[next_page]
+            correspondents_above = {j_attrs['tag']: [] for j_attrs in annots_below.values()}
+            correspondents_below = []
+
+            for i_annot, i_attrs in annots_here.items():
+                i_page = i_annot.page
+                correspondents_below = []
+                for j_annot, j_attrs in annots_below.items():
+                    j_attrs = annots_below[j_annot]
+                    j_page = j_annot.page
+                    i_geom = i_attrs["geometry"]
+                    j_geom = j_attrs["geometry"]
+                    i_tag = i_attrs['tag']
+                    j_tag = j_attrs['tag']
+                    correspondence_ratio = geom_ops.check_corresponds(i_geom, j_geom)
+                    if correspondence_ratio:
+                        correspondents_below.append(Correspondent(correspondence_ratio, j_geom, j_tag))
+                        correspondents_above[j_attrs['tag']].append(Correspondent(correspondence_ratio, i_geom, i_attrs['tag']))
+                corresponding_annotations[i_annot]["correspondents_above"] = correspondents_above.get(i_attrs['tag'], [])
+                corresponding_annotations[i_annot]["correspondents_below"] = correspondents_below
+                
+        else:
+            annots_here = annots_by_page[page]
+            for i_annot, i_attrs in annots_here.items():
+                corresponding_annotations[i_annot]["correspondents_below"] = []
+                corresponding_annotations[i_annot]["correspondents_above"] = correspondents_above.get(i_attrs['tag'], [])
+        if prev_page is None:
+            prev_page = page
+    return corresponding_annotations
+
+
+def annotations_by_page(
+    annots: dict[Annotation, dict], ascending=False
+) -> dict[int, dict[Annotation, dict]]:
+    """
+    Returns 'annots' in a dictionary keyed by page number
+    """
+    annots_by_page = {}
+    for annot, annot_attrs in annots.items():
+        annots_on_page = annots_by_page.get(annot.page, {})
+        annots_on_page.update({annot: annot_attrs})
+        annots_by_page[annot.page] = annots_on_page
+    return annots_by_page
 
 
 def get_tag_type(this_element_tag: str) -> str:

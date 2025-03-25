@@ -1,11 +1,41 @@
 from __future__ import annotations
 from typing import Optional
 from dataclasses import dataclass
+import numpy.typing as npt
+from ..geometry import geom_ops
 from shapely.geometry import (
     Polygon,
     MultiPolygon,
+    LineString
 )
 import itertools
+
+
+@dataclass
+class LoadingGeometry:
+    """
+    Represents a LoadingGeometry
+    """
+    geometry: Polygon | LineString
+    occupancy: str
+    load_components: npt.ArrayLike
+    plane_id: str | int
+
+
+@dataclass
+class DistributedLoad:
+    """
+    Represents a trapezoidal distributed load applied to a framing member
+
+    'x0': The start load location (as local ordinate along the member)
+    'x1': The end load location
+    'w0': The starting magnitude
+    'w1': The end magnitude
+    """
+    x0: float
+    x1: float
+    w0: float
+    w1: float
 
 
 @dataclass
@@ -68,6 +98,40 @@ class Singularity:
 
     def __neg__(self):
         return Singularity(self.x0, self.x1, -self.m, -self.y0, self.precision)
+    
+
+def get_distributed_loads_from_projected_polygons(
+    member: LineString,
+    applied_loading_areas: list[LoadingGeometry],
+) -> list[DistributedLoad]:
+    """
+    Returns a list of DistributedLoad representing the projected areas
+    """
+    # Rotate member and applied loading areas
+    # area_polys, load_components = zip(*applied_loading_areas)
+    load_geoms = [load_geom.geometry for load_geom in applied_loading_areas]
+    load_components = [load_geom.components for load_geom in applied_loading_areas]
+    load_occupancies = [load_geom.occupancies for load_geom in applied_loading_areas]
+    horiz_member, rotated_polys = geom_ops.rotate_to_horizontal(member, load_geoms)
+    rot_applied_loading_geoms = zip(rotated_polys, load_components)
+    distributed_loads = []
+    for idx, load_geom in enumerate(rot_applied_loading_geoms):
+        load_component = load_components[idx]
+        load_occupancy = load_components[idx]
+        load_magnitude = load_component or load_occupancy
+        poly_xy = project_polygon(load_geom, load_magnitude, xy=True)
+        projected_poly_coords = list(zip(*poly_xy))
+        dist_loads = []
+        inner = []
+        for idx, coord in enumerate(projected_poly_coords[1:-1]):
+            if idx % 2 == 1:
+                inner.append(coord)
+                dist_loads.append(inner)
+                inner = []
+            else:
+                inner.append(coord)
+        distributed_loads.append(dist_loads)
+    return distributed_loads
 
 
 def project_polygon(

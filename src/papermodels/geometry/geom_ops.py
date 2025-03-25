@@ -12,7 +12,8 @@ from shapely import (
     convex_hull,
 )
 import shapely.ops as ops
-from ..datatypes.element import Intersection, Correspondent
+import shapely.affinity as aff
+
 Geometry = Union[LineString, Polygon]
 IntersectingGeometry = Union[Point, LineString]
 
@@ -34,7 +35,7 @@ def get_intersection(
 
     all_linestrings = i_type == j_type == "LineString"
     if intersecting_region.geom_type == "Point" and all_linestrings:
-        return Intersection(intersecting_region, below, j_tag)
+        return (intersecting_region, below, j_tag)
     elif intersecting_region.geom_type == "MultiPoint": # Line enters and exits a polygon boundary
         if (
             (i_type == "Polygon" and j_type == "LineString")
@@ -43,14 +44,14 @@ def get_intersection(
         ):
             point = intersecting_region.centroid
             assert above.contains(point)
-            return Intersection(point, below, j_tag)
+            return (point, below, j_tag)
         else:
             raise ValueError(
                 "Could not get intersecting region for MultiPoint. Should not see this error.\n"
                 f"{above.wkt=} | {below.wkt=}"
             )
     elif intersecting_region.geom_type == "Point": # LineString and Polygon intersection @ boundary
-        return Intersection(intersecting_region, below, j_tag)
+        return (intersecting_region, below, j_tag)
     else:
         return None
 
@@ -86,7 +87,26 @@ def check_corresponds(above: Union[LineString, Polygon], below: Union[LineString
         return intersecting_region.area / below.area
     else:
         return 0.0
+    
 
+def get_local_intersection_ordinates(start_node: Point, intersections: list[Point]) -> list[float]:
+    """
+    Returns the relative distances of the Points in 'intersections' relative to the 'start_node'.
+    """
+    return [
+        start_node.distance(intersection) for intersection in intersections
+    ]
+
+
+def get_linestring_start_node(ls: LineString) -> Point:
+    """
+    Returns a Point representing the starting node of the 'ls' LineString
+    when the nodes are ordered with a +ve X bias.
+    """
+    coords_a, coords_b = ls.coords
+    ordered_coords = order_nodes_positive(Point(coords_a), Point(coords_b))
+    start_coord = ordered_coords[0]
+    return start_coord
 
 def get_joist_extents(
     joist_prototype: LineString, joist_supports: list[LineString]
@@ -302,6 +322,26 @@ def project_node(node: Point, vector: np.ndarray, magnitude: float):
     scaled_vector = vector * magnitude
     projected_node = np.array(node.xy) + scaled_vector
     return Point(projected_node)
+
+
+def rotate_to_horizontal(line: LineString, geoms: list[Geometry]):
+    """
+    Rotate the line so that it is horizonatla. Bring the geomswiith it
+    """
+    i_end, j_end = get_start_end_nodes(line)
+    ix, iy = i_end.coords[0]
+    jx, jy = j_end.coords[0]
+
+    delta_y = jy - iy
+    delta_x = jx - ix
+
+    angle = math.atan2(delta_y, delta_x)
+
+    rotated_line = aff.translate(aff.rotate(line, -angle, origin=i_end, use_radians=True), xoff=-ix)
+    rotated_geoms = [aff.translate(aff.rotate(geom, -angle, origin=i_end, use_radians=True), xoff=-ix) for geom in geoms]
+
+    return rotated_line, rotated_geoms
+
 
 
 def rotate_90(v: np.ndarray, precision: int = 6, ccw=True) -> tuple[float, float]:

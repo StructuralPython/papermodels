@@ -4,11 +4,12 @@ from copy import deepcopy
 import networkx as nx
 import hashlib
 
-from papermodels.datatypes.element import Element
+from papermodels.datatypes.element import Element, LoadedElement
 from shapely import Point, LineString, Polygon
 from ..geometry import geom_ops as geom
 from ..datatypes.element import Correspondent, Intersection
 from rich.progress import track
+import numpy.typing as npt
 
 
 class GeometryGraph(nx.DiGraph):
@@ -34,7 +35,8 @@ class GeometryGraph(nx.DiGraph):
         of the 'elements'.
         """
         g = cls()
-        for element in elements:
+        elements_copy = deepcopy(elements)
+        for element in elements_copy:
             hash = hashlib.sha256(str(element).encode()).hexdigest()
             start_coord = None
             if element.geometry.geom_type == "LineString":
@@ -59,6 +61,9 @@ class GeometryGraph(nx.DiGraph):
                     g.add_edge(element.tag, j_tag)
         # HERE: SEEM TO BE MISSING INDEXES ON POLYGON BOTTOMS HITTING LINES
         g.add_intersection_indexes_below()
+        for node in g.nodes:
+            print(f"{node=}")
+            print(f"{g.nodes[node]}")
         g.add_intersection_indexes_above()
         return g
     
@@ -66,26 +71,36 @@ class GeometryGraph(nx.DiGraph):
         sorted_nodes = nx.topological_sort(self)
         for node in sorted_nodes:
             node_attrs = self.nodes[node]
-            if node_attrs['start_coord'] is None: continue # HERE IS THE PROBLEM
-            start_coord = Point(node_attrs['start_coord'])
-            intersection_below_local_coords = []
-            for intersection in node_attrs['element'].intersections_below:
-                below_local_coord = start_coord.distance(intersection.intersecting_region)
-                intersection_below_local_coords.append((below_local_coord, intersection.other_tag))
-            sorted_below_ints = sorted(intersection_below_local_coords, key=lambda x: x[0])
-            _, other_tags_below = zip(*sorted_below_ints)
-            updated_intersections_below = []
             element = node_attrs['element']
-            for intersection in element.intersections_below:
-                other_tag = intersection.other_tag
-                local_index = other_tags_below.index(other_tag)
-                new_intersection = Intersection(
-                    intersection.intersecting_region,
-                    intersection.other_geometry,
-                    intersection.other_tag,
-                    local_index
-                )
-                updated_intersections_below.append(new_intersection)
+            if node_attrs['start_coord'] is None: # node geometry is polygon
+                updated_intersections_below = []
+                for intersection in element.intersections_below:
+                    new_intersection = Intersection(
+                        intersection.intersecting_region,
+                        intersection.other_geometry,
+                        intersection.other_tag,
+                        0
+                    )
+                    updated_intersections_below.append(new_intersection)
+            else:
+                start_coord = Point(node_attrs['start_coord'])
+                intersection_below_local_coords = []
+                for intersection in node_attrs['element'].intersections_below:
+                    below_local_coord = start_coord.distance(intersection.intersecting_region)
+                    intersection_below_local_coords.append((below_local_coord, intersection.other_tag))
+                sorted_below_ints = sorted(intersection_below_local_coords, key=lambda x: x[0])
+                _, other_tags_below = zip(*sorted_below_ints)
+                updated_intersections_below = []
+                for intersection in element.intersections_below:
+                    other_tag = intersection.other_tag
+                    local_index = other_tags_below.index(other_tag)
+                    new_intersection = Intersection(
+                        intersection.intersecting_region,
+                        intersection.other_geometry,
+                        intersection.other_tag,
+                        local_index
+                    )
+                    updated_intersections_below.append(new_intersection)
             element.intersections_below = updated_intersections_below
             self.nodes[node]['element'] = element
 
@@ -115,7 +130,25 @@ class GeometryGraph(nx.DiGraph):
                 indexed_intersections_above.append(new_intersection)
             element.intersections_above = indexed_intersections_above
             self.nodes[node]['element'] = element
-                
+
+
+    def create_loaded_elements(self, loading_areas: list[tuple[Polygon, npt.ArrayLike]]) -> list[LoadedElement]:
+        """
+        Returns a list of LoadedElement, each with 'loading_areas' applied.
+        
+        # TODO: Is there a way to include trib areas? A dict of trib areas where the key is the Element.geometry
+        # and the value is the trib area Polygon? Perhaps a way to specify a buffer value (or a left/right) value
+        # to generate one from thg Element.geometry and some integers?
+
+        # HERE: Need to find a way to add raw load annotations to the graph so that they cann
+        # automatically sort themselves by plane_id so that the right loads go to the right Elements
+        """
+        loaded_elements = []
+        for node in self.nodes:
+            node_attrs = self.nodes[node]
+            le = LoadedElement.from_element_with_loads(node_attrs['element'], loading_areas=loading_areas)
+            loaded_elements.append(le)
+        return loaded_elements
             
 
                 
