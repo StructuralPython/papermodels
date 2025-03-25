@@ -229,9 +229,9 @@ class LoadedElement(Element):
         Returns the structured beam dict for serialization
         """
         orientation = "unknown"
-        if any([self.intersections_below, self.intersections_above]):
+        if self.geometry.geom_type == "LineString": 
             orientation = "horizontal"
-        elif any([self.correspondents_above, self.correspondents_below]):
+        elif self.geometry.geom_type == "Polygon":
             orientation = "vertical"
 
         support_locations = self._get_support_locations()
@@ -242,7 +242,7 @@ class LoadedElement(Element):
             "element_attributes":
                 {
                     "tag": self.tag,
-                    "length": self.geometry.length,
+                    "length": self.geometry.length if self.geometry.geom_type == "LineString" else None,
                     "orientation": orientation,
                 },
             "supports": support_locations,
@@ -305,6 +305,17 @@ class LoadedElement(Element):
                         "magnitude": None,
                         "transfer_source": f"{source_member}",
                         "transfer_reaction_idx": reaction_idx,
+                        "direction": "gravity"
+                    }
+                )
+        elif self.geometry.geom_type == "Polygon":
+            for intersection in self.intersections_above:
+                transfer_loads.append(
+                    {
+                        "location": None,
+                        "magnitude": None,
+                        "transfer_source": intersection.other_tag,
+                        "transfer_reaction_idx": intersection.other_index,
                         "direction": "gravity"
                     }
                 )
