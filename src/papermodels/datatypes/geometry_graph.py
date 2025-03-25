@@ -26,6 +26,19 @@ class GeometryGraph(nx.DiGraph):
         super().__init__()
         self.node_hash = None
 
+
+    @property
+    def collector_elements(self):
+        return [
+            node for node in self.nodes if not list(self.predecessors(node))
+        ]
+    
+    @property
+    def transfer_elements(self):
+        return [
+            node for node in self.nodes if list(self.predecessors(node))
+        ]
+
     @classmethod
     def from_elements(
         cls, elements: list[Element]
@@ -59,11 +72,7 @@ class GeometryGraph(nx.DiGraph):
                 for intersection in element.intersections_below:
                     j_tag = intersection.other_tag
                     g.add_edge(element.tag, j_tag)
-        # HERE: SEEM TO BE MISSING INDEXES ON POLYGON BOTTOMS HITTING LINES
         g.add_intersection_indexes_below()
-        for node in g.nodes:
-            print(f"{node=}")
-            print(f"{g.nodes[node]}")
         g.add_intersection_indexes_above()
         return g
     
@@ -130,6 +139,7 @@ class GeometryGraph(nx.DiGraph):
                 indexed_intersections_above.append(new_intersection)
             element.intersections_above = indexed_intersections_above
             self.nodes[node]['element'] = element
+
 
 
     def create_loaded_elements(self, loading_areas: list[tuple[Polygon, npt.ArrayLike]]) -> list[LoadedElement]:
