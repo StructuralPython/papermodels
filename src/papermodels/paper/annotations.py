@@ -5,6 +5,7 @@ from shapely.wkt import loads as wkt_loads
 from shapely import Geometry, GeometryCollection, Point
 from papermodels.datatypes.annotation import Annotation
 from papermodels.fileio.utils import str_to_int
+from papermodels.loads.load_distribution import LoadingGeometry
 from typing import Any, Optional
 import numpy as np
 
@@ -39,6 +40,26 @@ def get_annotation_geometry_pairs(
     Returns a dict of annotation, shapely geometry pairs
     """
     return {annot: annotation_to_shapely(annot) for annot in annots}
+
+
+def annotation_to_loading_geometry(
+    annots: list[Annotation],
+    legend: list[Annotation],
+) -> list[LoadingGeometry]:
+    """
+    Convert annotations representing loading areas into a list of LoadingArea
+    """
+    acc = []
+    parsed_annots = parse_annotations(annots, legend)
+    for annot, annot_attrs in parsed_annots.items():
+        lg = LoadingGeometry(
+            geometry=annot_attrs['geometry'],
+            occupancy=annot_attrs.get("occupancy", None),
+            load_components=annot_attrs.get("components", None),
+            plane_id=annot_attrs['page_label'],
+        )
+        acc.append(lg)
+    return acc
 
 
 def parse_annotations(

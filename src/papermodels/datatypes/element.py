@@ -172,7 +172,7 @@ E00 = Element(
 @dataclass
 class LoadedElement(Element):
     trib_area: Polygon = None
-    loading_areas: Optional[list[tuple[Polygon, Union[str, npt.ArrayLike]]]] = None
+    loading_areas: Optional[ld.LoadingGeometry] = None
     applied_loading_areas: Optional[list[tuple[Polygon, npt.ArrayLike]]] = None
     model: Optional[dict] = None
 
@@ -198,31 +198,23 @@ class LoadedElement(Element):
         """
         Populates self.applied_loading_areas
         """
-        for idx, loading_area in enumerate(self.loading_areas):
-            try:
-                assert len(loading_area) == 2 and isinstance(loading_area[1], dict)
-            except AssertionError:
-                raise ValueError(
-                    "All supplied loading areas must be a tuple of length 2 and be populated"
-                    " with a dict as the second element of the tuple. Provide an empty dict "
-                    "in this position if no attributes are desired.\n"
-                    f"Erroneous value found at index: {idx}"
-                    )
+
             
         self.applied_loading_areas = self._get_intersecting_loads()
         self.model = self._build_model()
-            
+                
         
     def _get_intersecting_loads(self) -> list[tuple[Polygon, dict]]:
-        loading_array = np.array([loading_area[0] for loading_area in self.loading_areas])
-        intersecting_loads = self.trib_area.intersection(loading_array)
+        loading_array = np.array([loading_area.geometry for loading_area in self.loading_areas])
         applied_loading_areas = []
-        for idx, intersecting_load in enumerate(intersecting_loads):
-            if intersecting_load.is_empty or intersecting_load.area == 0: 
-                continue
-            applied_loading_areas.append(
-                (intersecting_load, self.loading_areas[idx][1])
-            )
+        if self.trib_area is not None:
+            intersecting_loads = self.trib_area.intersection(loading_array)
+            for idx, intersecting_load in enumerate(intersecting_loads):
+                if intersecting_load.is_empty or intersecting_load.area == 0: 
+                    continue
+                applied_loading_areas.append(
+                    (intersecting_load, self.loading_areas[idx][1])
+                )
         return applied_loading_areas 
 
         
@@ -237,14 +229,14 @@ class LoadedElement(Element):
         Returns the structured beam dict for serialization
         """
         orientation = "unknown"
-        if any(self.intersections_below, self.intersections_above):
+        if any([self.intersections_below, self.intersections_above]):
             orientation = "horizontal"
-        elif any(self.correspondents_above, self.correspondents_below):
+        elif any([self.correspondents_above, self.correspondents_below]):
             orientation = "vertical"
 
-        support_locations = self._get_support_locations(self)
-        transfer_loads = self._get_transfer_loads(self)
-        distributed_loads = self._get_distributed_loads(self)
+        support_locations = self._get_support_locations()
+        transfer_loads = self._get_transfer_loads()
+        distributed_loads = self._get_distributed_loads()
 
         model = {
             "element_attributes":
@@ -266,51 +258,56 @@ class LoadedElement(Element):
         """
         Calculates the support locations from the intersections below
         """
-        coords_a, coords_b = self.geometry.coords
-        coords_a, coords_b = Point(coords_a), Point(coords_b)
-        ordered_coords = geom_ops.order_nodes_positive(coords_a, coords_b)
-        start_coord = ordered_coords[0]
-        support_locations = geom_ops.get_local_intersection_ordinates(
-            start_coord,
-            [intersection[0] for intersection in self.intersections_below]
-        )
-        return [
-            {"location": support_location, "fixity": None}
-            for support_location in support_locations
-        ]
+        if self.geometry.geom_type == "LineString":
+            coords_a, coords_b = self.geometry.coords
+            coords_a, coords_b = Point(coords_a), Point(coords_b)
+            ordered_coords = geom_ops.order_nodes_positive(coords_a, coords_b)
+            start_coord = ordered_coords[0]
+            support_locations = geom_ops.get_local_intersection_ordinates(
+                start_coord,
+                [intersection[0] for intersection in self.intersections_below]
+            )
+            return [
+                {"location": support_location, "fixity": None}
+                for support_location in support_locations
+            ]
+        else:
+            return []
     
     def _get_transfer_loads(self):
         """
         Calculates the transfer load locations from the intersections above
         """
-        coords_a, coords_b = self.geometry.coords
-        coords_a, coords_b = Point(coords_a), Point(coords_b)
-        ordered_coords = geom_ops.order_nodes_positive(coords_a, coords_b)
-        start_coord = ordered_coords[0]
-        transfer_locations = geom_ops.get_local_intersection_ordinates(
-            start_coord,
-            [intersection[0] for intersection in self.intersections_above]
-        )
         transfer_loads = []
-        for idx, transfer_location in enumerate(transfer_locations):
-            intersection_data = self.intersections_above[idx]
-            source_member = intersection_data.other_tag
-            reaction_idx = intersection_data.other_index
-            if reaction_idx is None:
-                raise ValueError(
-                    "The .other_index attribute within the .intersections_above list"
-                    " is not calculated. Generate LoadedElement objects through the GeometryGraph"
-                    " interface in order to populate this necessary index."
-                )
-            transfer_loads.append(
-                {
-                    "location": transfer_location,
-                    "magnitude": None,
-                    "transfer_source": f"{source_member}",
-                    "transfer_reaction_idx": reaction_idx,
-                    "direction": "gravity"
-                }
+        if self.geometry.geom_type == "LineString":
+            coords_a, coords_b = self.geometry.coords
+            coords_a, coords_b = Point(coords_a), Point(coords_b)
+            ordered_coords = geom_ops.order_nodes_positive(coords_a, coords_b)
+            start_coord = ordered_coords[0]
+            transfer_locations = geom_ops.get_local_intersection_ordinates(
+                start_coord,
+                [intersection[0] for intersection in self.intersections_above]
             )
+            for idx, transfer_location in enumerate(transfer_locations):
+                intersection_data = self.intersections_above[idx]
+                source_member = intersection_data.other_tag
+                reaction_idx = intersection_data.other_index
+                if reaction_idx is None:
+                    print(self)
+                    raise ValueError(
+                        "The .other_index attribute within the .intersections_above list"
+                        " is not calculated. Generate LoadedElement objects through the GeometryGraph"
+                        " interface in order to populate this necessary index."
+                    )
+                transfer_loads.append(
+                    {
+                        "location": transfer_location,
+                        "magnitude": None,
+                        "transfer_source": f"{source_member}",
+                        "transfer_reaction_idx": reaction_idx,
+                        "direction": "gravity"
+                    }
+                )
         return transfer_loads
     
     def _get_distributed_loads(self):
