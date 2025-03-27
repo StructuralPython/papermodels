@@ -180,7 +180,7 @@ E00 = Element(
 
 @dataclass
 class LoadedElement(Element):
-    loading_areas: Optional[ld.LoadingGeometry] = None
+    loading_geoms: Optional[ld.LoadingGeometry] = None
     applied_loading_areas: Optional[list[tuple[Polygon, npt.ArrayLike]]] = None
     model: Optional[dict] = None
 
@@ -204,14 +204,12 @@ class LoadedElement(Element):
         """
         Populates self.applied_loading_areas
         """
-
-            
         self.applied_loading_areas = self._get_intersecting_loads()
         self.model = self._build_model()
                 
         
     def _get_intersecting_loads(self) -> list[tuple[Polygon, dict]]:
-        loading_array = np.array([loading_area.geometry for loading_area in self.loading_areas])
+        loading_array = np.array([loading_area.geometry for loading_area in self.loading_geoms])
         applied_loading_areas = []
         if self.trib_area is not None:
             intersecting_loads = self.trib_area.intersection(loading_array)
@@ -299,7 +297,6 @@ class LoadedElement(Element):
                 source_member = intersection_data.other_tag
                 reaction_idx = intersection_data.other_index
                 if reaction_idx is None:
-                    print(self)
                     raise ValueError(
                         "The .other_index attribute within the .intersections_above list"
                         " is not calculated. Generate LoadedElement objects through the GeometryGraph"
@@ -348,7 +345,7 @@ class LoadedElement(Element):
         return cls()
     
     @classmethod
-    def from_element_with_loads(cls, elem: Element, loading_areas: dict[Polygon, Union[str | npt.ArrayLike]], trib_area: Optional[Polygon] = None):
+    def from_element_with_loads(cls, elem: Element, loading_geoms: dict[Polygon, Union[str | npt.ArrayLike]], trib_area: Optional[Polygon] = None):
         """
         Returns a LoadedElement
         """
@@ -360,11 +357,11 @@ class LoadedElement(Element):
             elem.correspondents_above,
             elem.correspondents_below,
             elem.plane_id,
-            trib_area,
-            loading_areas,
+            element_type=elem.element_type,
+            subelements=elem.subelements,
+            trib_area=trib_area,
+            loading_geoms=loading_geoms,
         )
-
-
 
 
 
