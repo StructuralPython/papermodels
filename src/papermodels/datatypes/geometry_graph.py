@@ -26,6 +26,18 @@ class GeometryGraph(nx.DiGraph):
         super().__init__()
         self.node_hash = None
 
+    @property
+    def collector_elements(self):
+        return [
+            node for node in self.nodes if not list(self.predecessors(node))
+        ]
+    
+    @property
+    def transfer_elements(self):
+        return [
+            node for node in self.nodes if list(self.predecessors(node))
+        ]
+
     @classmethod
     def from_elements(
         cls, elements: list[Element]
@@ -59,12 +71,10 @@ class GeometryGraph(nx.DiGraph):
                 for intersection in element.intersections_below:
                     j_tag = intersection.other_tag
                     g.add_edge(element.tag, j_tag)
-        # HERE: SEEM TO BE MISSING INDEXES ON POLYGON BOTTOMS HITTING LINES
+                
         g.add_intersection_indexes_below()
-        for node in g.nodes:
-            print(f"{node=}")
-            print(f"{g.nodes[node]}")
         g.add_intersection_indexes_above()
+
         return g
     
     def add_intersection_indexes_below(self):
@@ -101,6 +111,21 @@ class GeometryGraph(nx.DiGraph):
                         local_index
                     )
                     updated_intersections_below.append(new_intersection)
+                if node in self.collector_elements and element.subelements is not None:
+                    for subelem in element.subelements:
+                        sub_updated_intersections_below = []
+                        for sub_intersection in subelem.intersections_below:
+                            sub_other_tag = sub_intersection.other_tag
+                            sub_local_index = other_tags_below.index(sub_other_tag)
+                            new_sub_intersection = Intersection(
+                                sub_intersection.intersecting_region,
+                                sub_intersection.other_geometry,
+                                sub_intersection.other_tag,
+                                sub_local_index
+                            )
+                            sub_updated_intersections_below.append(new_sub_intersection)
+                        subelem.intersections_below = sub_updated_intersections_below
+
             element.intersections_below = updated_intersections_below
             self.nodes[node]['element'] = element
 
@@ -117,22 +142,55 @@ class GeometryGraph(nx.DiGraph):
                 other_tag = intersection.other_tag
                 element_above = self.nodes[other_tag]['element']
                 above_intersections_below = {
-                    intersection_below.other_tag: intersection_below.other_index
-                    for intersection_below in element_above.intersections_below
+                    above_intersection_below.other_tag: above_intersection_below.other_index
+                    for above_intersection_below in element_above.intersections_below
                 }
                 local_index = above_intersections_below[element_tag]
-                new_intersection = Intersection(
-                    intersection.intersecting_region,
-                    intersection.other_geometry,
-                    intersection.other_tag,
-                    local_index
-                )
-                indexed_intersections_above.append(new_intersection)
+                if element_above.subelements is None:
+                    new_intersection = Intersection(
+                        intersection.intersecting_region,
+                        intersection.other_geometry,
+                        intersection.other_tag,
+                        local_index
+                    )
+                    indexed_intersections_above.append(new_intersection)
+                else:
+                    for subelem_above in element_above.subelements:
+                        sub_intersection = [inter for inter in subelem_above.intersections_below if inter.other_tag == element_tag][0]
+                        new_sub_intersection = Intersection(
+                            sub_intersection.intersecting_region,
+                            subelem_above.geometry,
+                            subelem_above.tag,
+                            local_index
+                        )
+                        indexed_intersections_above.append(new_sub_intersection)
+
+
             element.intersections_above = indexed_intersections_above
             self.nodes[node]['element'] = element
 
 
-    def create_loaded_elements(self, loading_areas: list[tuple[Polygon, npt.ArrayLike]]) -> list[LoadedElement]:
+    def generate_subelements(self, subelement_constructor: callable, *args, **kwargs) -> list[Element]:
+        """
+        Returns a list of Element to be assigned to element.subelements for elements
+        that have element_type == "collector".
+
+        'subelement_class': This should be a callable with the following signature:
+            def subelement_constructor(element: Element, [*args, **kwargs]) -> list[Element]
+
+            Where *args, and **kwargs can be any additional parameters that are defined
+            for the callable.
+        '*args' and '**kwargs': These are passed through to 'subelement_constructor'
+        """
+        collectors = self.collector_elements
+        for node in collectors:
+            node_attrs = self.nodes[node]
+            node_element = node_attrs['element']
+            subs = subelement_constructor(node_element, *args, **kwargs)
+            node_element.subelements = subs
+
+
+    def create_loaded_elements(self, loading_geoms: list[tuple[Polygon, npt.ArrayLike]]) -> list[LoadedElement]:
         """
         Returns a list of LoadedElement, each with 'loading_areas' applied.
         
@@ -143,11 +201,27 @@ class GeometryGraph(nx.DiGraph):
         # HERE: Need to find a way to add raw load annotations to the graph so that they cann
         # automatically sort themselves by plane_id so that the right loads go to the right Elements
         """
+        collector_elements = self.collector_elements
+        loading_geoms_by_plane = {}
+        for loading_geom in loading_geoms:
+            lg_plane = loading_geom.plane_id
+            loading_geoms_by_plane.setdefault(lg_plane, [])
+            loading_geoms_by_plane[lg_plane].append(loading_geom)
+
         loaded_elements = []
         for node in self.nodes:
             node_attrs = self.nodes[node]
-            le = LoadedElement.from_element_with_loads(node_attrs['element'], loading_areas=loading_areas)
-            loaded_elements.append(le)
+            element = node_attrs['element']
+            element.element_type = "collector" if node in collector_elements else "transfer"
+            element_plane_id = node_attrs['element'].plane_id
+            loading_geoms_on_plane = loading_geoms_by_plane.get(element_plane_id, [])
+            if element.element_type == "collector" and element.subelements is not None:
+                for sub_elem in element.subelements:
+                    le = LoadedElement.from_element_with_loads(sub_elem, loading_geoms=loading_geoms_on_plane)
+                    loaded_elements.append(le)
+            else:
+                le = LoadedElement.from_element_with_loads(node_attrs['element'], loading_geoms=loading_geoms_on_plane)
+                loaded_elements.append(le)
         return loaded_elements
             
 

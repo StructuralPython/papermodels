@@ -107,19 +107,13 @@ def get_distributed_loads_from_projected_polygons(
     """
     Returns a list of DistributedLoad representing the projected areas
     """
-    # Rotate member and applied loading areas
-    # area_polys, load_components = zip(*applied_loading_areas)
-    load_geoms = [load_geom.geometry for load_geom in applied_loading_areas]
-    load_components = [load_geom.components for load_geom in applied_loading_areas]
-    load_occupancies = [load_geom.occupancies for load_geom in applied_loading_areas]
-    horiz_member, rotated_polys = geom_ops.rotate_to_horizontal(member, load_geoms)
-    rot_applied_loading_geoms = zip(rotated_polys, load_components)
+    # Rotate member and applied load geometries
+    load_geoms = [load_geom[0] for load_geom in applied_loading_areas]
+    _, rotated_geoms = geom_ops.rotate_to_horizontal(member, load_geoms)
     distributed_loads = []
-    for idx, load_geom in enumerate(rot_applied_loading_geoms):
-        load_component = load_components[idx]
-        load_occupancy = load_components[idx]
-        load_magnitude = load_component or load_occupancy
-        poly_xy = project_polygon(load_geom, load_magnitude, xy=True)
+    for idx, load_geom in enumerate(rotated_geoms):
+        # Apply a unit load for all distributed loads
+        poly_xy = project_polygon(load_geom, 1.0, xy=True)
         projected_poly_coords = list(zip(*poly_xy))
         dist_loads = []
         inner = []
@@ -130,7 +124,7 @@ def get_distributed_loads_from_projected_polygons(
                 inner = []
             else:
                 inner.append(coord)
-        distributed_loads.append(dist_loads)
+        distributed_loads += dist_loads
     return distributed_loads
 
 

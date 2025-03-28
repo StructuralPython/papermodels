@@ -12,6 +12,9 @@ from ..paper.annotations import (
 from ..geometry import geom_ops
 from ..loads import load_distribution as ld
 import parse
+import math
+import tomli_w
+import json
 
 Geometry = Union[LineString, Polygon]
 
@@ -62,6 +65,12 @@ class Element:
         represents those "below".
     plane_id: Optional[str | int] = None, An optional unique identifier for the 2D
         plane that this Element resides on
+    element_type: One of {"collector", "transfer"} or None. Assigned within the
+        GeometryGraph.
+    subelements: list[Element] or None. Assigned within the GeometryGraph.
+    trib_area: Optional[Polygon] or None. # Not sure if adding this here is the right
+        thing to do. Currently in use for the creation of collector subelements and for storing
+        their trib areas.
     """
 
     geometry: Geometry
@@ -71,6 +80,9 @@ class Element:
     correspondents_above: Optional[list[dict]] = None
     correspondents_below: Optional[list[dict]] = None
     plane_id: Optional[str | int] = None
+    element_type: Optional[str] = None
+    subelements: list["Element"] = None
+    trib_area: Optional[Polygon] = None
 
     def __post_init__(self):
         if self.geometry.geom_type == "LineString" and len(self.geometry.coords) != 2:
@@ -171,14 +183,11 @@ E00 = Element(
 
 @dataclass
 class LoadedElement(Element):
-    trib_area: Polygon = None
-    loading_areas: Optional[ld.LoadingGeometry] = None
+    loading_geoms: Optional[ld.LoadingGeometry] = None
     applied_loading_areas: Optional[list[tuple[Polygon, npt.ArrayLike]]] = None
     model: Optional[dict] = None
 
     """
-    'trib_area' - Optional trib area for this element. If a list[Polygon] then
-        maybe this could work well with the joist arrays
     'loading_areas' - A list of tuples. Each tuple consists of a Polygon and a dict of
         attributes associated with that Polygon. If no attributes are desired,
         pass a tuple with an empty dict.
@@ -192,20 +201,18 @@ class LoadedElement(Element):
         this parameter.
 
 
-    TODO: Need to figure out how this will relate to a JoistArray
+    TODO: # HERE: Need to apply loading to sub-elements 
     """
     def __post_init__(self):
         """
         Populates self.applied_loading_areas
         """
-
-            
         self.applied_loading_areas = self._get_intersecting_loads()
         self.model = self._build_model()
                 
         
     def _get_intersecting_loads(self) -> list[tuple[Polygon, dict]]:
-        loading_array = np.array([loading_area.geometry for loading_area in self.loading_areas])
+        loading_array = np.array([loading_area.geometry for loading_area in self.loading_geoms])
         applied_loading_areas = []
         if self.trib_area is not None:
             intersecting_loads = self.trib_area.intersection(loading_array)
@@ -213,7 +220,7 @@ class LoadedElement(Element):
                 if intersecting_load.is_empty or intersecting_load.area == 0: 
                     continue
                 applied_loading_areas.append(
-                    (intersecting_load, self.loading_areas[idx][1])
+                    (intersecting_load, self.loading_geoms[idx])
                 )
         return applied_loading_areas 
 
@@ -235,17 +242,23 @@ class LoadedElement(Element):
             orientation = "vertical"
 
         support_locations = self._get_support_locations()
-        transfer_loads = self._get_transfer_loads()
+        transfer_loads = []
+        if self.element_type == "transfer":
+            transfer_loads = self._get_transfer_loads()
         distributed_loads = self._get_distributed_loads()
 
         model = {
             "element_attributes":
                 {
                     "tag": self.tag,
-                    "length": self.geometry.length if self.geometry.geom_type == "LineString" else None,
+                    "length": self.geometry.length if self.geometry.geom_type == "LineString" else {},
                     "orientation": orientation,
                 },
-            "supports": support_locations,
+            "element_geometry":
+                {
+                    "geometry": self.geometry.wkt,
+                    "supports": support_locations,
+                },
             "loads": {
                 "point_loads": transfer_loads,
                 "distributed_loads": distributed_loads or []
@@ -267,10 +280,13 @@ class LoadedElement(Element):
                 start_coord,
                 [intersection[0] for intersection in self.intersections_below]
             )
-            return [
-                {"location": support_location, "fixity": None}
-                for support_location in support_locations
-            ]
+            supports_acc = []
+            for idx, support_location in enumerate(support_locations):
+                fixity = "roller"
+                if idx == 0:
+                    fixity = "pin"
+                supports_acc.append({"location": support_location, "fixity": fixity})
+            return supports_acc
         else:
             return []
     
@@ -293,7 +309,6 @@ class LoadedElement(Element):
                 source_member = intersection_data.other_tag
                 reaction_idx = intersection_data.other_index
                 if reaction_idx is None:
-                    print(self)
                     raise ValueError(
                         "The .other_index attribute within the .intersections_above list"
                         " is not calculated. Generate LoadedElement objects through the GeometryGraph"
@@ -302,7 +317,7 @@ class LoadedElement(Element):
                 transfer_loads.append(
                     {
                         "location": transfer_location,
-                        "magnitude": None,
+                        "magnitude": 0,
                         "transfer_source": f"{source_member}",
                         "transfer_reaction_idx": reaction_idx,
                         "direction": "gravity"
@@ -312,8 +327,8 @@ class LoadedElement(Element):
             for intersection in self.intersections_above:
                 transfer_loads.append(
                     {
-                        "location": None,
-                        "magnitude": None,
+                        "location": [],
+                        "magnitude": 0,
                         "transfer_source": intersection.other_tag,
                         "transfer_reaction_idx": intersection.other_index,
                         "direction": "gravity"
@@ -327,22 +342,49 @@ class LoadedElement(Element):
         loading areas
         """
         if self.geometry.geom_type == "LineString":
-            distributed_loads = ld.get_distributed_loads_from_projected_polygons(
+            raw_dist_loads = ld.get_distributed_loads_from_projected_polygons(
                 self.geometry,
                 self.applied_loading_areas
             )
+            
+            distributed_loads = []
+            for idx, (start_xy, end_xy) in enumerate(raw_dist_loads):
+                start_x, start_y = start_xy
+                end_x, end_y = end_xy
+                if math.isclose(start_x, 0, abs_tol=1e-6):
+                    start_x = 0
+                intersected_poly, applied_loading = self.applied_loading_areas[idx]
+
+                dist_load = {
+                    "occupancy": applied_loading.occupancy,
+                    "load_components": applied_loading.load_components or [],
+                    "applied_area": intersected_poly.area,
+                    "start_loc": start_x,
+                    "start_magnitude": start_y,
+                    "end_loc": end_x,
+                    "end_magnitude":  end_y,
+                }
+                distributed_loads.append(dist_load)
             return distributed_loads
 
 
-    @classmethod
-    def load_model(cls):
+    def dump_toml(self, fp):
         """
-        Returns a LoadedElement generated from the output of 'dump_model'
+        Dumps the .model attribute to a TOML file
         """
-        return cls()
+        tomli_w.dump(self.model, fp)
+        return fp
+        
+    def dump_json(self, fp):
+        """
+        Dumps the .model attribute to a TOML file
+        """
+        json.dump(self.model, fp, indent=2)
+        return fp
+        
     
     @classmethod
-    def from_element_with_loads(cls, elem: Element, loading_areas: dict[Polygon, Union[str | npt.ArrayLike]], trib_area: Optional[Polygon] = None):
+    def from_element_with_loads(cls, elem: Element, loading_geoms: dict[Polygon, Union[str | npt.ArrayLike]], trib_area: Optional[Polygon] = None):
         """
         Returns a LoadedElement
         """
@@ -354,11 +396,11 @@ class LoadedElement(Element):
             elem.correspondents_above,
             elem.correspondents_below,
             elem.plane_id,
-            trib_area,
-            loading_areas,
+            element_type=elem.element_type,
+            subelements=elem.subelements,
+            trib_area=elem.trib_area,
+            loading_geoms=loading_geoms,
         )
-
-
 
 
 
