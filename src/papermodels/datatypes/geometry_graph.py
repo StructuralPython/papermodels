@@ -201,6 +201,7 @@ class GeometryGraph(nx.DiGraph):
         # HERE: Need to find a way to add raw load annotations to the graph so that they cann
         # automatically sort themselves by plane_id so that the right loads go to the right Elements
         """
+        collector_elements = self.collector_elements
         loading_geoms_by_plane = {}
         for loading_geom in loading_geoms:
             lg_plane = loading_geom.plane_id
@@ -210,10 +211,17 @@ class GeometryGraph(nx.DiGraph):
         loaded_elements = []
         for node in self.nodes:
             node_attrs = self.nodes[node]
+            element = node_attrs['element']
+            element.element_type = "collector" if node in collector_elements else "transfer"
             element_plane_id = node_attrs['element'].plane_id
             loading_geoms_on_plane = loading_geoms_by_plane.get(element_plane_id, [])
-            le = LoadedElement.from_element_with_loads(node_attrs['element'], loading_geoms=loading_geoms_on_plane)
-            loaded_elements.append(le)
+            if element.element_type == "collector" and element.subelements is not None:
+                for sub_elem in element.subelements:
+                    le = LoadedElement.from_element_with_loads(sub_elem, loading_geoms=loading_geoms_on_plane)
+                    loaded_elements.append(le)
+            else:
+                le = LoadedElement.from_element_with_loads(node_attrs['element'], loading_geoms=loading_geoms_on_plane)
+                loaded_elements.append(le)
         return loaded_elements
             
 

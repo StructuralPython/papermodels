@@ -108,7 +108,7 @@ def get_distributed_loads_from_projected_polygons(
     Returns a list of DistributedLoad representing the projected areas
     """
     # Rotate member and applied load geometries
-    load_geoms = [load_geom.geometry for load_geom in applied_loading_areas]
+    load_geoms = [load_geom[0] for load_geom in applied_loading_areas]
     _, rotated_geoms = geom_ops.rotate_to_horizontal(member, load_geoms)
     distributed_loads = []
     for idx, load_geom in enumerate(rotated_geoms):
@@ -124,7 +124,7 @@ def get_distributed_loads_from_projected_polygons(
                 inner = []
             else:
                 inner.append(coord)
-        distributed_loads.append(dist_loads)
+        distributed_loads += dist_loads
     return distributed_loads
 
 

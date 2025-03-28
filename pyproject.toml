@@ -23,7 +23,8 @@ dependencies = [
     "PyNiteFEA >= 1.0.0",
     "pycba",
     "rich",
-    "forallpeople"
+    "forallpeople",
+    "tomli-w"
 ]
 
 
