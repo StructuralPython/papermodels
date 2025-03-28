@@ -142,17 +142,30 @@ class GeometryGraph(nx.DiGraph):
                 other_tag = intersection.other_tag
                 element_above = self.nodes[other_tag]['element']
                 above_intersections_below = {
-                    intersection_below.other_tag: intersection_below.other_index
-                    for intersection_below in element_above.intersections_below
+                    above_intersection_below.other_tag: above_intersection_below.other_index
+                    for above_intersection_below in element_above.intersections_below
                 }
                 local_index = above_intersections_below[element_tag]
-                new_intersection = Intersection(
-                    intersection.intersecting_region,
-                    intersection.other_geometry,
-                    intersection.other_tag,
-                    local_index
-                )
-                indexed_intersections_above.append(new_intersection)
+                if element_above.subelements is None:
+                    new_intersection = Intersection(
+                        intersection.intersecting_region,
+                        intersection.other_geometry,
+                        intersection.other_tag,
+                        local_index
+                    )
+                    indexed_intersections_above.append(new_intersection)
+                else:
+                    for subelem_above in element_above.subelements:
+                        sub_intersection = [inter for inter in subelem_above.intersections_below if inter.other_tag == element_tag][0]
+                        new_sub_intersection = Intersection(
+                            sub_intersection.intersecting_region,
+                            subelem_above.geometry,
+                            subelem_above.tag,
+                            local_index
+                        )
+                        indexed_intersections_above.append(new_sub_intersection)
+
+
             element.intersections_above = indexed_intersections_above
             self.nodes[node]['element'] = element
 

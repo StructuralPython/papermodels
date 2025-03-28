@@ -198,7 +198,7 @@ class LoadedElement(Element):
         this parameter.
 
 
-    TODO: Need to figure out how this will relate to a JoistArray
+    TODO: # HERE: Need to apply loading to sub-elements 
     """
     def __post_init__(self):
         """
