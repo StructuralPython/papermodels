@@ -51,12 +51,11 @@ class JoistArrayModel:
         self._joist_prototype = self.joist_prototype
         self._cantilever_tolerance = cantilever_tolerance
         self._extents = get_joist_extents(self.joist_prototype, self.joist_supports)
-        # print(f"{self._extents=}")
 
         self._supports = determine_support_order(self.joist_prototype, self.joist_supports)
         self._cantilevers = get_cantilever_segments(self.joist_prototype, self._supports)
         self.vector_parallel = get_direction_vector(self.joist_prototype)
-        self.vector_normal = rotate_90(self.vector_parallel, ccw=False)
+        self.vector_normal = rotate_90(self.vector_parallel, ccw=True)
         self.joist_at_start = float(joist_at_start)
         self.joist_at_end = float(joist_at_end)
         self.joist_locations = get_joist_locations(
@@ -101,9 +100,8 @@ class JoistArrayModel:
         """
         subelements = []
         for idx, joist_geom in enumerate(self.joist_geoms):
-            print(idx)
             trib_area = self.joist_trib_areas[idx]
-
+            sub_id = f"{self.id}-{idx}"
             # other_tag = self.joist_support_tags[idx]
             intersections_below = []
             for sup_idx, support_geom in enumerate(self.joist_supports):
@@ -112,7 +110,7 @@ class JoistArrayModel:
                 intersections_below.append(intersection_below)
             element = Element(
                 joist_geom,
-                self.id,
+                sub_id,
                 intersections_below=intersections_below,
                 plane_id=self.plane_id,
                 element_type="collector",
@@ -174,7 +172,7 @@ class JoistArrayModel:
 
         if index != 0 and index != len(self.joist_locations) - 1:
             new_centroid = project_node(
-                start_centroid, -self.vector_normal, joist_distance
+                start_centroid, self.vector_normal, joist_distance # orig -ve
             )
 
             system_bounds = get_system_bounds(
@@ -182,19 +180,16 @@ class JoistArrayModel:
             )
             projection_distance = get_magnitude(system_bounds)
             ray_aj = project_node(
-                new_centroid, -self.vector_parallel, projection_distance
+                new_centroid, -self.vector_parallel, projection_distance # orig -ve
             )
             ray_a = LineString([new_centroid, ray_aj])
             ray_bj = project_node(
-                new_centroid, self.vector_parallel, projection_distance
+                new_centroid, self.vector_parallel, projection_distance # orig +ve
             )
             ray_b = LineString([new_centroid, ray_bj])
-
-            # display(GeometryCollection([start_centroid, new_centroid, ray_a, self._supports['A'], self._extents['A'][0]]))
+            # display(GeometryCollection([start_centroid, self._supports['A'], ray_a, self._supports['B'], self._extents['A'][0], self._extents['B'][0]]))
             support_a_loc = ray_a.intersection(self._supports["A"])
-
             support_b_loc = ray_b.intersection(self._supports["B"])
-
 
             end_a = support_a_loc
             end_b = support_b_loc
@@ -216,7 +211,6 @@ class JoistArrayModel:
             end_b = project_node(
                 support_b_loc, self.vector_parallel, self._cantilevers["B"]
             )
-        print(f"{[end_a, end_b]=}")
         return LineString([end_a, end_b])
 
     def get_extent_edge(self, edge: str = "start"):
@@ -511,7 +505,6 @@ def get_direction_vector(ls: LineString) -> np.ndarray:
     column_vector = np.array(j_node.xy) - np.array(i_node.xy)
     column_vector_norm = np.linalg.norm(column_vector)
     parallel_vector =  column_vector / column_vector_norm
-    # print(f"{parallel_vector=}")
     return parallel_vector
     # return column_vector.T[0] # Return a flat, 1D vector
 
@@ -536,7 +529,6 @@ def determine_support_order(
         (joist_prototype & all_supports).geoms
     )
     support_a, support_b = supports
-    # print(f"{support_a=} | {support_b=}")
     if joist_a_node.buffer(1e-6).intersects(support_a):
         return {"A": support_a, "B": support_b}
     elif joist_b_node.buffer(1e-6).intersects(support_a):
@@ -590,7 +582,6 @@ def project_node(node: Point, vector: np.ndarray, magnitude: float):
     """
     scaled_vector = vector * magnitude
     projected_node = np.array(node.xy) + scaled_vector
-    # print(f"{node=} | {vector=}  | {magnitude=}")
     return Point(projected_node)
 
 
@@ -601,10 +592,18 @@ def rotate_90(v: np.ndarray, precision: int = 6, ccw=True) -> tuple[float, float
     'precision': round result to this many decimal places
     'ccw': if True, rotate counter-clockwise (clockwise, otherwise)
     """
+    v_angle = np.arctan2(v[1], v[0])
+
     if ccw:
-        angle = math.pi / 2
+        if 0 < v_angle <= math.pi / 2: # Positive x-bias
+            angle = -math.pi / 2
+        else:
+            angle = math.pi/2
     else:
-        angle = -math.pi / 2
+        if 0 < v_angle <= math.pi / 2: # Positive x-bias
+            angle = math.pi/2
+        else:
+            angle = -math.pi / 2
 
     rot = np.array(
         [
