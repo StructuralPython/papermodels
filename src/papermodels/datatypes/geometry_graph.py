@@ -111,6 +111,21 @@ class GeometryGraph(nx.DiGraph):
                         local_index
                     )
                     updated_intersections_below.append(new_intersection)
+                if node in self.collector_elements and element.subelements is not None:
+                    for subelem in element.subelements:
+                        sub_updated_intersections_below = []
+                        for sub_intersection in subelem.intersections_below:
+                            sub_other_tag = sub_intersection.other_tag
+                            sub_local_index = other_tags_below.index(sub_other_tag)
+                            new_sub_intersection = Intersection(
+                                sub_intersection.intersecting_region,
+                                sub_intersection.other_geometry,
+                                sub_intersection.other_tag,
+                                sub_local_index
+                            )
+                            sub_updated_intersections_below.append(new_sub_intersection)
+                        subelem.intersections_below = sub_updated_intersections_below
+
             element.intersections_below = updated_intersections_below
             self.nodes[node]['element'] = element
 

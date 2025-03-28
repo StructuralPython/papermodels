@@ -15,7 +15,7 @@ from shapely import (
 )
 import shapely.ops as ops
 
-from papermodels.datatypes.element import Element
+from papermodels.datatypes.element import Element, Intersection
 from papermodels.datatypes.utils import class_representation
 from papermodels.geometry import geom_ops
 
@@ -106,7 +106,10 @@ class JoistArrayModel:
             intersections_below = []
             for sup_idx, support_geom in enumerate(self.joist_supports):
                 other_tag = self.joist_support_tags[sup_idx]
-                intersection_below = geom_ops.get_intersection(joist_geom,  support_geom, other_tag)
+                intersection_attrs = geom_ops.get_intersection(joist_geom,  support_geom, other_tag)
+                intersection_below = Intersection(
+                    *intersection_attrs
+                )
                 intersections_below.append(intersection_below)
             element = Element(
                 joist_geom,
