@@ -164,6 +164,7 @@ def scale_annotations(
     annots: list[Annotation],
     scale: float,
     paper_origin: Optional[tuple[float, float]] = None,
+    round_precision: int = 4
 ) -> list[Annotation]:
     """
     Scale the annotations in 'annots'. Each vertex in each annotation in 'annots' will be multiplied
@@ -176,7 +177,7 @@ def scale_annotations(
     scaled_annotations = []
     for annot in annots:
         annot_dict = asdict(annot).copy()
-        scaled_vertices = scale_vertices(annot.vertices, scale)
+        scaled_vertices = scale_vertices(annot.vertices, scale, round_precision=round_precision)
         annot_dict["vertices"] = scaled_vertices
         scaled_annotations.append(Annotation(**annot_dict))
     return scaled_annotations
@@ -186,6 +187,7 @@ def scale_vertices(
     vertices: list[float],
     scale: float,
     paper_origin: Optional[tuple[float, float]] = None,
+    round_precision: int = 4
 ) -> Annotation:
     """
     Scale the annotation. Each vertex in 'annot' will be multiplied
@@ -198,8 +200,8 @@ def scale_vertices(
         offset_y = paper_origin[1]
         vertices = _translate_vertices(vertices, offset_x, offset_y)
 
-    scaled_vertices = [vertex * scale for vertex in vertices]
-    return scaled_vertices
+    scaled_vertices = [round(vertex * scale, round_precision) for vertex in vertices]
+    return tuple(scaled_vertices)
 
 
 

@@ -34,17 +34,17 @@ def load_pdf_annotations(pdf_path: pathlib.Path | str) -> list[Annotation]:
             if "/Subj" in annot:
                 annot_type = str(annot["/Subj"])
             if annot_type.lower() in ("polygon", "polyline", "circle", "ellipse"):
-                vertices = list(annot.get("/Vertices", []))
+                vertices = tuple(annot.get("/Vertices", tuple()))
             elif annot_type.lower() in (
                 "rectangle",
                 "square",
                 "rectangle sketch to scale",
             ):
-                bbox = list(annot.get("/Rect", []))
-                buffers = list(annot.get("/RD", [0, 0, 0, 0]))
+                bbox = tuple(annot.get("/Rect", tuple()))
+                buffers = tuple(annot.get("/RD", (0, 0, 0, 0)))
                 x1, y1, x2, y2 = bbox
                 b1, b2, b3, b4 = buffers
-                vertices = [
+                vertices = (
                     x1,
                     y1,
                     x1,
@@ -53,9 +53,9 @@ def load_pdf_annotations(pdf_path: pathlib.Path | str) -> list[Annotation]:
                     y2 - b4 - b2,
                     x2 - b3 - b1,
                     y1,
-                ]
+                )
             elif annot_type == "Line":
-                vertices = list(annot.get("/L", []))
+                vertices = tuple(annot.get("/L", tuple()))
             else:
                 print(f"Cannot read (yet): {annot_type}")
             text = str(annot.get("/Contents", ""))
@@ -64,7 +64,7 @@ def load_pdf_annotations(pdf_path: pathlib.Path | str) -> list[Annotation]:
             line_color = tuple(annot.get("/C", stream_dict.get("RG", (0, 0, 0))))
             fill_color = tuple(annot.get("/IC", stream_dict.get("rg", (1, 1, 1))))
             fill_opacity = annot.get("/CA", Decimal("1.0"))
-            line_width = stream_dict.get("w", [1])[0]
+            line_width = stream_dict.get("w", (1,))[0]
             line_type = None
             line_opacity = 1
             matrix = (1, 0, 0, 1, 0, 0)

@@ -346,25 +346,34 @@ class LoadedElement(Element):
                 self.geometry,
                 self.applied_loading_areas
             )
-            
+            polygon_areas = geom_ops.calculate_trapezoid_area_sums(raw_dist_loads)
+            # print(len(raw_dist_loads), len(polygon_areas))
             distributed_loads = []
-            for idx, (start_xy, end_xy) in enumerate(raw_dist_loads):
-                start_x, start_y = start_xy
-                end_x, end_y = end_xy
-                if math.isclose(start_x, 0, abs_tol=1e-6):
-                    start_x = 0
-                intersected_poly, applied_loading = self.applied_loading_areas[idx]
-
-                dist_load = {
-                    "occupancy": applied_loading.occupancy,
-                    "load_components": applied_loading.load_components or [],
-                    "applied_area": intersected_poly.area,
-                    "start_loc": start_x,
-                    "start_magnitude": start_y,
-                    "end_loc": end_x,
-                    "end_magnitude":  end_y,
-                }
-                distributed_loads.append(dist_load)
+            for idx, dist_load_collection in enumerate(raw_dist_loads):
+                total_polygon_area = polygon_areas[idx]
+                for dist_load_element in dist_load_collection:
+                    start_xy, end_xy = dist_load_element
+                    start_x, start_y = start_xy
+                    if math.isclose(start_x, 0, abs_tol=1e-6):
+                        start_x = 0
+                    end_x, end_y = end_xy
+                    area_dist_load = geom_ops.trapezoid_area(
+                        h=(end_x - start_x),
+                        b1=start_y,
+                        b2=end_y
+                    )
+                    trapezoid_ratio = area_dist_load / total_polygon_area
+                    intersected_poly, applied_loading = self.applied_loading_areas[idx]
+                    dist_load = {
+                        "occupancy": applied_loading.occupancy,
+                        "load_components": applied_loading.load_components or [],
+                        "applied_area": intersected_poly.area * trapezoid_ratio,
+                        "start_loc": start_x,
+                        "start_magnitude": start_y,
+                        "end_loc": end_x,
+                        "end_magnitude":  end_y,
+                    }
+                    distributed_loads.append(dist_load)
             return distributed_loads
 
 

@@ -110,22 +110,22 @@ def get_distributed_loads_from_projected_polygons(
     # Rotate member and applied load geometries
     load_geoms = [load_geom[0] for load_geom in applied_loading_areas]
     _, rotated_geoms = geom_ops.rotate_to_horizontal(member, load_geoms)
-    distributed_loads = []
+    member_distributed_loads = []
     for idx, load_geom in enumerate(rotated_geoms):
         # Apply a unit load for all distributed loads
         poly_xy = project_polygon(load_geom, 1.0, xy=True)
         projected_poly_coords = list(zip(*poly_xy))
-        dist_loads = []
-        inner = []
+        polygon_dist_loads = [] # Polygon may have many pairs
+        inner_pair = []
         for idx, coord in enumerate(projected_poly_coords[1:-1]):
             if idx % 2 == 1:
-                inner.append(coord)
-                dist_loads.append(inner)
-                inner = []
+                inner_pair.append(coord)
+                polygon_dist_loads.append(inner_pair)
+                inner_pair = []
             else:
-                inner.append(coord)
-        distributed_loads += dist_loads
-    return distributed_loads
+                inner_pair.append(coord)
+        member_distributed_loads.append(polygon_dist_loads)
+    return member_distributed_loads
 
 
 def project_polygon(

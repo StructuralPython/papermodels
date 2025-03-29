@@ -363,6 +363,37 @@ def get_rectangle_centerline(p: Polygon) -> LineString:
     return center_line
     
 
+def calculate_trapezoid_area_sums(
+    member_loads: list[list[list[tuple]]]
+) -> list[float]:
+    """
+    Returns a list of the sums of the areas of the trapezoids
+    in 'traps'
+    """
+    member_polys = []
+    for polygon_load in member_loads:
+        polygon_loads = []
+        for inner_pair in polygon_load:
+            start, end = inner_pair
+            start_x, start_y = start
+            end_x, end_y = end
+            h = end_x - start_x
+            b2 = start_y
+            b1 = end_y
+            trap_area = trapezoid_area(h, b2, b1)
+            polygon_loads.append(trap_area)
+        member_polys.append(sum(polygon_loads))
+    return member_polys
+        
+
+
+def trapezoid_area(h: float, b2: float, b1: float) -> float:
+    """
+    Returns the area of the trapezoid.
+    """
+    area = (b1 + b2) / 2 * h
+    return area
+
 
 def rotate_90(v: np.ndarray, precision: int = 6, ccw=True) -> tuple[float, float]:
     """

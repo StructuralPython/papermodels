@@ -188,6 +188,8 @@ class GeometryGraph(nx.DiGraph):
             node_element = node_attrs['element']
             subs = subelement_constructor(node_element, *args, **kwargs)
             node_element.subelements = subs
+        self.add_intersection_indexes_below()
+        self.add_intersection_indexes_above()
 
 
     def create_loaded_elements(self, loading_geoms: list[tuple[Polygon, npt.ArrayLike]]) -> list[LoadedElement]:
