@@ -19,7 +19,7 @@ papermodels is a software tool to "automate" the process of tracking loads by ha
 - [x] Scale annotations
 - [x] Categorize annotations according to a legend (e.g. green line == "beam")
 - [x] Auto-tag annotations as structural members
-- [ ] Convert the geometry graph into a load path graph
+- [x] Convert the geometry graph into a load path graph
 
 ### Load distribution model
 - [x] Convert arbitrary load polygon into exact distributed load
@@ -27,11 +27,11 @@ papermodels is a software tool to "automate" the process of tracking loads by ha
 - [ ] One-way arbitrary load distribution as continuous joists 
 
 ### Load path graphs
-- [ ] Create load path graph from scratch
-- [ ] Create load path graph from geometry graph
-- [ ] Create individual members from scratch
+- [x] Create load path graph from scratch
+- [x] Create load path graph from geometry graph
+- [x] Create individual members from scratch
 - [ ] Create individual members from text file
-- [ ] Save individual members to text file
+- [x] Save individual members to text file
 - [ ] Save load path graph to text or binary file
 - [ ] Reload load path graph from text or binary file
 
