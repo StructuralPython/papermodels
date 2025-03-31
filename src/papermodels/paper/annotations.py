@@ -4,7 +4,6 @@ from dataclasses import asdict
 from shapely.wkt import loads as wkt_loads
 from shapely import Geometry, GeometryCollection, Point
 from papermodels.datatypes.annotation import Annotation
-from papermodels.fileio.utils import str_to_int
 from papermodels.loads.load_distribution import LoadingGeometry
 from typing import Any, Optional
 import numpy as np
@@ -254,3 +253,10 @@ def _group_vertices_str(vertices: str, close=False) -> str:
     if close:
         acc.append(acc[0])
     return ", ".join(acc)
+
+
+def str_to_int(s: str) -> int | str:
+    try:
+        return int(s)
+    except ValueError:
+        return s
