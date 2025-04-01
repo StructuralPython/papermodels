@@ -7,6 +7,7 @@ from papermodels.datatypes.annotation import Annotation
 from papermodels.fileio.utils import str_to_int
 from papermodels.loads.load_distribution import LoadingGeometry
 from typing import Any, Optional
+import re
 import numpy as np
 
 
@@ -83,7 +84,8 @@ def parse_annotations(
             prop: getattr(legend_item, prop) for prop in properties_to_match
         }
         matching_annots = filter_annotations(annots, legend_properties)
-        legend_data = legend_item.text.replace("\r", "\n").replace("Legend\n", "").split("\n")
+        legend_text = strip_html_tags(legend_item.text)
+        legend_data = legend_text.replace("\r\n", "\n").replace("\r", "\n").replace("Legend\n", "").split("\n")
         legend_data = [elem for elem in legend_data if elem]
         annot_attributes = {
             legend_attr.split(": ")[0].lower(): legend_attr.split(": ")[1]
@@ -254,3 +256,10 @@ def _group_vertices_str(vertices: str, close=False) -> str:
     if close:
         acc.append(acc[0])
     return ", ".join(acc)
+
+
+def strip_html_tags(s: str) -> str:
+    """
+    Removes but does not sanitize HTML tags from strings
+    """
+    return re.sub('<[^<]+?>', '', s)
