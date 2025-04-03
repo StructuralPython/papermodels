@@ -1,0 +1,19 @@
+[element_attributes]
+tag = "CT1.6"
+orientation = "vertical"
+
+[element_attributes.length]
+
+[element_geometry]
+geometry = "POLYGON ((14.8897 22.0142, 14.8897 22.6935, 15.569 22.6935, 15.569 22.0142, 14.8897 22.0142))"
+supports = []
+
+[loads]
+distributed_loads = []
+
+[[loads.point_loads]]
+location = []
+magnitude = 0
+transfer_source = "FB1.1"
+transfer_reaction_idx = 0
+direction = "gravity"

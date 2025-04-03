@@ -1,0 +1,82 @@
+[element_attributes]
+tag = "WT2.1"
+orientation = "vertical"
+
+[element_attributes.length]
+
+[element_geometry]
+geometry = "POLYGON ((33.1939 21.8364, 33.1939 33.75, 33.5818 33.75, 33.5818 21.8364, 33.1939 21.8364))"
+supports = []
+
+[loads]
+distributed_loads = []
+
+[[loads.point_loads]]
+location = []
+magnitude = 0
+transfer_source = "J2.1-0"
+transfer_reaction_idx = 1
+direction = "gravity"
+
+[[loads.point_loads]]
+location = []
+magnitude = 0
+transfer_source = "J2.1-1"
+transfer_reaction_idx = 1
+direction = "gravity"
+
+[[loads.point_loads]]
+location = []
+magnitude = 0
+transfer_source = "J2.1-2"
+transfer_reaction_idx = 1
+direction = "gravity"
+
+[[loads.point_loads]]
+location = []
+magnitude = 0
+transfer_source = "J2.1-3"
+transfer_reaction_idx = 1
+direction = "gravity"
+
+[[loads.point_loads]]
+location = []
+magnitude = 0
+transfer_source = "J2.1-4"
+transfer_reaction_idx = 1
+direction = "gravity"
+
+[[loads.point_loads]]
+location = []
+magnitude = 0
+transfer_source = "J2.1-5"
+transfer_reaction_idx = 1
+direction = "gravity"
+
+[[loads.point_loads]]
+location = []
+magnitude = 0
+transfer_source = "J2.1-6"
+transfer_reaction_idx = 1
+direction = "gravity"
+
+[[loads.point_loads]]
+location = []
+magnitude = 0
+transfer_source = "J2.1-7"
+transfer_reaction_idx = 1
+direction = "gravity"
+
+[[loads.point_loads]]
+location = []
+magnitude = 0
+transfer_source = "J2.1-8"
+transfer_reaction_idx = 1
+direction = "gravity"
+
+[[loads.point_loads]]
+location = []
+magnitude = 0
+transfer_source = "J2.1-9"
+transfer_reaction_idx = 1
+direction = "gravity"
