@@ -16,7 +16,6 @@ from shapely import (
 import shapely.ops as ops
 
 from papermodels.datatypes.element import Element, Intersection
-from papermodels.datatypes.utils import class_representation
 from papermodels.geometry import geom_ops
 
 from rich import print
@@ -91,6 +90,7 @@ class JoistArrayModel:
         joist_array = cls(
             element, spacing, initial_offset, joist_at_start, joist_at_end, cantilever_tolerance
         )
+        # joist_array.show_svg()
         return joist_array.to_subelements()
     
 
@@ -240,7 +240,8 @@ class JoistArrayModel:
             # Convert -ve index lookup to a +ve index lookup
             index = len(self.joist_locations) + index
         if index == 0:  # The first joist
-            trib_widths = (0.0, self.joist_locations[1] / 2.0)
+            spacing_right = self.joist_locations[1] - self.joist_locations[0]
+            trib_widths = (0.0, spacing_right / 2.0)
         elif index == len(self.joist_locations) - 1:  # The last joist
             spacing_left = self.joist_locations[-1] - self.joist_locations[-2]
             trib_widths = (spacing_left / 2.0, 0.0)
@@ -265,16 +266,16 @@ class JoistArrayModel:
         # Left - # TODO: Can I not just buffer the joist? I guess that if the joist is on an 
         # angle then extents won't capture the angle.
         if trib_left != 0.0:
-            i_left = project_node(i_node, self.vector_normal, trib_left)
-            j_left = project_node(j_node, self.vector_normal, trib_left)
+            i_left = project_node(i_node, -self.vector_normal, trib_left)
+            j_left = project_node(j_node, -self.vector_normal, trib_left)
             trib_area_left = convex_hull(MultiPoint([i_left, j_left, j_node, i_node]))
         else:
             trib_area_left = Polygon()
 
         # Right
         if trib_right != 0.0:
-            i_right = project_node(i_node, -self.vector_normal, trib_right)
-            j_right = project_node(j_node, -self.vector_normal, trib_right)
+            i_right = project_node(i_node, self.vector_normal, trib_right)
+            j_right = project_node(j_node, self.vector_normal, trib_right)
             trib_area_right = convex_hull(
                 MultiPoint([i_right, j_right, j_node, i_node])
             )
@@ -292,7 +293,7 @@ class JoistArrayModel:
 
         For manual visual review
         """
-        return GeometryCollection(self.joist_geoms + self.joist_trib_areas + self.joist_supports)
+        return display(GeometryCollection(self.joist_geoms + self.joist_trib_areas + self.joist_supports))
         
 
 

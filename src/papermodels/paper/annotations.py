@@ -42,15 +42,13 @@ def get_annotation_geometry_pairs(
     return {annot: annotation_to_shapely(annot) for annot in annots}
 
 
-def annotation_to_loading_geometry(
-    annots: list[Annotation],
-    legend: list[Annotation],
+def parsed_annotations_to_loading_geometry(
+    parsed_annots: dict[Annotation, dict],
 ) -> list[LoadingGeometry]:
     """
     Convert annotations representing loading areas into a list of LoadingArea
     """
     acc = []
-    parsed_annots = parse_annotations(annots, legend)
     for annot, annot_attrs in parsed_annots.items():
         lg = LoadingGeometry(
             geometry=annot_attrs['geometry'],
@@ -63,7 +61,7 @@ def annotation_to_loading_geometry(
 
 
 def parse_annotations(
-    annots: list[Annotation], legend: list[Annotation]
+    annots: list[Annotation], legend: list[Annotation], legend_identifier: str
 ) -> dict[Annotation, dict]:
     """
     Returns a dictionary of annotations organized by their legend entry. If the annotation type is not
@@ -84,13 +82,14 @@ def parse_annotations(
         }
         matching_annots = filter_annotations(annots, legend_properties)
         legend_text = strip_html_tags(legend_item.text)
-        legend_data = legend_text.replace("\r\n", "\n").replace("\r", "\n").replace("Legend\n", "").split("\n")
+        legend_data = legend_text.lower().replace("\r\n", "\n").replace("\r", "\n").replace(f"{legend_identifier.lower()}\n", "").split("\n")
         legend_data = [elem for elem in legend_data if elem]
         annot_attributes = {
-            legend_attr.split(": ")[0].lower(): legend_attr.split(": ")[1]
+            legend_attr.split(": ")[0]: legend_attr.split(": ")[1]
             for legend_attr in legend_data
         }
         for annot in matching_annots:
+            if annot in legend: continue
             annot_geom = annotation_to_shapely(annot)
             annot_attrs = {}
             annot_attrs["geometry"] = annot_geom
