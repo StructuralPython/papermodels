@@ -261,7 +261,7 @@ def strip_html_tags(s: str) -> str:
     """
     Removes but does not sanitize HTML tags from strings
     """
-    return re.sub('<[^<]+?>', '', s)
+    return re.sub('<[^<]+?>', '\n', s)
 
 def str_to_int(s: str) -> int | str:
     try:
