@@ -68,12 +68,14 @@ def load_pdf_annotations(pdf_path: pathlib.Path | str) -> list[Annotation]:
             # opacity for a quick fix for editors that do not allow control over only
             # the fill opacity.
             fill_opacity = annot.get("/FillOpacity", Decimal("1.0"))
+            line_opacity = Decimal("1.0")
             global_opacity = annot.get("/CA", Decimal("1.0"))
             if global_opacity != Decimal("1.0") and fill_opacity == Decimal("1.0"):
                 fill_opacity = global_opacity
+            if global_opacity != Decimal("1.0") and line_opacity == Decimal("1.0"):
+                line_opacity = global_opacity
             line_width = stream_dict.get("w", (1,))[0]
             line_type = None
-            line_opacity = 1
             matrix = (1, 0, 0, 1, 0, 0)
             annotation = Annotation(
                 object_type=annot_type,
