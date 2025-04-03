@@ -1,12 +1,7 @@
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy import Column, Integer, String, Float
-from sqlalchemy_utils import ColorType
-from sqlalchemy_utils import ScalarListType
-
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any
-from papermodels.datatypes.utils import class_representation
+
 
 
 @dataclass(frozen=True)

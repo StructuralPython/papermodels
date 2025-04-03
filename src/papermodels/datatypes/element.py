@@ -142,7 +142,6 @@ class Element:
         tagged_annotations = tag_parsed_annotations(parsed_annotations)
         annotations_w_intersect = get_geometry_intersections(tagged_annotations)
         annotations_w_intersect_corrs = get_geometry_correspondents(annotations_w_intersect)
-        # print(corresponding_annotations)
 
         elements = []
         for annot_attrs in annotations_w_intersect_corrs.values():
@@ -347,7 +346,6 @@ class LoadedElement(Element):
                 self.applied_loading_areas
             )
             polygon_areas = geom_ops.calculate_trapezoid_area_sums(raw_dist_loads)
-            # print(len(raw_dist_loads), len(polygon_areas))
             distributed_loads = []
             for idx, dist_load_collection in enumerate(raw_dist_loads):
                 total_polygon_area = polygon_areas[idx]
@@ -510,6 +508,8 @@ def get_geometry_correspondents(
                 
         else:
             annots_here = annots_by_page[page]
+            if len(descending_pages) == 1: 
+                correspondents_above = {} # There are no correspondents above or below on a single page
             for i_annot, i_attrs in annots_here.items():
                 corresponding_annotations[i_annot]["correspondents_below"] = []
                 corresponding_annotations[i_annot]["correspondents_above"] = correspondents_above.get(i_attrs['tag'], [])
