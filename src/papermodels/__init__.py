@@ -2,7 +2,7 @@
 Load networks
 """
 
-from . import db
+from . import datatypes
 from . import loads
 from . import paper
 

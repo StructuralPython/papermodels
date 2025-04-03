@@ -4,7 +4,6 @@ from dataclasses import asdict
 from shapely.wkt import loads as wkt_loads
 from shapely import Geometry, GeometryCollection, Point
 from papermodels.datatypes.annotation import Annotation
-from papermodels.fileio.utils import str_to_int
 from papermodels.loads.load_distribution import LoadingGeometry
 from typing import Any, Optional
 import re
@@ -263,3 +262,9 @@ def strip_html_tags(s: str) -> str:
     Removes but does not sanitize HTML tags from strings
     """
     return re.sub('<[^<]+?>', '', s)
+
+def str_to_int(s: str) -> int | str:
+    try:
+        return int(s)
+    except ValueError:
+        return s

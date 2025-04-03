@@ -8,8 +8,6 @@ from matplotlib.patches import Polygon
 import numpy as np
 import parse
 
-from papermodels.db.data_model import Annotation
-
 
 def plot_annotations(
     annots: list[Annotation] | dict[Annotation, dict],

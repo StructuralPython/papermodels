@@ -92,42 +92,6 @@ class LoadElement:
         }
 
 
-@dataclass
-class LoadArray(UserDict):
-    """
-    A type alias to represent LoadElements extracted from the paper model.
-
-    The actual dictionary is also stored under the 'data' attribute, as per the
-    conventional UserDict behaviour.
-
-    The dictionary stored within should be in the following structure.
-        {
-            "page_number_1": [
-                load_element_1,
-                load_element_2,
-                load_element_3
-            ],
-            "page_number_2": [
-                load_element_3,
-                load_element_4
-            ]
-        }
-    """
-
-    @classmethod
-    def from_annotations(cls, parsed_load_annotations: dict[Annotation]):
-        """
-        Returns a LoadArray-style dict populated with LoadElements.
-
-        parsed_load_annotations is a dict with Annotation objects as keys
-        and dict of values. The values dict has keys, "type" and "geometry".
-        The value of the "type" key will match the annotation's corresponding
-        legend entry so the use of the user-defined legend will persist.
-        """
-        for annot, annot_props in parsed_load_annotations.items():
-            annot_type = annot_props["type"]
-            annot_geom = annot_props["geometry"]
-
 
 def parse_load_text(text: str) -> dict:
     """
