@@ -1,0 +1,77 @@
+[element_attributes]
+tag = "J1.1-6"
+length = 11.104499999999998
+orientation = "horizontal"
+
+[element_geometry]
+geometry = "LINESTRING (23.155299999999997 22.4091, 23.155299999999997 33.5136)"
+supports = [
+    { location = 0.0, fixity = "pin" },
+    { location = 11.062000000000001, fixity = "roller" },
+]
+
+[loads]
+point_loads = []
+
+[[loads.distributed_loads]]
+occupancy = "residential"
+load_components = []
+applied_area = 14.805629850001345
+start_loc = 0
+start_magnitude = 0.090054
+end_loc = 11.104499999999002
+end_magnitude = 0.090054
+
+[[loads.distributed_loads]]
+occupancy = "big stuff"
+load_components = []
+applied_area = 2.2356191732043866
+start_loc = 2.390900000001002
+start_magnitude = 0.267215
+end_loc = 4.067656298809968
+end_magnitude = 0.267215
+
+[[loads.distributed_loads]]
+occupancy = "big stuff"
+load_components = []
+applied_area = 0.02768342218930197
+start_loc = 4.067656298810968
+start_magnitude = 0.267215
+end_loc = 4.109182470249163
+end_magnitude = 0.0
+
+[[loads.distributed_loads]]
+occupancy = "big stuff"
+load_components = []
+applied_area = 0.0
+start_loc = 4.109182470250163
+start_magnitude = 0.0
+end_loc = 7.563693376170079
+end_magnitude = 0.0
+
+[[loads.distributed_loads]]
+occupancy = "big stuff"
+load_components = []
+applied_area = 0.03906233718246261
+start_loc = 7.563693376171079
+start_magnitude = 0.0
+end_loc = 7.622288346818976
+end_magnitude = 0.267215
+
+[[loads.distributed_loads]]
+occupancy = "big stuff"
+load_components = []
+applied_area = 2.6833436277271763
+start_loc = 7.6222883468199765
+start_magnitude = 0.267215
+end_loc = 9.634846381564074
+end_magnitude = 0.267215
+
+[[loads.distributed_loads]]
+occupancy = "big stuff"
+load_components = []
+applied_area = 0.003899674844429657
+start_loc = 9.634846381565074
+start_magnitude = 0.267215
+end_loc = 9.640696040073175
+end_magnitude = 0.0

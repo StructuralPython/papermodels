@@ -37,3 +37,43 @@ papermodels is a software tool to "automate" the process of tracking loads by ha
 
 ### Arbitrary load factoring
 - [ ] Data model to handle creation of arbitrary load factoring approaches
+
+## Demo Usage
+
+**Please see the Examples directory**
+
+The below will parse annotations from the PDF (provided that there are legend entries setup correctly) and will create the `LoadedElement`s.
+
+```python
+from decimal import Decimal
+from papermodels.paper.pdf import load_pdf_annotations
+from papermodels.datatypes.geometry_graph import GeometryGraph
+from papermodels.datatypes.joist_models import JoistArrayModel
+
+graph = GeometryGraph.from_pdf_file("sketch_to_scale.pdf", scale=Decimal(1 / 72 * 4))
+graph.generate_subelements(JoistArrayModel.create_subelements, spacing=1.3333)
+les = graph.create_loaded_elements()
+
+graph.plot()
+```
+
+The `LoadedElement`s can then be dumped to disk for further processing:
+
+```python
+import pathlib
+output_dir = pathlib.Path("model_files")
+
+file_format = "toml" # also try "json"
+
+for loaded_element in les:
+    if file_format == "toml":
+        output_toml = output_dir / "toml"
+        output_toml.mkdir(parents=True, exist_ok=True)
+        with open(output_dir / "toml" / f"{loaded_element.tag}.toml", "wb") as file:
+            loaded_element.dump_toml(file)
+    elif file_format == "json":
+        output_json = output_dir / "json"
+        output_json.mkdir(parents=True, exist_ok=True)
+        with open(output_dir / "json" / f"{loaded_element.tag}.json", "w") as file:
+            loadeded_element.dump_json(file)
+```

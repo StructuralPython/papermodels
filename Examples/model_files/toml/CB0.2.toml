@@ -1,0 +1,13 @@
+[element_attributes]
+tag = "CB0.2"
+orientation = "vertical"
+
+[element_attributes.length]
+
+[element_geometry]
+geometry = "POLYGON ((33.0766 21.9779, 33.0766 22.6572, 33.7559 22.6572, 33.7559 21.9779, 33.0766 21.9779))"
+supports = []
+
+[loads]
+point_loads = []
+distributed_loads = []

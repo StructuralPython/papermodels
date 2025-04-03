@@ -1,0 +1,23 @@
+[element_attributes]
+tag = "J2.1-0"
+length = 16.960700000000003
+orientation = "horizontal"
+
+[element_geometry]
+geometry = "LINESTRING (16.4769 22.4091, 33.4376 22.4091)"
+supports = [
+    { location = 3.658899999999999, fixity = "pin" },
+    { location = 16.717, fixity = "roller" },
+]
+
+[loads]
+point_loads = []
+
+[[loads.distributed_loads]]
+occupancy = "roof"
+load_components = []
+applied_area = 11.306850655000678
+start_loc = 0
+start_magnitude = 0.05896
+end_loc = 16.960699999999004
+end_magnitude = 0.05896

@@ -1,0 +1,41 @@
+[element_attributes]
+tag = "J1.1-3"
+length = 11.104499999999998
+orientation = "horizontal"
+
+[element_geometry]
+geometry = "LINESTRING (19.1554 22.4091, 19.1554 33.5136)"
+supports = [
+    { location = 0.0, fixity = "pin" },
+    { location = 11.062000000000001, fixity = "roller" },
+]
+
+[loads]
+point_loads = []
+
+[[loads.distributed_loads]]
+occupancy = "residential"
+load_components = []
+applied_area = 14.805629850001344
+start_loc = 0
+start_magnitude = 0.090054
+end_loc = 11.104499999998998
+end_magnitude = 0.090054
+
+[[loads.distributed_loads]]
+occupancy = "big stuff"
+load_components = []
+applied_area = 9.634955661466133
+start_loc = 2.390900000001002
+start_magnitude = 0.138326
+end_loc = 9.617297406033746
+end_magnitude = 0.138326
+
+[[loads.distributed_loads]]
+occupancy = "big stuff"
+load_components = []
+applied_area = 0.003899674844431305
+start_loc = 9.617297406034746
+start_magnitude = 0.138326
+end_loc = 9.623147064542854
+end_magnitude = 0.0

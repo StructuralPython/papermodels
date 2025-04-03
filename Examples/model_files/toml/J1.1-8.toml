@@ -1,0 +1,86 @@
+[element_attributes]
+tag = "J1.1-8"
+length = 11.104499999999998
+orientation = "horizontal"
+
+[element_geometry]
+geometry = "LINESTRING (25.8219 22.4091, 25.8219 33.5136)"
+supports = [
+    { location = 0.0, fixity = "pin" },
+    { location = 11.062000000000001, fixity = "roller" },
+]
+
+[loads]
+point_loads = []
+
+[[loads.distributed_loads]]
+occupancy = "residential"
+load_components = []
+applied_area = 14.805629850001345
+start_loc = 0
+start_magnitude = 0.090054
+end_loc = 11.104499999999002
+end_magnitude = 0.090054
+
+[[loads.distributed_loads]]
+occupancy = "big stuff"
+load_components = []
+applied_area = 2.3463528620027287
+start_loc = 2.390900000001002
+start_magnitude = 0.252893
+end_loc = 4.150708641688361
+end_magnitude = 0.252893
+
+[[loads.distributed_loads]]
+occupancy = "big stuff"
+load_components = []
+applied_area = 0.027681622483678493
+start_loc = 4.150708641689361
+start_magnitude = 0.252893
+end_loc = 4.1919
+end_magnitude = 0.0020389999999999575
+
+[[loads.distributed_loads]]
+occupancy = "big stuff"
+load_components = []
+applied_area = 3.1181946103520085e-06
+start_loc = 4.1919000000010005
+start_magnitude = 0.0020389999999999575
+end_loc = 4.192480129454886
+end_magnitude = 0.0
+
+[[loads.distributed_loads]]
+occupancy = "big stuff"
+load_components = []
+applied_area = 0.0
+start_loc = 4.192480129455886
+start_magnitude = 0.0
+end_loc = 7.446503434872284
+end_magnitude = 0.0
+
+[[loads.distributed_loads]]
+occupancy = "big stuff"
+load_components = []
+applied_area = 0.039062337183102945
+start_loc = 7.446503434873284
+start_magnitude = 0.0
+end_loc = 7.505098405521181
+end_magnitude = 0.252893
+
+[[loads.distributed_loads]]
+occupancy = "big stuff"
+load_components = []
+applied_area = 2.855191675889569
+start_loc = 7.505098405522181
+start_magnitude = 0.252893
+end_loc = 9.64654569858429
+end_magnitude = 0.252893
+
+[[loads.distributed_loads]]
+occupancy = "big stuff"
+load_components = []
+applied_area = 0.003899674844493583
+start_loc = 9.64654569858529
+start_magnitude = 0.252893
+end_loc = 9.652395357093392
+end_magnitude = 0.0
