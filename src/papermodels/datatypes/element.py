@@ -126,10 +126,9 @@ class Element:
         )
 
     @classmethod
-    def from_annotations(
+    def from_parsed_annotations(
         cls,
-        annots: list[Annotation], 
-        legend: list[Annotation],
+        parsed_annotations: dict[Annotation, dict], 
         correspond_with_like_only: bool = True,
     ) -> list["Element"]:
         """
@@ -137,8 +136,6 @@ class Element:
         types described in the 'legend'. If an annotation is not described in the legend then it will
         not be included in the result list of Elements.
         """
-        sorted_by_page_annotations = sorted(annots, key=lambda x: x.page, reverse=True)
-        parsed_annotations = parse_annotations(sorted_by_page_annotations, legend)
         tagged_annotations = tag_parsed_annotations(parsed_annotations)
         annotations_w_intersect = get_geometry_intersections(tagged_annotations)
         annotations_w_intersect_corrs = get_geometry_correspondents(annotations_w_intersect)
@@ -216,7 +213,7 @@ class LoadedElement(Element):
         if self.trib_area is not None:
             intersecting_loads = self.trib_area.intersection(loading_array)
             for idx, intersecting_load in enumerate(intersecting_loads):
-                if intersecting_load.is_empty or intersecting_load.area == 0: 
+                if intersecting_load.is_empty or math.isclose(intersecting_load.area, 0): 
                     continue
                 applied_loading_areas.append(
                     (intersecting_load, self.loading_geoms[idx])
@@ -405,7 +402,7 @@ class LoadedElement(Element):
             elem.plane_id,
             element_type=elem.element_type,
             subelements=elem.subelements,
-            trib_area=elem.trib_area,
+            trib_area=elem.trib_area or trib_area,
             loading_geoms=loading_geoms,
         )
 
@@ -443,6 +440,7 @@ def get_geometry_intersections(
     annots = list(tagged_annotations.keys())
     intersected_annotations = tagged_annotations.copy()
     for i_annot in annots:
+        
         i_attrs = intersected_annotations[i_annot]
         i_rank = i_attrs["rank"]
         i_page = i_annot.page
