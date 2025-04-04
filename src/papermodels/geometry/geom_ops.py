@@ -139,7 +139,6 @@ def clean_polygon_supports(support_geoms: list[LineString | Polygon], joist_prot
                 assert support_line.intersects(joist_prototype)
             # elif sum(support_intersections) == 2:
             else:
-                print(sum(support_intersections))
                 # Ensure there are no missing intersections on the support line
                 support_line = get_rectangle_centerline(support_geom)
                 assert support_line.intersects(joist_prototype)

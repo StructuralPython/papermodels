@@ -69,7 +69,6 @@ def parse_annotations(
     """
     # TODO: Make this more configurable by the user
     properties_to_match = [
-        "object_type",
         "line_color",
         "fill_color",
         "line_type",

@@ -328,6 +328,7 @@ class LoadedElement(Element):
                     transfer_loads['dist'].append(
                     {
                         "transfer_source": f"{source_member}",
+                        "transfer_reaction_index": intersection_above.other_index,
                         "occupancy": "",
                         "load_components": [],
                         "applied_area": 0.0,
@@ -364,6 +365,7 @@ class LoadedElement(Element):
                     transfer_loads['dist'].append(
                     {
                         "transfer_source": f"{source_member}",
+                        "transfer_reaction_index": intersection.other_index,
                         "occupancy": "",
                         "load_components": [],
                         "applied_area": 0.0,
@@ -404,6 +406,7 @@ class LoadedElement(Element):
                     intersected_poly, applied_loading = self.applied_loading_areas[idx]
                     dist_load = {
                         "transfer_source": "",
+                        "transfer_reaction_index": "", 
                         "occupancy": applied_loading.occupancy,
                         "load_components": applied_loading.load_components or [],
                         "applied_area": intersected_poly.area * trapezoid_ratio,
@@ -497,9 +500,9 @@ def get_collector_extents(
     ordered_support_geoms = geom_ops.determine_support_order(collector_prototype.geometry, support_geoms)
     support_a_tag = support_tags_by_geom[cleaned_supports_map[ordered_support_geoms['A']]]
     support_b_tag = support_tags_by_geom[cleaned_supports_map[ordered_support_geoms['B']]]
-    collector_extents = geom_ops.get_joist_extents(collector_prototype.geometry, support_geoms)
-    support_a = support_geoms[0]
-    support_b = support_geoms[1]
+    collector_extents = geom_ops.get_joist_extents(collector_prototype.geometry, list(ordered_support_geoms.values()))
+    support_a = ordered_support_geoms['A']
+    support_b = ordered_support_geoms['B']
     support_a_start_node, _ = geom_ops.get_start_end_nodes(support_a)
     support_b_start_node, _ = geom_ops.get_start_end_nodes(support_b)
 

@@ -122,10 +122,8 @@ class GeometryGraph(nx.DiGraph):
                 _, other_tags_below = zip(*sorted_below_ints)
                 updated_intersections_below = []
                 collector_extents = {}
-                # print(f"{element.tag=} | {element.element_type=}")
                 if element.element_type == "collector" and element.reaction_type == "linear":
                     collector_extents = get_collector_extents(element)
-                    # print(collector_extents)
                 for intersection in element.intersections_below:
                     other_tag = intersection.other_tag
 
