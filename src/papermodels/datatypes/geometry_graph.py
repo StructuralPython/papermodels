@@ -9,7 +9,7 @@ import hashlib
 from papermodels.datatypes.element import Element, LoadedElement
 from shapely import Point, LineString, Polygon
 from ..geometry import geom_ops as geom
-from ..datatypes.element import Correspondent, Intersection
+from ..datatypes.element import Correspondent, Intersection, get_collector_extents
 from ..paper.annotations import (
     Annotation, 
     scale_annotations, 
@@ -85,6 +85,13 @@ class GeometryGraph(nx.DiGraph):
                 
         g.add_intersection_indexes_below()
         g.add_intersection_indexes_above()
+        
+        for node in g.collector_elements:
+            g.nodes[node]['element'].element_type = "collector"
+        
+        for node in g.transfer_elements:
+            g.nodes[node]['element'].element_type = "transfer"
+
 
         return g
     
@@ -92,7 +99,7 @@ class GeometryGraph(nx.DiGraph):
         sorted_nodes = nx.topological_sort(self)
         for node in sorted_nodes:
             node_attrs = self.nodes[node]
-            element = node_attrs['element']
+            element: Element = node_attrs['element']
             if node_attrs['start_coord'] is None: # node geometry is polygon
                 updated_intersections_below = []
                 for intersection in element.intersections_below:
@@ -110,19 +117,28 @@ class GeometryGraph(nx.DiGraph):
                     below_local_coord = start_coord.distance(intersection.intersecting_region)
                     intersection_below_local_coords.append((below_local_coord, intersection.other_tag))
                 sorted_below_ints = sorted(intersection_below_local_coords, key=lambda x: x[0])
+                if len(sorted_below_ints) < 2:
+                    raise ValueError(f"It seems that this element only has one support: {node}")
                 _, other_tags_below = zip(*sorted_below_ints)
                 updated_intersections_below = []
+                collector_extents = {}
+                if element.element_type == "collector" and element.reaction_type == "linear":
+                    collector_extents = get_collector_extents(element)
                 for intersection in element.intersections_below:
                     other_tag = intersection.other_tag
+
                     local_index = other_tags_below.index(other_tag)
                     new_intersection = Intersection(
                         intersection.intersecting_region,
                         intersection.other_geometry,
                         intersection.other_tag,
-                        local_index
+                        local_index,
+                        other_reaction_type="linear",
+                        other_extents=collector_extents.get(other_tag, None)
                     )
                     updated_intersections_below.append(new_intersection)
                 if node in self.collector_elements and element.subelements is not None:
+
                     for subelem in element.subelements:
                         sub_updated_intersections_below = []
                         for sub_intersection in subelem.intersections_below:
@@ -151,18 +167,26 @@ class GeometryGraph(nx.DiGraph):
             element_tag = element.tag
             for intersection in self.nodes[node]['element'].intersections_above:
                 other_tag = intersection.other_tag
-                element_above = self.nodes[other_tag]['element']
+                element_above: Element = self.nodes[other_tag]['element']
                 above_intersections_below = {
-                    above_intersection_below.other_tag: above_intersection_below.other_index
+                    above_intersection_below.other_tag: (
+                        above_intersection_below.other_index,
+                        above_intersection_below.other_extents
+                    )
                     for above_intersection_below in element_above.intersections_below
                 }
-                local_index = above_intersections_below[element_tag]
+                collector_extents = {}
+                local_index = above_intersections_below[element_tag][0]
+                other_extents = above_intersections_below[element_tag][1]
+                # print(f"{element_above=} {other_extents=}")
                 if element_above.subelements is None:
                     new_intersection = Intersection(
                         intersection.intersecting_region,
                         intersection.other_geometry,
                         intersection.other_tag,
-                        local_index
+                        local_index,
+                        element_above.reaction_type,
+                        other_extents=other_extents
                     )
                     indexed_intersections_above.append(new_intersection)
                 else:
@@ -172,7 +196,9 @@ class GeometryGraph(nx.DiGraph):
                             sub_intersection.intersecting_region,
                             subelem_above.geometry,
                             subelem_above.tag,
-                            local_index
+                            local_index,
+                            element_above.reaction_type,
+                            # No collector_extents because this is an element with subelements (all points)
                         )
                         indexed_intersections_above.append(new_sub_intersection)
 
@@ -181,7 +207,13 @@ class GeometryGraph(nx.DiGraph):
             self.nodes[node]['element'] = element
 
 
-    def generate_subelements(self, subelement_constructor: callable, *args, **kwargs) -> list[Element]:
+    def assign_collector_behaviour(
+            self, 
+            element_constructor: callable, 
+            as_subelements: bool,
+            *args,
+            **kwargs
+    ) -> list[Element]:
         """
         Returns a list of Element to be assigned to element.subelements for elements
         that have element_type == "collector".
@@ -193,14 +225,23 @@ class GeometryGraph(nx.DiGraph):
             for the callable.
         '*args' and '**kwargs': These are passed through to 'subelement_constructor'
         """
+        # TODO: Add the ability to filter collector elements to assign different
+        # behaviours based on rules
         collectors = self.collector_elements
         for node in collectors:
             node_attrs = self.nodes[node]
             node_element = node_attrs['element']
-            subs = subelement_constructor(node_element, *args, **kwargs)
-            node_element.subelements = subs
+            new_elem = element_constructor(node_element, *args, **kwargs)
+            # print(new_elem)
+            if as_subelements:
+                node_element.subelements = new_elem
+            else:
+                # assert isinstance(new_elem, Element) # Not an iterable of multiple elements
+                node_attrs['element'] = new_elem
         self.add_intersection_indexes_below()
         self.add_intersection_indexes_above()
+        # print([self.nodes[node] for node in self.collector_elements])
+
 
     @classmethod
     def from_pdf_file(
@@ -328,7 +369,7 @@ class GeometryGraph(nx.DiGraph):
         return nx.draw_spectral(self, with_labels=True)
 
 
-    def create_loaded_elements(self) -> list[LoadedElement]:
+    def create_loaded_elements(self) -> dict[str, LoadedElement]:
         """
         Returns a list of LoadedElement, each with 'loading_areas' applied.
         
@@ -347,7 +388,7 @@ class GeometryGraph(nx.DiGraph):
             loading_geoms_by_plane.setdefault(lg_plane, [])
             loading_geoms_by_plane[lg_plane].append(loading_geom)
 
-        loaded_elements = []
+        loaded_elements = {}
         for node in self.nodes:
             node_attrs = self.nodes[node]
             element = node_attrs['element']
@@ -357,10 +398,10 @@ class GeometryGraph(nx.DiGraph):
             if element.element_type == "collector" and element.subelements is not None:
                 for sub_elem in element.subelements:
                     le = LoadedElement.from_element_with_loads(sub_elem, loading_geoms=loading_geoms_on_plane)
-                    loaded_elements.append(le)
+                    loaded_elements.append({node: le})
             else:
                 le = LoadedElement.from_element_with_loads(node_attrs['element'], loading_geoms=loading_geoms_on_plane)
-                loaded_elements.append(le)
+                loaded_elements.update({node: le})
         return loaded_elements
             
 

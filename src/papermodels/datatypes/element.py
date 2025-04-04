@@ -27,6 +27,8 @@ class Intersection(NamedTuple):
     other_geometry: Union[LineString, Polygon]
     other_tag: str
     other_index: Optional[int] = None
+    other_reaction_type: str = "point"
+    other_extents: Optional[tuple] = None
 
 
 class Correspondent(NamedTuple):
@@ -83,6 +85,7 @@ class Element:
     element_type: Optional[str] = None
     subelements: list["Element"] = None
     trib_area: Optional[Polygon] = None
+    reaction_type: str = "point"
 
     def __post_init__(self):
         if self.geometry.geom_type == "LineString" and len(self.geometry.coords) != 2:
@@ -238,7 +241,7 @@ class LoadedElement(Element):
             orientation = "vertical"
 
         support_locations = self._get_support_locations()
-        transfer_loads = []
+        transfer_loads = {}
         if self.element_type == "transfer":
             transfer_loads = self._get_transfer_loads()
         distributed_loads = self._get_distributed_loads()
@@ -256,8 +259,8 @@ class LoadedElement(Element):
                     "supports": support_locations,
                 },
             "loads": {
-                "point_loads": transfer_loads,
-                "distributed_loads": distributed_loads or []
+                "point_loads": transfer_loads.get('point', []),
+                "distributed_loads": transfer_loads.get('dist', []) + distributed_loads
             }
         }
         return model
@@ -290,7 +293,7 @@ class LoadedElement(Element):
         """
         Calculates the transfer load locations from the intersections above
         """
-        transfer_loads = []
+        transfer_loads = {"point": [], "dist": []}
         if self.geometry.geom_type == "LineString":
             coords_a, coords_b = self.geometry.coords
             coords_a, coords_b = Point(coords_a), Point(coords_b)
@@ -301,49 +304,91 @@ class LoadedElement(Element):
                 [intersection[0] for intersection in self.intersections_above]
             )
             for idx, transfer_location in enumerate(transfer_locations):
-                intersection_data = self.intersections_above[idx]
-                source_member = intersection_data.other_tag
-                reaction_idx = intersection_data.other_index
+                intersection_above: Intersection = self.intersections_above[idx]
+                transfer_type = intersection_above.other_reaction_type
+                source_member = intersection_above.other_tag
+                reaction_idx = intersection_above.other_index
                 if reaction_idx is None:
                     raise ValueError(
                         "The .other_index attribute within the .intersections_above list"
                         " is not calculated. Generate LoadedElement objects through the GeometryGraph"
                         " interface in order to populate this necessary index."
                     )
-                transfer_loads.append(
+                if transfer_type == "point":
+                    transfer_loads['point'].append(
+                        {
+                            "location": transfer_location,
+                            "magnitude": 0,
+                            "transfer_source": f"{source_member}",
+                            "transfer_reaction_idx": reaction_idx,
+                            "direction": "gravity"
+                        }
+                    )
+                elif transfer_type == "linear":
+                    transfer_loads['dist'].append(
                     {
-                        "location": transfer_location,
-                        "magnitude": 0,
                         "transfer_source": f"{source_member}",
-                        "transfer_reaction_idx": reaction_idx,
-                        "direction": "gravity"
+                        "transfer_reaction_index": intersection_above.other_index,
+                        "occupancy": "",
+                        "load_components": [],
+                        "applied_area": 0.0,
+                        "start_loc": intersection_above.other_extents[0],
+                        "start_magnitude": 1.0,
+                        "end_loc": intersection_above.other_extents[1],
+                        "end_magnitude": 1.0,
                     }
                 )
         elif self.geometry.geom_type == "Polygon":
             for intersection in self.intersections_above:
-                transfer_loads.append(
+                if intersection.other_reaction_type == "point":
+                    transfer_loads['point'].append(
+                        {
+                            "location": [],
+                            "magnitude": 0,
+                            "transfer_source": intersection.other_tag,
+                            "transfer_reaction_idx": intersection.other_index,
+                            "direction": "gravity"
+                        }
+                    )
+                elif intersection.other_reaction_type == "linear":
+                    # supporting_geometry = [ib.other_geometry for ib in self.correspondents_below]
+                    # supporting_geometry = geom_ops.clean_polygon_supports(supporting_geometry, self.geometry)
+                    # joist_extents = geom_ops.get_joist_extents(
+                    #     self.geometry,
+                    #     supporting_geometry
+                    # )
+                    # start_node, _ = geom_ops.get_start_end_nodes(self.geometry)
+                    # start_x = Point(joist_extents['A']).distance(start_node)
+                    # end_x = Point(joist_extents['B']).distance(start_node)
+                    source_member = intersection.other_tag
+                    start_x, end_x = intersection.other_extents
+                    transfer_loads['dist'].append(
                     {
-                        "location": [],
-                        "magnitude": 0,
-                        "transfer_source": intersection.other_tag,
-                        "transfer_reaction_idx": intersection.other_index,
-                        "direction": "gravity"
+                        "transfer_source": f"{source_member}",
+                        "transfer_reaction_index": intersection.other_index,
+                        "occupancy": "",
+                        "load_components": [],
+                        "applied_area": 0.0,
+                        "start_loc": start_x,
+                        "start_magnitude": 1.0,
+                        "end_loc": end_x,
+                        "end_magnitude": 1.0,
                     }
                 )
         return transfer_loads
     
-    def _get_distributed_loads(self):
+    def _get_distributed_loads(self) -> list[dict]:
         """
         Computes the resulting distributed loads from the applied
         loading areas
-        """
+        """            
+        distributed_loads = []
         if self.geometry.geom_type == "LineString":
             raw_dist_loads = ld.get_distributed_loads_from_projected_polygons(
                 self.geometry,
                 self.applied_loading_areas
             )
             polygon_areas = geom_ops.calculate_trapezoid_area_sums(raw_dist_loads)
-            distributed_loads = []
             for idx, dist_load_collection in enumerate(raw_dist_loads):
                 total_polygon_area = polygon_areas[idx]
                 for dist_load_element in dist_load_collection:
@@ -360,6 +405,8 @@ class LoadedElement(Element):
                     trapezoid_ratio = area_dist_load / total_polygon_area
                     intersected_poly, applied_loading = self.applied_loading_areas[idx]
                     dist_load = {
+                        "transfer_source": "",
+                        "transfer_reaction_index": "", 
                         "occupancy": applied_loading.occupancy,
                         "load_components": applied_loading.load_components or [],
                         "applied_area": intersected_poly.area * trapezoid_ratio,
@@ -370,6 +417,8 @@ class LoadedElement(Element):
                     }
                     distributed_loads.append(dist_load)
             return distributed_loads
+        else:
+            return []
 
 
     def dump_toml(self, fp):
@@ -429,6 +478,46 @@ class LoadedElement(Element):
 #     correspondents=["C1.1"],
 #     # page_label="L01",
 # )
+
+def get_collector_extents(
+    collector_prototype: Element,
+) -> dict[str, tuple]:
+    """
+    Returns a dict keyed by .tag attributes in collector_prototype.intersections_below
+    and with values representing the (start_x, end_x) locations where the collector
+    prototype would spread over the other_geometry. The (start_x, end_x) locations 
+    refer to ordinates on other_geometry, not on the collector_prototype.
+    """
+    support_tags_by_geom = {ib.other_geometry: ib.other_tag for ib in collector_prototype.intersections_below}
+    # print(support_tags_by_geom.keys())
+    poly_support_geoms = list(support_tags_by_geom.keys())
+    support_geoms = geom_ops.clean_polygon_supports(poly_support_geoms, collector_prototype.geometry)
+    
+    cleaned_supports_map = {}
+    for idx, poly_support_geom in enumerate(poly_support_geoms):
+        clean_support_geom = support_geoms[idx]
+        cleaned_supports_map.update({clean_support_geom: poly_support_geom})
+    ordered_support_geoms = geom_ops.determine_support_order(collector_prototype.geometry, support_geoms)
+    support_a_tag = support_tags_by_geom[cleaned_supports_map[ordered_support_geoms['A']]]
+    support_b_tag = support_tags_by_geom[cleaned_supports_map[ordered_support_geoms['B']]]
+    collector_extents = geom_ops.get_joist_extents(collector_prototype.geometry, list(ordered_support_geoms.values()))
+    support_a = ordered_support_geoms['A']
+    support_b = ordered_support_geoms['B']
+    support_a_start_node, _ = geom_ops.get_start_end_nodes(support_a)
+    support_b_start_node, _ = geom_ops.get_start_end_nodes(support_b)
+
+    a_extents = (
+        Point(collector_extents['A'][0]).distance(support_a_start_node),
+        Point(collector_extents['A'][1]).distance(support_a_start_node),
+        )
+    b_extents = (
+        Point(collector_extents['B'][0]).distance(support_b_start_node),
+        Point(collector_extents['B'][1]).distance(support_b_start_node),
+        )
+    
+    return {support_a_tag: a_extents, support_b_tag: b_extents}
+
+
 
 
 def get_geometry_intersections(

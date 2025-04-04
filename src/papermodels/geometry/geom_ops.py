@@ -108,6 +108,46 @@ def get_linestring_start_node(ls: LineString) -> Point:
     start_coord = ordered_coords[0]
     return start_coord
 
+
+
+def clean_polygon_supports(support_geoms: list[LineString | Polygon], joist_prototype: Optional[LineString] = None):
+    """
+    Converts any Polygon in support_geoms into LineStrings. The LineStrings
+    are created depending on where the joist prototype lands within the polygon.
+
+    Assumption: the Polygon represents a single rectangle which represents a 
+    wall or something similar.
+
+    The resulting LineString will either be located on the inside face of the
+    rectangle support or along the centerline.
+
+    Generating the centerline assumes that the Polygon is a rectangle. Results
+    will be unpredictable for Polygons of other shapes.
+    """
+    cleaned_supports = []
+    for support_geom in support_geoms:
+        if support_geom.geom_type == "Polygon":
+            support_lines = explode_polygon(support_geom)
+            if joist_prototype is None:
+                support_line = get_rectangle_centerline(support_geom)
+                cleaned_supports.append(support_line)
+            support_intersections = joist_prototype.intersects(np.array(support_lines))
+            if sum(support_intersections) == 1: # Intersects on one edge only
+                intersecting_line_index = int(support_intersections.nonzero()[0][0])
+                support_line = support_lines[intersecting_line_index]
+                # Ensure there are no missing intersections on the support line
+                assert support_line.intersects(joist_prototype)
+            # elif sum(support_intersections) == 2:
+            else:
+                # Ensure there are no missing intersections on the support line
+                support_line = get_rectangle_centerline(support_geom)
+                assert support_line.intersects(joist_prototype)
+            cleaned_supports.append(support_line)
+        else:
+            cleaned_supports.append(support_geom)
+    return cleaned_supports
+
+
 def get_joist_extents(
     joist_prototype: LineString, joist_supports: list[LineString]
 ) -> dict[str, tuple[Point, Point]]:
@@ -120,6 +160,7 @@ def get_joist_extents(
         (the relevant line segment which provides the support to 'joist_prototype')
     """
     supports_bbox = get_system_bounds(joist_prototype, joist_supports)
+    
     magnitude_max = get_magnitude(supports_bbox)
     joist_vector = get_direction_vector(joist_prototype)
     ordered_supports = determine_support_order(joist_prototype, joist_supports)
@@ -166,21 +207,18 @@ def get_cantilever_segments(
     Returns a dictionary containing the cantilever lengths over-hanging supports "A" and
     "B", respectively. Returns a length of 0.0 if the length is less than the tolerance.
     """
-    splits_a = ops.split(joist_prototype, ordered_supports["A"])
-    splits_b = ops.split(joist_prototype, ordered_supports["B"])
-    supports = MultiLineString([ordered_supports["A"], ordered_supports["B"]])
+    joist_interior = convex_hull(MultiLineString([geom for geom in ordered_supports.values()]))
+    cantilevers = ops.split(joist_prototype, joist_interior) - joist_interior
     cantilever_segments = {"A": 0.0, "B": 0.0}
-    for geom_a in splits_a.geoms:
-        if isinstance(geom_a & supports, Point):
-            cantilever_segments["A"] = (
-                0.0 if geom_a.length < tolerance else geom_a.length
-            )
-
-    for geom_b in splits_b.geoms:
-        if isinstance(geom_b & supports, Point):
-            cantilever_segments["B"] = (
-                0.0 if geom_a.length < tolerance else geom_a.length
-            )
+    if isinstance(cantilevers, LineString):
+        split_a = cantilevers
+        split_b = Point() # A geometry of length 0
+    elif hasattr(cantilevers, "geoms"):
+        split_a, split_b = cantilevers.geoms
+    if split_a.distance(ordered_supports['A']) < split_a.distance(ordered_supports['B']):
+        cantilever_segments = {"A": split_a.length, "B": split_b.length}
+    else:
+        cantilever_segments = {"A": split_b.length, "B": split_a.length}
     return cantilever_segments
 
 
@@ -236,7 +274,6 @@ def get_joist_locations(
         joist_locs.append(distance - distance_remaining)
     else:
         joist_locs.append(distance)
-
     return joist_locs
 
 
@@ -250,7 +287,8 @@ def get_direction_vector(ls: LineString) -> np.ndarray:
     i_node, j_node = get_start_end_nodes(ls)
     column_vector = np.array(j_node.xy) - np.array(i_node.xy)
     column_vector_norm = np.linalg.norm(column_vector)
-    return column_vector / column_vector_norm
+    parallel_vector =  column_vector / column_vector_norm
+    return parallel_vector
     # return column_vector.T[0] # Return a flat, 1D vector
 
 
@@ -264,6 +302,10 @@ def determine_support_order(
     between them is going to be in the +ve direction (positive X bias). See the
     docstring for get_start_end_nodes for more explanation of the +ve vector direction.
     """
+    # TODO: THIS FUNCTION CAN ENABLE HAVING JOISTS WITH MORE THAN TWO SUPPORTS
+    # This function should still return the {"A": .., "B": ...} dict but should
+    # ignore supports in between A and B. The intermediate supports are re-captured
+    # in .to_subelements().
 
     all_supports = MultiLineString(supports)
     joist_a_node, joist_b_node = order_nodes_positive(
@@ -322,6 +364,35 @@ def project_node(node: Point, vector: np.ndarray, magnitude: float):
     scaled_vector = vector * magnitude
     projected_node = np.array(node.xy) + scaled_vector
     return Point(projected_node)
+
+
+def rotate_90(v: np.ndarray, precision: int = 6, ccw=True) -> tuple[float, float]:
+    """
+    Rotate the vector components, 'x1' and 'y1' by 90 degrees.
+
+    'precision': round result to this many decimal places
+    'ccw': if True, rotate counter-clockwise (clockwise, otherwise)
+    """
+    v_angle = np.arctan2(v[1], v[0])
+
+    if ccw:
+        if 0 < v_angle <= math.pi / 2: # Positive x-bias
+            angle = -math.pi / 2
+        else:
+            angle = math.pi/2
+    else:
+        if 0 < v_angle <= math.pi / 2: # Positive x-bias
+            angle = math.pi/2
+        else:
+            angle = -math.pi / 2
+
+    rot = np.array(
+        [
+            [round(math.cos(angle), precision), -round(math.sin(angle), precision)],
+            [round(math.sin(angle), precision), round(math.cos(angle), precision)],
+        ]
+    )
+    return rot @ v
 
 
 def rotate_to_horizontal(line: LineString, geoms: list[Geometry]):
@@ -394,26 +465,6 @@ def trapezoid_area(h: float, b2: float, b1: float) -> float:
     area = (b1 + b2) / 2 * h
     return area
 
-
-def rotate_90(v: np.ndarray, precision: int = 6, ccw=True) -> tuple[float, float]:
-    """
-    Rotate the vector components, 'x1' and 'y1' by 90 degrees.
-
-    'precision': round result to this many decimal places
-    'ccw': if True, rotate counter-clockwise (clockwise, otherwise)
-    """
-    if ccw:
-        angle = math.pi / 2
-    else:
-        angle = -math.pi / 2
-
-    rot = np.array(
-        [
-            [round(math.cos(angle), precision), -round(math.sin(angle), precision)],
-            [round(math.sin(angle), precision), round(math.cos(angle), precision)],
-        ]
-    )
-    return rot @ v
 
 
 def create_linestring(points: list[tuple]) -> LineString:
