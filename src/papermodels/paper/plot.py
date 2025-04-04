@@ -7,7 +7,8 @@ from matplotlib.figure import Figure
 from matplotlib.patches import Polygon
 import numpy as np
 import parse
-
+from ..datatypes.annotation import Annotation
+from shapely.ops import polylabel
 
 def plot_annotations(
     annots: list[Annotation] | dict[Annotation, dict],
@@ -81,10 +82,12 @@ def plot_annotations(
         if annotation_dict and has_tags and plot_tags:
             tag = annots[annot]["tag"]
             geom = annots[annot]["geometry"]
-            centroid = np.array(geom.centroid.coords[0])
+            rep_point = np.array(geom.representative_point().coords[0])
+            centroid_point = np.array(geom.centroid.coords[0])
+            plot_point = (rep_point + centroid_point) / 2
             ax.annotate(
                 tag,
-                centroid * dpi / 72,
+                plot_point * dpi / 72,
                 zorder=100 * len(annots),
             )
 

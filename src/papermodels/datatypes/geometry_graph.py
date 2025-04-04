@@ -14,8 +14,11 @@ from ..paper.annotations import (
     Annotation, 
     scale_annotations, 
     parse_annotations, 
-    parsed_annotations_to_loading_geometry
+    parsed_annotations_to_loading_geometry,
+    filter_annotations,
+    tag_parsed_annotations
 )
+from ..paper.plot import plot_annotations
 from ..paper.pdf import load_pdf_annotations
 from rich.progress import track
 from rich import print
@@ -36,6 +39,8 @@ class GeometryGraph(nx.DiGraph):
         super().__init__()
         self.node_hash = None
         self.loading_geometries = None
+        self.parsed_annotations = None
+        self.legend_entries = None
 
     @property
     def collector_elements(self):
@@ -335,6 +340,7 @@ class GeometryGraph(nx.DiGraph):
         load_entries = {}
         trib_area_entries = {}
         structural_element_entries = {}
+        parsed_annotations_acc = {}
         for annots_in_page in annots_by_page:
 
             # Scale taking origin into account
@@ -351,6 +357,7 @@ class GeometryGraph(nx.DiGraph):
 
             # Separate annotation types
             parsed_annotations = parse_annotations(annots_in_page, legend_entries, legend_identifier)
+            parsed_annotations_acc = parsed_annotations | parsed_annotations_acc
             for annot, annot_attrs in parsed_annotations.items():
                 if "occupancy" in annot_attrs:
                     load_entries.update({annot: annot_attrs})
@@ -361,12 +368,26 @@ class GeometryGraph(nx.DiGraph):
 
         elements = Element.from_parsed_annotations(structural_element_entries)
         graph = cls.from_elements(elements)
+        graph.parsed_annotations = tag_parsed_annotations(parsed_annotations_acc)
+        graph.legend_entries = legend_entries
         graph.loading_geometries = parsed_annotations_to_loading_geometry(load_entries)
         return graph
 
 
-    def plot(self):
+    def plot_connectivity(self):
         return nx.draw_spectral(self, with_labels=True)
+    
+
+    def plot_annotations(self, page_idx: int, figsize: tuple[float, float]=(8, 8), dpi: int = 150):
+        """
+        Plots all annotations in self.parsed_annotations that are on the 'page_idx'
+        """
+        annots = {
+            annot: attrs 
+            for annot, attrs in self.parsed_annotations.items() 
+            if annot.page == page_idx and annot not in self.legend_entries
+        }
+        return plot_annotations(annots, figsize, dpi, plot_tags=True)
 
 
     def create_loaded_elements(self) -> dict[str, LoadedElement]:
