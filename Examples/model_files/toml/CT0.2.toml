@@ -1,11 +1,11 @@
 [element_attributes]
-tag = "CT2.2"
+tag = "CT0.2"
 orientation = "vertical"
 
 [element_attributes.length]
 
 [element_geometry]
-geometry = "POLYGON ((19.7544 22.0277, 19.7544 22.7071, 20.4338 22.7071, 20.4338 22.0277, 19.7544 22.0277))"
+geometry = "POLYGON ((18.8018 20.8077, 18.8018 21.331, 19.3819 21.331, 19.3819 20.8077, 18.8018 20.8077))"
 supports = []
 
 [loads]
@@ -14,6 +14,6 @@ distributed_loads = []
 [[loads.point_loads]]
 location = []
 magnitude = 0
-transfer_source = "FB2.1"
-transfer_reaction_idx = 0
+transfer_source = "FB0.1"
+transfer_reaction_idx = 1
 direction = "gravity"
