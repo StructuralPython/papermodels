@@ -1,0 +1,32 @@
+[element_attributes]
+tag = "J0.1-7"
+length = 6.821000018325757
+orientation = "horizontal"
+
+[element_geometry]
+geometry = "LINESTRING (18.529603946781652 27.6745, 18.53010394678165 20.8535)"
+supports = [
+    { location = 6.76750001818202, fixity = "pin" },
+    { location = 0.06490000017436268, fixity = "roller" },
+]
+
+[loads]
+point_loads = []
+
+[[loads.distributed_loads]]
+occupancy = "F"
+load_components = []
+applied_area = 7.222727226716325
+start_loc = 0
+start_magnitude = 0.146606
+end_loc = 6.821000018324755
+end_magnitude = 0.146606
+
+[[loads.distributed_loads]]
+occupancy = "F"
+load_components = []
+applied_area = 2.1030150477406035e-15
+start_loc = 6.821000018325751
+start_magnitude = 0.146606
+end_loc = 6.821000018325755
+end_magnitude = 0.017306
