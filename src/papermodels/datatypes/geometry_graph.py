@@ -35,8 +35,9 @@ class GeometryGraph(nx.DiGraph):
     The node_hash is how changes to the graph nodes can be tracked.
     """
 
-    def __init__(self):
+    def __init__(self, do_not_process: bool = False):
         super().__init__()
+        self.do_not_process = do_not_process
         self.node_hash = None
         self.loading_geometries = None
         self.parsed_annotations = None
@@ -56,7 +57,7 @@ class GeometryGraph(nx.DiGraph):
 
     @classmethod
     def from_elements(
-        cls, elements: list[Element]
+        cls, elements: list[Element], do_not_process: bool = False
     ) -> GeometryGraph:
         """
         Returns a GeometryGraph (networkx.DiGraph) based upon the intersections and correspondents
@@ -87,17 +88,19 @@ class GeometryGraph(nx.DiGraph):
                 for intersection in element.intersections_below:
                     j_tag = intersection.other_tag
                     g.add_edge(element.tag, j_tag)
-                
-        g.add_intersection_indexes_below()
-        g.add_intersection_indexes_above()
-        
+
         for node in g.collector_elements:
             g.nodes[node]['element'].element_type = "collector"
         
         for node in g.transfer_elements:
             g.nodes[node]['element'].element_type = "transfer"
 
+        if do_not_process:
+            return g
 
+        g.add_intersection_indexes_below()
+        g.add_intersection_indexes_above()
+    
         return g
     
     def add_intersection_indexes_below(self):
@@ -255,7 +258,8 @@ class GeometryGraph(nx.DiGraph):
         legend_identifier: str = "legend",
         scale: Optional[Decimal] = None,
         debug: bool = False,
-        progress: bool = False
+        progress: bool = False,
+        do_not_process: bool = False
     ):
         """
         Returns a GeometryGraph built from that annotations in the provided PDF file
@@ -285,9 +289,11 @@ class GeometryGraph(nx.DiGraph):
         'debug':  When True, will provide verbose documentation of the annotation parsing
             process to assist in reviewing errors and geometry inconsistencies.
         'progress': When True, a progress bar will be displayed
+        'do_not_process': Reads the file and adds annotations to the graph but does not
+            process the connectivity. Useful for debugging and plotting prior to processing.
         """
         annotations = load_pdf_annotations(filepath)
-        return cls.from_annotations(annotations, legend_identifier, scale=scale)
+        return cls.from_annotations(annotations, legend_identifier, scale=scale, do_not_process=do_not_process)
         
 
 
@@ -300,7 +306,8 @@ class GeometryGraph(nx.DiGraph):
         # area_load_properties: Optional[dict] = None,
         # trib_area_properties: Optional[dict] = None,
         debug: bool = False,
-        progress: bool = False
+        progress: bool = False,
+        do_not_process: bool = False
     ):
         """
         Returns a GeometryGraph built from the provided annotations.
@@ -329,6 +336,8 @@ class GeometryGraph(nx.DiGraph):
         'debug':  When True, will provide verbose documentation of the annotation parsing
             process to assist in reviewing errors and geometry inconsistencies.
         'progress': When True, a progress bar will be displayed
+        'do_not_process': Reads teh fille and adds annotations to the graph but does not
+            process connectivity. Useful for debugging.
         """
         annots = annotations
         page_ids = sorted(set([annot.page for annot in annots]), reverse=True)
@@ -367,7 +376,7 @@ class GeometryGraph(nx.DiGraph):
                     structural_element_entries.update({annot: annot_attrs})
 
         elements = Element.from_parsed_annotations(structural_element_entries)
-        graph = cls.from_elements(elements)
+        graph = cls.from_elements(elements, do_not_process=do_not_process)
         graph.parsed_annotations = tag_parsed_annotations(parsed_annotations_acc)
         graph.legend_entries = legend_entries
         graph.loading_geometries = parsed_annotations_to_loading_geometry(load_entries)
