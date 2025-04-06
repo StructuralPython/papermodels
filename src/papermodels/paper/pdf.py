@@ -8,7 +8,7 @@ import pathlib
 import parse
 
 
-def load_pdf_annotations(pdf_path: pathlib.Path | str) -> list[Annotation]:
+def load_pdf_annotations(pdf_path: pathlib.Path | str, show_skipped: bool = False) -> list[Annotation]:
     """
     Returns a lists of pdf annotations keyed by page index.
 
@@ -19,6 +19,7 @@ def load_pdf_annotations(pdf_path: pathlib.Path | str) -> list[Annotation]:
     annots_in_pdf = []
 
     # Numeric data extracted from pikepdf is type Decimal
+    skipped_annots = []
     for page_num, page_data in enumerate(pdf_obj.pages):
         for annot in page_data.obj.Annots:
             if "/Parent" in annot:
@@ -33,6 +34,9 @@ def load_pdf_annotations(pdf_path: pathlib.Path | str) -> list[Annotation]:
                 stream_dict = {}
             if "/Subj" in annot:
                 annot_type = str(annot["/Subj"])
+            else:
+                skipped_annots.append(annot)
+                continue
             if annot_type.lower() in ("polygon", "polyline", "circle", "ellipse"):
                 vertices = tuple(annot.get("/Vertices", tuple()))
             elif annot_type.lower() in (
@@ -61,6 +65,9 @@ def load_pdf_annotations(pdf_path: pathlib.Path | str) -> list[Annotation]:
             text = str(annot.get("/Contents", ""))
             rc = annot.get("/RC")
             text = parse_html_text_content(str(rc)) if rc is not None else text
+            if "ignore" in text:
+                skipped_annots.append(annot)
+                continue
             line_color = tuple(annot.get("/C", stream_dict.get("RG", (0, 0, 0))))
             fill_color = tuple(annot.get("/IC", stream_dict.get("rg", (1, 1, 1))))
             # fill_opacity and global_opacity are different things and should be separated
@@ -91,6 +98,8 @@ def load_pdf_annotations(pdf_path: pathlib.Path | str) -> list[Annotation]:
                 matrix=matrix,
             )
             annots_in_pdf.append(annotation)
+    if show_skipped:
+        print(skipped_annots)
     return annots_in_pdf
 
 

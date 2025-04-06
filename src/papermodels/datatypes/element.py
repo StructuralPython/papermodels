@@ -497,7 +497,11 @@ def get_collector_extents(
     for idx, poly_support_geom in enumerate(poly_support_geoms):
         clean_support_geom = support_geoms[idx]
         cleaned_supports_map.update({clean_support_geom: poly_support_geom})
-    ordered_support_geoms = geom_ops.determine_support_order(collector_prototype.geometry, support_geoms)
+    try:
+        ordered_support_geoms = geom_ops.determine_support_order(collector_prototype.geometry, support_geoms)
+    except TypeError as e:
+        print(f"Check: {collector_prototype.tag}")
+        raise e
     support_a_tag = support_tags_by_geom[cleaned_supports_map[ordered_support_geoms['A']]]
     support_b_tag = support_tags_by_geom[cleaned_supports_map[ordered_support_geoms['B']]]
     collector_extents = geom_ops.get_joist_extents(collector_prototype.geometry, list(ordered_support_geoms.values()))
