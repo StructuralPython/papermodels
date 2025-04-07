@@ -320,7 +320,7 @@ class LoadedElement(Element):
                             "location": transfer_location,
                             "magnitude": 0,
                             "transfer_source": f"{source_member}",
-                            "transfer_reaction_idx": reaction_idx,
+                            "transfer_reaction_index": reaction_idx,
                             "direction": "gravity"
                         }
                     )
