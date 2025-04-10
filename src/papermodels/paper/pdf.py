@@ -80,6 +80,8 @@ def compare_annotations(pm_annot: Annotation, pike_annot: pike.Annotation, page_
     for duplicate annotations.
     """
     converted = pike_annotation_to_pm_annotation(pike_annot, pm_annot.local_id, page_num)
+    if converted is None:
+        return False
     return pm_annot == converted
 
 
