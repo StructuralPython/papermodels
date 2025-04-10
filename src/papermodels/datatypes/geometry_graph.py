@@ -84,7 +84,6 @@ class GeometryGraph(nx.DiGraph):
             if element.correspondents_below is not None:
                 for correspondent in element.correspondents_below:
                     j_tag = correspondent.other_tag
-                    # print("correspondent: ", j_tag)
                     g.add_edge(element.tag, j_tag)
             if element.intersections_below is not None:
                 for intersection in element.intersections_below:
@@ -188,7 +187,6 @@ class GeometryGraph(nx.DiGraph):
                 collector_extents = {}
                 local_index = above_intersections_below[element_tag][0]
                 other_extents = above_intersections_below[element_tag][1]
-                # print(f"{element_above=} {other_extents=}")
                 if element_above.subelements is None:
                     new_intersection = Intersection(
                         intersection.intersecting_region,
@@ -242,7 +240,6 @@ class GeometryGraph(nx.DiGraph):
             node_attrs = self.nodes[node]
             node_element = node_attrs['element']
             new_elem = element_constructor(node_element, *args, **kwargs)
-            # print(new_elem)
             if as_subelements:
                 node_element.subelements = new_elem
             else:
@@ -250,7 +247,6 @@ class GeometryGraph(nx.DiGraph):
                 node_attrs['element'] = new_elem
         self.add_intersection_indexes_below()
         self.add_intersection_indexes_above()
-        # print([self.nodes[node] for node in self.collector_elements])
 
 
     @classmethod

@@ -489,7 +489,6 @@ def get_collector_extents(
     refer to ordinates on other_geometry, not on the collector_prototype.
     """
     support_tags_by_geom = {ib.other_geometry: ib.other_tag for ib in collector_prototype.intersections_below}
-    # print(support_tags_by_geom.keys())
     poly_support_geoms = list(support_tags_by_geom.keys())
     support_geoms = geom_ops.clean_polygon_supports(poly_support_geoms, collector_prototype.geometry)
     

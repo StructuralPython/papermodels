@@ -49,13 +49,11 @@ def update_pdf_annotations(
             for annot_idx, annot in enumerate(page_data.obj.Annots):
                 for parsed_annotation, annot_attrs in parsed_annotations.items():
                     annotations_equal = compare_annotations(parsed_annotation, annot, page_idx)
-                    # print(annotations_equal)
                     if annotations_equal:
                         text_to_add = f"tag: {annot_attrs['tag']}"
                         replace_text = not append_text
                         updated_pike_annot = update_annotation_text_field(annot, text_to_add, replace_text)
                         page_data.obj.Annots[annot_idx] = updated_pike_annot
-                        # print(updated_pike_annot.get("/Contents"))
         pdf_obj.save(export_path)
 
 
@@ -133,7 +131,6 @@ def pike_annotation_to_pm_annotation(annot, annot_idx: int, page_idx: int) -> Op
     elif annot_type == "Line":
         vertices = tuple(annot.get("/L", tuple()))
     else:
-        print(annot)
         print(f"Cannot read (yet): {annot_type}")
         return None
     text = str(annot.get("/Contents", ""))
