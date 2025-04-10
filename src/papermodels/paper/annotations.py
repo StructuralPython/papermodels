@@ -88,11 +88,14 @@ def parse_annotations(
             for legend_attr in legend_data
         }
         for annot in matching_annots:
-            if annot in legend: continue
+            if annot in legend: 
+                continue
+            existing_annot_tag = parse_existing_annot_tag(annot.text)
             annot_geom = annotation_to_shapely(annot)
             annot_attrs = {}
             annot_attrs["geometry"] = annot_geom
             annot_attrs['page_label'] = annot.page
+            annot_attrs['tag'] = existing_annot_tag
             for annot_key, annot_attr in annot_attributes.items():
                 annot_attrs[annot_key] = str_to_int(
                     annot_attr.split("<")[0]
@@ -107,24 +110,54 @@ def tag_parsed_annotations(
 ) -> dict[Annotation, dict]:
     """
     Adds an identifying tag to the annotation based on the page number of the annotation and
-    its identified type.
+    its identified type. Prioritizes manually named tags according to thsi format: 
+    "{ABBR}{PAGE_ID}.{INDEX}". If an annotation is not already tagged accordingly then
+    it will be auto-assigned an integer index after all tagged annotations have been accounted
+    for.
+
+    All tags are guaranteed to be unique.
     """
     counts = {}
     annots_to_tag = parsed_annots.copy()
+    annots_to_enumerate = {}
     for annot, annot_attrs in annots_to_tag.items():
+        tag = annot_attrs.get('tag')
+        if tag is not None:
+            parsed = parse_tag_components(tag)
+            if parsed is not None and len(parsed) == 3: # Tag is not in correct format so ignore
+                type_initials, page_id, tag_idx = parsed
+                tag_prefix = f"{type_initials}{page_id}"
+                counts.setdefault(tag_prefix, set())
+                counts[tag_prefix].add(int(tag_idx))
+            else:
+                annots_to_enumerate.update({annot: annot_attrs})
+        else:
+            annots_to_enumerate.update({annot: annot_attrs})
+
+    for annot, annot_attrs in annots_to_enumerate.items():
         type_initials = "".join(
             [label[0].upper() for label in annot_attrs["type"].split(" ")]
         )
         tag_prefix = f"{type_initials}{annot.page}"
-        if tag_prefix not in counts:
-            counts[tag_prefix] = 1
-        count = counts[tag_prefix]
+        counts.setdefault(tag_prefix, set())
+        count = 0
+        while count in counts[tag_prefix]:
+            count += 1
         tag = f"{tag_prefix}.{count}"
-        annot_attrs["tag"] = tag
-        counts[tag_prefix] += 1
+        annot_attrs['tag'] = tag
+        counts[tag_prefix].add(count)
+        prev_count = count
+
     return annots_to_tag
 
-
+def parse_tag_components(tag: str) -> tuple[str, int, int]:
+    """
+    Returns a tuple of the tag components: type abbrev., page_id, tag_idx
+    """
+    pattern = re.compile(r"([A-Za-z]+)([0-9]+).([0-9]+)")
+    results = pattern.search(tag)
+    if results is not None:
+        return results.groups()
 
 def _annotation_to_wkt(annot: Annotation) -> str:
     """
@@ -137,6 +170,21 @@ def _annotation_to_wkt(annot: Annotation) -> str:
     elif annot.object_type in ("Polygon", "Rectangle", "Square"):
         grouped_vertices = _group_vertices_str(annot.vertices, close=True)
         return f"POLYGON(({grouped_vertices}))"
+
+
+def parse_existing_annot_tag(text_contents: str) -> Optional[str]:
+    """
+    Returns a tag if there is a tag field existing within the annotation's
+    text field, 'text_contents'. Returns None, otherwise.
+
+    A tag field looks like: "tag: <tag name>".
+    """
+    index = text_contents.lower().find("tag:")
+    if index == -1:
+        return None
+    tag_text = text_contents[index:]
+    tag_value = re.search(r"^tag:[\s]*([A-Za-z.0-9\-]+)", tag_text).groups()[0]
+    return tag_value
 
 
 def filter_annotations(annots: list[Annotation], properties: dict) -> list[Annotation]:

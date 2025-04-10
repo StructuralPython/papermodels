@@ -19,7 +19,7 @@ from ..paper.annotations import (
     tag_parsed_annotations
 )
 from ..paper.plot import plot_annotations
-from ..paper.pdf import load_pdf_annotations
+from ..paper import pdf
 from rich.progress import track
 from rich import print
 import numpy.typing as npt
@@ -41,7 +41,9 @@ class GeometryGraph(nx.DiGraph):
         self.node_hash = None
         self.loading_geometries = None
         self.parsed_annotations = None
+        self.raw_annotations = None
         self.legend_entries = None
+        self.pdf_path = None
 
     @property
     def collector_elements(self):
@@ -82,7 +84,6 @@ class GeometryGraph(nx.DiGraph):
             if element.correspondents_below is not None:
                 for correspondent in element.correspondents_below:
                     j_tag = correspondent.other_tag
-                    # print("correspondent: ", j_tag)
                     g.add_edge(element.tag, j_tag)
             if element.intersections_below is not None:
                 for intersection in element.intersections_below:
@@ -186,7 +187,6 @@ class GeometryGraph(nx.DiGraph):
                 collector_extents = {}
                 local_index = above_intersections_below[element_tag][0]
                 other_extents = above_intersections_below[element_tag][1]
-                # print(f"{element_above=} {other_extents=}")
                 if element_above.subelements is None:
                     new_intersection = Intersection(
                         intersection.intersecting_region,
@@ -240,7 +240,6 @@ class GeometryGraph(nx.DiGraph):
             node_attrs = self.nodes[node]
             node_element = node_attrs['element']
             new_elem = element_constructor(node_element, *args, **kwargs)
-            # print(new_elem)
             if as_subelements:
                 node_element.subelements = new_elem
             else:
@@ -248,18 +247,20 @@ class GeometryGraph(nx.DiGraph):
                 node_attrs['element'] = new_elem
         self.add_intersection_indexes_below()
         self.add_intersection_indexes_above()
-        # print([self.nodes[node] for node in self.collector_elements])
 
 
     @classmethod
     def from_pdf_file(
         cls,
-        filepath: pathlib.path | str,
+        pdf_filepath: pathlib.path | str,
         legend_identifier: str = "legend",
         scale: Optional[Decimal] = None,
         debug: bool = False,
         progress: bool = False,
-        do_not_process: bool = False
+        do_not_process: bool = False,
+        save_tagged_pdf_file: bool = False,
+        tag_pdf_file_mode: str = "append",
+        show_skipped: bool = False,
     ):
         """
         Returns a GeometryGraph built from that annotations in the provided PDF file
@@ -291,10 +292,13 @@ class GeometryGraph(nx.DiGraph):
         'progress': When True, a progress bar will be displayed
         'do_not_process': Reads the file and adds annotations to the graph but does not
             process the connectivity. Useful for debugging and plotting prior to processing.
+        'show_skipped': Shows the skipped annotations that occured during pdf.load_pdf_annotations
         """
-        annotations = load_pdf_annotations(filepath)
-        return cls.from_annotations(annotations, legend_identifier, scale=scale, do_not_process=do_not_process)
-        
+        annotations = pdf.load_pdf_annotations(pdf_filepath, show_skipped)
+        graph = cls.from_annotations(annotations, legend_identifier, scale=scale, do_not_process=do_not_process)
+        graph.pdf_path = pathlib.Path(pdf_filepath).resolve()
+        return graph
+
 
 
     @classmethod
@@ -350,8 +354,8 @@ class GeometryGraph(nx.DiGraph):
         trib_area_entries = {}
         structural_element_entries = {}
         parsed_annotations_acc = {}
+        raw_annotations_acc = {}
         for annots_in_page in annots_by_page:
-
             # Scale taking origin into account
             origin_annots = [annot for annot in annots_in_page if "origin" in annot.text.lower()]
             origin_on_page = None
@@ -362,11 +366,13 @@ class GeometryGraph(nx.DiGraph):
                 origin_on_page = parse_origin_annotation(origin_annot)
 
             if scale is not None:
-                annots_in_page = scale_annotations(annots_in_page, scale, origin_on_page)
+                scaled_annots_in_page = scale_annotations(annots_in_page, scale, origin_on_page)
 
             # Separate annotation types
-            parsed_annotations = parse_annotations(annots_in_page, legend_entries, legend_identifier)
+            parsed_annotations = parse_annotations(scaled_annots_in_page, legend_entries, legend_identifier)
+            raw_annotations = parse_annotations(annots_in_page, legend_entries, legend_identifier)
             parsed_annotations_acc = parsed_annotations | parsed_annotations_acc
+            raw_annotations_acc = raw_annotations | raw_annotations_acc
             for annot, annot_attrs in parsed_annotations.items():
                 if "occupancy" in annot_attrs:
                     load_entries.update({annot: annot_attrs})
@@ -378,6 +384,7 @@ class GeometryGraph(nx.DiGraph):
         elements = Element.from_parsed_annotations(structural_element_entries)
         graph = cls.from_elements(elements, do_not_process=do_not_process)
         graph.parsed_annotations = tag_parsed_annotations(parsed_annotations_acc)
+        graph.raw_annotations = tag_parsed_annotations(raw_annotations_acc)
         graph.legend_entries = legend_entries
         graph.loading_geometries = parsed_annotations_to_loading_geometry(load_entries)
         return graph
@@ -434,6 +441,32 @@ class GeometryGraph(nx.DiGraph):
                 loaded_elements.update({node: le})
         return loaded_elements
             
+
+    def export_tagged_pdf(
+        self,
+        export_path: Optional[pathlib.Path | str] = None,
+        mode: str = "append"
+    ) -> None: 
+        """
+        Returns None. Generates a copy of the PDF file at self.pdf_path
+        with the element tags added to the text field of each annotation
+        which represents a structural element (e.g. "tag: FB0.1")
+        'export_path' - If not provided, the export is stored in the same
+            directory as self.pdf_path with "-tagged" appended to the filename.
+        'mode' - One of {"append", "replace"}. If "append", the tag field is
+        appended to the end of the existing annotation using a new line character
+        as a separator.
+        """
+        if mode.lower() == "append": 
+            append = True
+        elif mode.lower() == 'replace':
+            append=False
+        else:
+            raise ValueError(f'tag_pdf_file_mode must be one of {"append", "replace"}, not {mode=}')
+        if export_path is None:
+            new_filename = f"{self.pdf_path.stem}-tagged{self.pdf_path.suffix}"
+            export_path = pathlib.Path(self.pdf_path).with_name(new_filename)
+        pdf.update_pdf_annotations(self.pdf_path, self.raw_annotations, export_path, append)
 
 
     def hash_nodes(self):
