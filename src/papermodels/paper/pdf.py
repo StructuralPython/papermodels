@@ -66,7 +66,9 @@ def update_annotation_text_field(pike_annot: pike.Annotation, text: str, replace
     is appended on a new line to the existing 'text'.
     """
     orig_text = pike_annot.get("/Contents")
-    if replace or orig_text is None:
+    if "tag:" in str(orig_text) and not replace: # Don't append a tag if there is one there
+        return pike_annot
+    elif replace or orig_text is None:
        pike_annot['/Contents'] = pike.String(text)
     else:
        pike_annot['/Contents'] = pike.String(f"{str(orig_text)}\r\n{text}")
