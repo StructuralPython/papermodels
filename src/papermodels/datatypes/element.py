@@ -246,12 +246,17 @@ class LoadedElement(Element):
             transfer_loads = self._get_transfer_loads()
         distributed_loads = self._get_distributed_loads()
 
+
         model = {
             "element_attributes":
                 {
                     "tag": self.tag,
                     "length": self.geometry.length if self.geometry.geom_type == "LineString" else {},
                     "orientation": orientation,
+                    "vert_correspondent_below": [corr.other_tag for corr in self.correspondents_below],
+                    "vert_correspondent_above": [corr.other_tag for corr in self.correspondents_above],
+                    "horz_intersects_above": [inter.other_tag for inter in self.intersections_above],
+                    "horz_intersects_below": [inter.other_tag for inter in self.intersections_below]
                 },
             "element_geometry":
                 {
