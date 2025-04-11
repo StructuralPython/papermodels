@@ -147,6 +147,7 @@ class Element:
 
         elements = []
         for annot_attrs in annotations_w_intersect_corrs.values():
+            print(annot_attrs['tag'])
             if correspond_with_like_only:
                 corrs_a = [cor for cor in annot_attrs['correspondents_above'] if annot_attrs['tag'][0] == cor.other_tag[0]]
                 corrs_b = [cor for cor in annot_attrs['correspondents_below'] if annot_attrs['tag'][0] == cor.other_tag[0]]
@@ -300,6 +301,7 @@ class LoadedElement(Element):
         """
         Calculates the transfer load locations from the intersections above
         """
+        print(self.tag)
         transfer_loads = {"point": [], "dist": []}
         if self.geometry.geom_type == "LineString":
             coords_a, coords_b = self.geometry.coords
@@ -312,7 +314,9 @@ class LoadedElement(Element):
             )
             for idx, transfer_location in enumerate(transfer_locations):
                 intersection_above: Intersection = self.intersections_above[idx]
+                print(intersection_above.other_tag)
                 transfer_type = intersection_above.other_reaction_type
+                print(intersection_above)
                 source_member = intersection_above.other_tag
                 reaction_idx = intersection_above.other_index
                 if reaction_idx is None:
@@ -340,8 +344,8 @@ class LoadedElement(Element):
                     )
                 elif transfer_type == "linear":
                     dist_load = self.create_distributed_load(
-                        intersection_above.other_extents[0],
-                        1.0,
+                        start_location=intersection_above.other_extents[0],
+                        start_magnitude=1.0,
                         end_location=intersection_above.other_extents[1],
                         end_magnitude=1.0,
                         transfer_source=f"{source_member}",
@@ -625,7 +629,6 @@ def get_collector_extents(
 
 
 
-
 def get_geometry_intersections(
     tagged_annotations: dict[Annotation, dict],
 ) -> dict[Annotation, dict]:
@@ -635,7 +638,6 @@ def get_geometry_intersections(
     annots = list(tagged_annotations.keys())
     intersected_annotations = tagged_annotations.copy()
     for i_annot in annots:
-        
         i_attrs = intersected_annotations[i_annot]
         i_rank = i_attrs["rank"]
         i_page = i_annot.page
@@ -649,12 +651,14 @@ def get_geometry_intersections(
             j_geom = j_attrs["geometry"]
             if i_page != j_page: 
                 continue
-            if i_rank < j_rank:
+            if j_rank > i_rank:
                 intersection = geom_ops.get_intersection(i_geom, j_geom, j_attrs['tag'])
+                other_reaction_type = i_attrs['reaction_type']
                 if intersection is None: continue
                 intersections_below.append(Intersection(*intersection))
             elif i_rank > j_rank:
                 intersection = geom_ops.get_intersection(j_geom, i_geom, j_attrs['tag'])
+                reaction_type
                 if intersection is None: continue
                 intersections_above.append(Intersection(*intersection))
         i_attrs["intersections_above"] = intersections_above
@@ -680,11 +684,10 @@ def get_geometry_correspondents(
             annots_here = annots_by_page[page]
             annots_below = annots_by_page[next_page]
             correspondents_above = {j_attrs['tag']: [] for j_attrs in annots_below.values()}
-            correspondents_below = []
+            correspondents_below = {}
 
             for i_annot, i_attrs in annots_here.items():
                 i_page = i_annot.page
-                correspondents_below = []
                 for j_annot, j_attrs in annots_below.items():
                     j_attrs = annots_below[j_annot]
                     j_page = j_annot.page
@@ -695,11 +698,17 @@ def get_geometry_correspondents(
                     i_rxn_type = i_attrs.get('reaction_type', "point")
                     j_rxn_type = j_attrs.get('reaction_type', "point")
                     correspondence_ratio = geom_ops.check_corresponds(i_geom, j_geom)
+                    correspondents_below.setdefault(i_tag, [])
+                    # print(f"{i_tag=} | {j_tag=} | {correspondence_ratio=}")
                     if correspondence_ratio:
-                        correspondents_below.append(Correspondent(correspondence_ratio, j_geom, j_tag, other_reaction_type=j_rxn_type))
-                        correspondents_above[j_attrs['tag']].append(Correspondent(correspondence_ratio, i_geom, i_attrs['tag'], other_reaction_type=i_rxn_type))
-                corresponding_annotations[i_annot]["correspondents_above"] = correspondents_above.get(i_attrs['tag'], [])
-                corresponding_annotations[i_annot]["correspondents_below"] = correspondents_below
+                        correspondents_below[i_tag].append(Correspondent(correspondence_ratio, j_geom, j_tag, other_reaction_type=j_rxn_type))
+                        correspondents_above[j_tag].append(Correspondent(correspondence_ratio, i_geom, i_attrs['tag'], other_reaction_type=i_rxn_type))
+                        corresponding_annotations[j_annot]["correspondents_above"] = correspondents_below[i_tag]
+                        corresponding_annotations[i_annot]["correspondents_below"] = correspondents_below[i_tag]
+                    else:
+                        # Populate empty fields for annotations with no correspondents
+                        corresponding_annotations[i_annot]['correspondents_above'] = []
+                        corresponding_annotations[i_annot]['correspondents_below'] = []
                 
         else:
             annots_here = annots_by_page[page]
@@ -707,7 +716,7 @@ def get_geometry_correspondents(
                 correspondents_above = {} # There are no correspondents above or below on a single page
             for i_annot, i_attrs in annots_here.items():
                 corresponding_annotations[i_annot]["correspondents_below"] = []
-                corresponding_annotations[i_annot]["correspondents_above"] = correspondents_above.get(i_attrs['tag'], [])
+                corresponding_annotations[j_annot]["correspondents_above"] = correspondents_above.get(i_attrs['tag'], [])
         if prev_page is None:
             prev_page = page
     return corresponding_annotations

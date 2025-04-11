@@ -142,7 +142,7 @@ class GeometryGraph(nx.DiGraph):
                         intersection.other_geometry,
                         intersection.other_tag,
                         local_index,
-                        other_reaction_type="linear",
+                        other_reaction_type=intersection.other_reaction_type,
                         other_extents=collector_extents.get(other_tag, None)
                     )
                     updated_intersections_below.append(new_intersection)

@@ -5,6 +5,7 @@ from shapely.wkt import loads as wkt_loads
 from shapely import Geometry, GeometryCollection, Point
 from papermodels.datatypes.annotation import Annotation
 from papermodels.loads.load_distribution import LoadingGeometry
+from papermodels.geometry import geom_ops
 from typing import Any, Optional
 import re
 import numpy as np
@@ -101,6 +102,10 @@ def parse_annotations(
                     annot_attr.split("<")[0]
                 )  # .split() to remove trailing HTML tags
             # annot_attrs["rank"] = int(annot_attributes["rank"])
+            annot_attrs.setdefault("reaction_type", "point")
+            annot_attrs['reaction_type'] = annot_attrs['reaction_type'].lower()
+            if annot_geom.geom_type == "Polygon" and annot_attrs['reaction_type'] == "linear":
+                annot_attrs['length'] = geom_ops.get_rectangle_centerline(annot_geom).length
             parsed_annotations.update({annot: annot_attrs})
     return parsed_annotations
 
