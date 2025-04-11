@@ -300,7 +300,6 @@ class LoadedElement(Element):
         """
         Calculates the transfer load locations from the intersections above
         """
-        print(self.tag)
         transfer_loads = {"point": [], "dist": []}
         if self.geometry.geom_type == "LineString":
             coords_a, coords_b = self.geometry.coords
@@ -313,9 +312,7 @@ class LoadedElement(Element):
             )
             for idx, transfer_location in enumerate(transfer_locations):
                 intersection_above: Intersection = self.intersections_above[idx]
-                print(intersection_above.other_tag)
                 transfer_type = intersection_above.other_reaction_type
-                print(intersection_above)
                 source_member = intersection_above.other_tag
                 reaction_idx = intersection_above.other_index
                 if reaction_idx is None:
@@ -699,16 +696,13 @@ def get_geometry_correspondents(
                     j_rxn_type = j_attrs.get('reaction_type', "point")
                     correspondence_ratio = geom_ops.check_corresponds(i_geom, j_geom)
                     correspondents_below.setdefault(i_tag, [])
-                    # print(f"{i_tag=} | {j_tag=} | {correspondence_ratio=}")
                     if correspondence_ratio:
                         correspondents_below[i_tag].append(Correspondent(correspondence_ratio, j_geom, j_tag, other_reaction_type=j_rxn_type))
                         correspondents_above[j_tag].append(Correspondent(correspondence_ratio, i_geom, i_attrs['tag'], other_reaction_type=i_rxn_type))
-                        # print(f"{correspondents_above=}")
                         corresponding_annotations[j_annot].setdefault("correspondents_above", [])
                         corresponding_annotations[i_annot].setdefault("correspondents_below", [])
                         corresponding_annotations[j_annot]["correspondents_above"] = correspondents_above[j_tag]
                         corresponding_annotations[i_annot]["correspondents_below"] = correspondents_below[i_tag]
-                        # corresponding_annotations[i_annot]['correspondents_above'] += correspondents_
                     else:
                         # Populate empty fields for annotations with no correspondents
                         corresponding_annotations[i_annot].setdefault("correspondents_below", [])

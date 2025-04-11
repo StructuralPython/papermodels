@@ -90,8 +90,6 @@ class GeometryGraph(nx.DiGraph):
                     j_tag = intersection.other_tag
                     g.add_edge(element.tag, j_tag)
             if element.tag in g.collector_elements:
-                print(element.tag)
-                print(element.correspondents_above)
                 for correspondent in element.correspondents_above:
                     j_tag = correspondent.other_tag
                     g.add_edge(j_tag, element.tag)
