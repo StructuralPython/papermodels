@@ -84,7 +84,7 @@ def parse_annotations(
         legend_data = legend_text.lower().replace("\r\n", "\n").replace("\r", "\n").replace(f"{legend_identifier.lower()}\n", "").split("\n")
         legend_data = [elem for elem in legend_data if elem]
         annot_attributes = {
-            legend_attr.split(": ")[0]: legend_attr.split(": ")[1]
+            legend_attr.split(": ")[0].lower().replace(" ", "_"): legend_attr.split(": ")[1]
             for legend_attr in legend_data
         }
         for annot in matching_annots:

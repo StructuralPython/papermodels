@@ -38,6 +38,8 @@ class Correspondent(NamedTuple):
     overlap_ratio: float
     other_geometry: Polygon
     other_tag: str
+    other_reaction_type: str = "point"
+    other_extents: Optional[tuple] = None
 
 
 @dataclass
@@ -320,6 +322,13 @@ class LoadedElement(Element):
                         " interface in order to populate this necessary index."
                     )
                 if transfer_type == "point":
+                    point_load = self.create_point_load(
+                        transfer_location=transfer_location,
+                        magnitude=0.0,
+                        transfer_source=f"{source_member}",
+                        transfer_reaction_index=reaction_idx,
+                        direction="gravity",
+                    )
                     transfer_loads['point'].append(
                         {
                             "location": transfer_location,
@@ -330,20 +339,57 @@ class LoadedElement(Element):
                         }
                     )
                 elif transfer_type == "linear":
-                    transfer_loads['dist'].append(
-                    {
-                        "transfer_source": f"{source_member}",
-                        "transfer_reaction_index": intersection_above.other_index,
-                        "occupancy": "",
-                        "load_components": [],
-                        "applied_area": 0.0,
-                        "start_loc": intersection_above.other_extents[0],
-                        "start_magnitude": 1.0,
-                        "end_loc": intersection_above.other_extents[1],
-                        "end_magnitude": 1.0,
-                    }
-                )
+                    dist_load = self.create_distributed_load(
+                        intersection_above.other_extents[0],
+                        1.0,
+                        end_location=intersection_above.other_extents[1],
+                        end_magnitude=1.0,
+                        transfer_source=f"{source_member}",
+                        transfer_reaction_index=intersection_above.other_index,
+                        occupancy="",
+                        load_components={},
+                        applied_area=0.0,
+                        direction="gravity"
+                    )
+                    transfer_loads['dist'].append(dist_load)
+                #     transfer_loads['dist'].append(
+                #     {
+                #         "transfer_source": f"{source_member}",
+                #         "transfer_reaction_index": intersection_above.other_index,
+                #         "occupancy": "",
+                #         "load_components": [],
+                #         "applied_area": 0.0,
+                #         "start_loc": intersection_above.other_extents[0],
+                #         "start_magnitude": 1.0,
+                #         "end_loc": intersection_above.other_extents[1],
+                #         "end_magnitude": 1.0,
+                #     }
+                # )
         elif self.geometry.geom_type == "Polygon":
+            for correspondent in self.correspondents_above:
+                if correspondent.other_reaction_type == "point":
+                    point_load = self.create_point_load(
+                        transfer_location=1,
+                        magnitude=0.0,
+                        transfer_source=correspondent.other_tag,
+                        transfer_reaction_index=0,
+                        direction="gravity"
+                    )
+                    transfer_loads['point'].append(point_load)
+                elif correspondent.other_reaction_type == "linear":
+                    dist_load = self.create_distributed_load(
+                        start_location=0.0,
+                        start_magnitude=1.0,
+                        end_location=geom_ops.get_rectangle_centerline(self.geometry).length,
+                        end_magnitude=1.0,
+                        transfer_source=correspondent.other_tag,
+                        transfer_reaction_index=0,
+                        occupancy="",
+                        load_components={},
+                        applied_area=0.0,
+                        direction="gravity",
+                    )
+                    transfer_loads['dist'].append(dist_load)
             for intersection in self.intersections_above:
                 if intersection.other_reaction_type == "point":
                     transfer_loads['point'].append(
@@ -356,32 +402,84 @@ class LoadedElement(Element):
                         }
                     )
                 elif intersection.other_reaction_type == "linear":
-                    # supporting_geometry = [ib.other_geometry for ib in self.correspondents_below]
-                    # supporting_geometry = geom_ops.clean_polygon_supports(supporting_geometry, self.geometry)
-                    # joist_extents = geom_ops.get_joist_extents(
-                    #     self.geometry,
-                    #     supporting_geometry
-                    # )
-                    # start_node, _ = geom_ops.get_start_end_nodes(self.geometry)
-                    # start_x = Point(joist_extents['A']).distance(start_node)
-                    # end_x = Point(joist_extents['B']).distance(start_node)
                     source_member = intersection.other_tag
                     start_x, end_x = intersection.other_extents
                     transfer_loads['dist'].append(
-                    {
-                        "transfer_source": f"{source_member}",
-                        "transfer_reaction_index": intersection.other_index,
-                        "occupancy": "",
-                        "load_components": [],
-                        "applied_area": 0.0,
-                        "start_loc": start_x,
-                        "start_magnitude": 1.0,
-                        "end_loc": end_x,
-                        "end_magnitude": 1.0,
-                    }
-                )
+                        self.create_distributed_load(
+                            start_location=start_x,
+                            start_magnitude=1.0,
+                            end_location=end_x,
+                            end_magnitude=1.0,
+                            transfer_source=f"{source_member}",
+                            transfer_reaction_index=intersection.other_index,
+                            occupancy="",
+                            load_components={},
+                            applied_area=0.0,
+                            direction="gravity"
+                        )
+                    )
+                #     transfer_loads['dist'].append(
+                #     {
+                #         "transfer_source": f"{source_member}",
+                #         "transfer_reaction_index": intersection.other_index,
+                #         "occupancy": "",
+                #         "load_components": [],
+                #         "applied_area": 0.0,
+                #         "start_loc": start_x,
+                #         "start_magnitude": 1.0,
+                #         "end_loc": end_x,
+                #         "end_magnitude": 1.0,
+                #     }
+                # )
+                    
         return transfer_loads
     
+
+    @staticmethod
+    def create_point_load(
+            transfer_location: str,
+            magnitude: float,
+            transfer_source: str,
+            transfer_reaction_index: int,
+            direction: str = "gravity"
+    ):
+
+        return {
+            "location": transfer_location,
+            "magnitude": magnitude,
+            "transfer_source": transfer_source,
+            "transfer_reaction_index": transfer_reaction_index,
+            "direction": direction
+        }
+    
+    @staticmethod
+    def create_distributed_load(
+        start_location: float,
+        start_magnitude: float,
+        end_location: float,
+        end_magnitude: float,
+        transfer_source: str,
+        transfer_reaction_index: int,
+        occupancy: str,
+        load_components: dict,
+        applied_area: float,
+        direction: str,
+    ):
+
+        return {
+            "transfer_source": transfer_source,
+            "transfer_reaction_index": transfer_reaction_index,
+            "occupancy": occupancy,
+            "load_components": load_components,
+            "applied_area": applied_area,
+            "start_loc": start_location,
+            "start_magnitude": start_magnitude,
+            "end_loc": end_location,
+            "end_magnitude": end_magnitude,
+            "direction": direction,
+        }
+
+
     def _get_distributed_loads(self) -> list[dict]:
         """
         Computes the resulting distributed loads from the applied
@@ -594,10 +692,12 @@ def get_geometry_correspondents(
                     j_geom = j_attrs["geometry"]
                     i_tag = i_attrs['tag']
                     j_tag = j_attrs['tag']
+                    i_rxn_type = i_attrs.get('reaction_type', "point")
+                    j_rxn_type = j_attrs.get('reaction_type', "point")
                     correspondence_ratio = geom_ops.check_corresponds(i_geom, j_geom)
                     if correspondence_ratio:
-                        correspondents_below.append(Correspondent(correspondence_ratio, j_geom, j_tag))
-                        correspondents_above[j_attrs['tag']].append(Correspondent(correspondence_ratio, i_geom, i_attrs['tag']))
+                        correspondents_below.append(Correspondent(correspondence_ratio, j_geom, j_tag, other_reaction_type=j_rxn_type))
+                        correspondents_above[j_attrs['tag']].append(Correspondent(correspondence_ratio, i_geom, i_attrs['tag'], other_reaction_type=i_rxn_type))
                 corresponding_annotations[i_annot]["correspondents_above"] = correspondents_above.get(i_attrs['tag'], [])
                 corresponding_annotations[i_annot]["correspondents_below"] = correspondents_below
                 
