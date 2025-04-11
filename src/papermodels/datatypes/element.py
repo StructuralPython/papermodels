@@ -147,7 +147,6 @@ class Element:
 
         elements = []
         for annot_attrs in annotations_w_intersect_corrs.values():
-            print(annot_attrs['tag'])
             if correspond_with_like_only:
                 corrs_a = [cor for cor in annot_attrs['correspondents_above'] if annot_attrs['tag'][0] == cor.other_tag[0]]
                 corrs_b = [cor for cor in annot_attrs['correspondents_below'] if annot_attrs['tag'][0] == cor.other_tag[0]]
@@ -658,7 +657,7 @@ def get_geometry_intersections(
                 intersections_below.append(Intersection(*intersection))
             elif i_rank > j_rank:
                 intersection = geom_ops.get_intersection(j_geom, i_geom, j_attrs['tag'])
-                reaction_type
+                # reaction_type
                 if intersection is None: continue
                 intersections_above.append(Intersection(*intersection))
         i_attrs["intersections_above"] = intersections_above
@@ -678,6 +677,7 @@ def get_geometry_correspondents(
     last_page = descending_pages[-1]
     corresponding_annotations = tagged_annotations.copy()
     prev_page = None
+    annots_prev = {}
     for page in descending_pages:
         if page != last_page:
             next_page = page - 1
@@ -688,14 +688,14 @@ def get_geometry_correspondents(
 
             for i_annot, i_attrs in annots_here.items():
                 i_page = i_annot.page
+                i_tag = i_attrs['tag']
+                i_geom = i_attrs["geometry"]
+                i_rxn_type = i_attrs.get('reaction_type', "point")
                 for j_annot, j_attrs in annots_below.items():
                     j_attrs = annots_below[j_annot]
                     j_page = j_annot.page
-                    i_geom = i_attrs["geometry"]
                     j_geom = j_attrs["geometry"]
-                    i_tag = i_attrs['tag']
                     j_tag = j_attrs['tag']
-                    i_rxn_type = i_attrs.get('reaction_type', "point")
                     j_rxn_type = j_attrs.get('reaction_type', "point")
                     correspondence_ratio = geom_ops.check_corresponds(i_geom, j_geom)
                     correspondents_below.setdefault(i_tag, [])
@@ -703,20 +703,35 @@ def get_geometry_correspondents(
                     if correspondence_ratio:
                         correspondents_below[i_tag].append(Correspondent(correspondence_ratio, j_geom, j_tag, other_reaction_type=j_rxn_type))
                         correspondents_above[j_tag].append(Correspondent(correspondence_ratio, i_geom, i_attrs['tag'], other_reaction_type=i_rxn_type))
-                        corresponding_annotations[j_annot]["correspondents_above"] = correspondents_below[i_tag]
+                        # print(f"{correspondents_above=}")
+                        corresponding_annotations[j_annot].setdefault("correspondents_above", [])
+                        corresponding_annotations[i_annot].setdefault("correspondents_below", [])
+                        corresponding_annotations[j_annot]["correspondents_above"] = correspondents_above[j_tag]
                         corresponding_annotations[i_annot]["correspondents_below"] = correspondents_below[i_tag]
+                        # corresponding_annotations[i_annot]['correspondents_above'] += correspondents_
                     else:
                         # Populate empty fields for annotations with no correspondents
-                        corresponding_annotations[i_annot]['correspondents_above'] = []
-                        corresponding_annotations[i_annot]['correspondents_below'] = []
+                        corresponding_annotations[i_annot].setdefault("correspondents_below", [])
+                        corresponding_annotations[i_annot].setdefault("correspondents_above", [])
+                
+            annots_prev = annots_here
                 
         else:
-            annots_here = annots_by_page[page]
+            annots_last = annots_by_page[page]
             if len(descending_pages) == 1: 
                 correspondents_above = {} # There are no correspondents above or below on a single page
-            for i_annot, i_attrs in annots_here.items():
-                corresponding_annotations[i_annot]["correspondents_below"] = []
-                corresponding_annotations[j_annot]["correspondents_above"] = correspondents_above.get(i_attrs['tag'], [])
+            for i_annot, i_attrs in annots_last.items():
+                # For catching correspondents that terminate on the last page 
+                for j_annot, j_attrs in annots_prev.items():
+                    j_tag = j_attrs['tag']
+                    if j_tag in correspondents_below:
+                        for corr in correspondents_below.get(j_tag, []):
+                            if corr.other_tag == i_tag:
+                                correspondents_above[i_tag].append(Correspondent(corr.overlap_ratio, j_attrs['geometry'], j_tag, j_attrs['reaction_type']))
+
+                i_tag = i_attrs['tag']
+                corresponding_annotations[i_annot]['correspondents_above'] = correspondents_above[i_tag]
+                corresponding_annotations[i_annot]['correspondents_below'] = []
         if prev_page is None:
             prev_page = page
     return corresponding_annotations

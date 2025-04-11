@@ -89,6 +89,12 @@ class GeometryGraph(nx.DiGraph):
                 for intersection in element.intersections_below:
                     j_tag = intersection.other_tag
                     g.add_edge(element.tag, j_tag)
+            if element.tag in g.collector_elements:
+                print(element.tag)
+                print(element.correspondents_above)
+                for correspondent in element.correspondents_above:
+                    j_tag = correspondent.other_tag
+                    g.add_edge(j_tag, element.tag)
 
         for node in g.collector_elements:
             g.nodes[node]['element'].element_type = "collector"
