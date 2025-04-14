@@ -1,0 +1,33 @@
+[element_attributes]
+tag = "WB2.0"
+orientation = "vertical"
+vert_correspondent_below = []
+vert_correspondent_above = [
+    "WT3.0",
+]
+horz_intersects_above = []
+horz_intersects_below = [
+    "FB2.2",
+]
+
+[element_attributes.length]
+
+[element_geometry]
+geometry = "POLYGON ((33.1581 22.7636, 33.1581 33.1205, 33.7576 33.1205, 33.7576 22.7636, 33.1581 22.7636))"
+supports = []
+
+[loads]
+point_loads = []
+
+[[loads.distributed_loads]]
+transfer_source = "WT3.0"
+transfer_reaction_index = 0
+occupancy = ""
+applied_area = 0.0
+start_loc = 0.0
+start_magnitude = 1.0
+end_loc = 10.3569
+end_magnitude = 1.0
+direction = "gravity"
+
+[loads.distributed_loads.load_components]

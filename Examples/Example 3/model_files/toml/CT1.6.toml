@@ -1,0 +1,44 @@
+[element_attributes]
+tag = "CT1.6"
+orientation = "vertical"
+vert_correspondent_below = []
+vert_correspondent_above = []
+horz_intersects_above = [
+    "FB1.0",
+    "FB1.2",
+    "FB1.3",
+]
+horz_intersects_below = []
+
+[element_attributes.length]
+
+[element_geometry]
+geometry = "POLYGON ((28.3823 22.0162, 28.3823 22.7789, 29.145 22.7789, 29.145 22.0162, 28.3823 22.0162))"
+supports = []
+
+[[loads.point_loads]]
+location = []
+magnitude = 0
+transfer_source = "FB1.2"
+transfer_reaction_idx = 2
+direction = "gravity"
+
+[[loads.point_loads]]
+location = []
+magnitude = 0
+transfer_source = "FB1.3"
+transfer_reaction_idx = 1
+direction = "gravity"
+
+[[loads.distributed_loads]]
+transfer_source = "FB1.0"
+transfer_reaction_index = 0
+occupancy = ""
+applied_area = 0.0
+start_loc = 0.0183592093071141
+start_magnitude = 1.0
+end_loc = 0.6976592093071154
+end_magnitude = 1.0
+direction = "gravity"
+
+[loads.distributed_loads.load_components]

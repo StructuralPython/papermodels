@@ -1,0 +1,36 @@
+[element_attributes]
+tag = "FB2.2"
+length = 11.127203479760764
+orientation = "horizontal"
+vert_correspondent_below = []
+vert_correspondent_above = []
+horz_intersects_above = [
+    "WB2.0",
+]
+horz_intersects_below = [
+    "CT2.1",
+    "CT2.2",
+]
+
+[element_geometry]
+geometry = "LINESTRING (33.3956 22.3455, 33.4044 33.4727)"
+supports = [
+    { location = 0.31170009747658084, fixity = "pin" },
+    { location = 10.69420334435056, fixity = "roller" },
+]
+
+[loads]
+point_loads = []
+
+[[loads.distributed_loads]]
+transfer_source = "WB2.0"
+transfer_reaction_index = 0
+occupancy = ""
+applied_area = 0.0
+start_loc = 0.4181001307505899
+start_magnitude = 1.0
+end_loc = 10.775003369618789
+end_magnitude = 1.0
+direction = "gravity"
+
+[loads.distributed_loads.load_components]
