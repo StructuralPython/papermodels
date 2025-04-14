@@ -127,6 +127,7 @@ def tag_parsed_annotations(
     annots_to_enumerate = {}
     for annot, annot_attrs in annots_to_tag.items():
         tag = annot_attrs.get('tag')
+        # There is an existing annotation
         if tag is not None:
             parsed = parse_tag_components(tag)
             if parsed is not None and len(parsed) == 3: # Tag is not in correct format so ignore
@@ -138,6 +139,7 @@ def tag_parsed_annotations(
                 annots_to_enumerate.update({annot: annot_attrs})
         else:
             annots_to_enumerate.update({annot: annot_attrs})
+
 
     for annot, annot_attrs in annots_to_enumerate.items():
         type_initials = "".join(

@@ -158,6 +158,7 @@ class Element:
                 correspondents_above=corrs_a,
                 correspondents_below=corrs_b,
                 plane_id=annot_attrs.get("page_label", None),
+                reaction_type=annot_attrs.get('reaction_type', 'point')
             )
             elements.append(element)
         return elements
@@ -624,6 +625,39 @@ def get_collector_extents(
     return {support_a_tag: a_extents, support_b_tag: b_extents}
 
 
+def get_transfer_extents(element: Element) -> tuple[str, dict]:
+    """
+    Returns a tuple of str, extents_dict
+
+    e.g.
+    ("FB0.1", {"A": 12, "B": 23.4})
+
+    For the polygon element that has a linear reaction type.
+    This element could have more than one intersection below
+    if it overlaps multiple beams, for example. It can also 
+    have correspondents that need to have a portion of teh
+    linear load applied to it.
+    """
+    intersection_extents = {}
+    for intersection_below in element.intersections_below:
+        intersection_below: Intersection
+        tag = intersection_below.other_tag
+        other_geom = intersection_below.other_geometry
+        if isinstance(other_geom, LineString):
+            start_coord, _ = geom_ops.get_start_end_nodes(other_geom)
+            overlapping_linestring = element.geometry.intersection(other_geom)
+            overlap_start, overlap_end = geom_ops.get_start_end_nodes(overlapping_linestring)
+            intersection_extents.update(
+                {
+                    tag: (
+                     start_coord.distance(overlap_start), 
+                     start_coord.distance(overlap_end)
+                    )
+                }
+            )
+    return intersection_extents
+
+
 
 def get_geometry_intersections(
     tagged_annotations: dict[Annotation, dict],
@@ -645,7 +679,7 @@ def get_geometry_intersections(
             j_page = j_annot.page
             i_geom = i_attrs["geometry"]
             j_geom = j_attrs["geometry"]
-            if i_page != j_page: 
+            if i_page != j_page:
                 continue
             if j_rank > i_rank:
                 intersection = geom_ops.get_intersection(i_geom, j_geom, j_attrs['tag'])
@@ -657,6 +691,7 @@ def get_geometry_intersections(
                 # reaction_type
                 if intersection is None: continue
                 intersections_above.append(Intersection(*intersection))
+
         i_attrs["intersections_above"] = intersections_above
         i_attrs["intersections_below"] = intersections_below
     return intersected_annotations
@@ -687,16 +722,20 @@ def get_geometry_correspondents(
                 i_page = i_annot.page
                 i_tag = i_attrs['tag']
                 i_geom = i_attrs["geometry"]
+                i_rank = i_attrs["rank"]
                 i_rxn_type = i_attrs.get('reaction_type', "point")
                 for j_annot, j_attrs in annots_below.items():
                     j_attrs = annots_below[j_annot]
                     j_page = j_annot.page
                     j_geom = j_attrs["geometry"]
+                    j_rank = j_attrs['rank']
                     j_tag = j_attrs['tag']
                     j_rxn_type = j_attrs.get('reaction_type', "point")
+                    if i_geom.geom_type == "LineString" and j_geom.geom_type == "LineString":
+                        continue # No correspondence between lines
                     correspondence_ratio = geom_ops.check_corresponds(i_geom, j_geom)
                     correspondents_below.setdefault(i_tag, [])
-                    if correspondence_ratio:
+                    if correspondence_ratio and i_rank >= j_rank: # Same rank allowed to transfer in correspondents (e.g. column to column)
                         correspondents_below[i_tag].append(Correspondent(correspondence_ratio, j_geom, j_tag, other_reaction_type=j_rxn_type))
                         correspondents_above[j_tag].append(Correspondent(correspondence_ratio, i_geom, i_attrs['tag'], other_reaction_type=i_rxn_type))
                         corresponding_annotations[j_annot].setdefault("correspondents_above", [])
