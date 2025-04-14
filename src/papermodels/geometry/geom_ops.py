@@ -424,13 +424,15 @@ def explode_polygon(p: Polygon) -> list[LineString]:
 def get_rectangle_centerline(p: Polygon) -> LineString:
     """
     Returns the centerline of the Polygon 'p' assuming that 'p' represents
-    a regular rectangle with a long dimension and a short dimension
+    a regular rectangle with a long dimension and a short dimension.
+    The LineString is created with a +ve X-bias.
     """
     rectangle_edges = explode_polygon(p)
     sorted_edges = sorted(rectangle_edges, key=lambda x: x.length)
     short_edges = sorted_edges[:2]
     edge1, edge2 = short_edges
-    center_line = LineString([edge1.centroid, edge2.centroid])
+    start, end = order_nodes_positive(edge1.centroid, edge2.centroid)
+    center_line = LineString([start, end])
     return center_line
     
 

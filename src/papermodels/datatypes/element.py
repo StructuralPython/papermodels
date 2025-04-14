@@ -38,6 +38,8 @@ class Correspondent(NamedTuple):
     overlap_ratio: float
     other_geometry: Polygon
     other_tag: str
+    other_reaction_type: str = "point"
+    other_extents: Optional[tuple] = None
 
 
 @dataclass
@@ -156,6 +158,7 @@ class Element:
                 correspondents_above=corrs_a,
                 correspondents_below=corrs_b,
                 plane_id=annot_attrs.get("page_label", None),
+                reaction_type=annot_attrs.get('reaction_type', 'point')
             )
             elements.append(element)
         return elements
@@ -246,12 +249,17 @@ class LoadedElement(Element):
             transfer_loads = self._get_transfer_loads()
         distributed_loads = self._get_distributed_loads()
 
+
         model = {
             "element_attributes":
                 {
                     "tag": self.tag,
                     "length": self.geometry.length if self.geometry.geom_type == "LineString" else {},
                     "orientation": orientation,
+                    "vert_correspondent_below": [corr.other_tag for corr in self.correspondents_below],
+                    "vert_correspondent_above": [corr.other_tag for corr in self.correspondents_above],
+                    "horz_intersects_above": [inter.other_tag for inter in self.intersections_above],
+                    "horz_intersects_below": [inter.other_tag for inter in self.intersections_below]
                 },
             "element_geometry":
                 {
@@ -315,6 +323,13 @@ class LoadedElement(Element):
                         " interface in order to populate this necessary index."
                     )
                 if transfer_type == "point":
+                    point_load = self.create_point_load(
+                        transfer_location=transfer_location,
+                        magnitude=0.0,
+                        transfer_source=f"{source_member}",
+                        transfer_reaction_index=reaction_idx,
+                        direction="gravity",
+                    )
                     transfer_loads['point'].append(
                         {
                             "location": transfer_location,
@@ -325,20 +340,57 @@ class LoadedElement(Element):
                         }
                     )
                 elif transfer_type == "linear":
-                    transfer_loads['dist'].append(
-                    {
-                        "transfer_source": f"{source_member}",
-                        "transfer_reaction_index": intersection_above.other_index,
-                        "occupancy": "",
-                        "load_components": [],
-                        "applied_area": 0.0,
-                        "start_loc": intersection_above.other_extents[0],
-                        "start_magnitude": 1.0,
-                        "end_loc": intersection_above.other_extents[1],
-                        "end_magnitude": 1.0,
-                    }
-                )
+                    dist_load = self.create_distributed_load(
+                        start_location=intersection_above.other_extents[0],
+                        start_magnitude=1.0,
+                        end_location=intersection_above.other_extents[1],
+                        end_magnitude=1.0,
+                        transfer_source=f"{source_member}",
+                        transfer_reaction_index=intersection_above.other_index,
+                        occupancy="",
+                        load_components={},
+                        applied_area=0.0,
+                        direction="gravity"
+                    )
+                    transfer_loads['dist'].append(dist_load)
+                #     transfer_loads['dist'].append(
+                #     {
+                #         "transfer_source": f"{source_member}",
+                #         "transfer_reaction_index": intersection_above.other_index,
+                #         "occupancy": "",
+                #         "load_components": [],
+                #         "applied_area": 0.0,
+                #         "start_loc": intersection_above.other_extents[0],
+                #         "start_magnitude": 1.0,
+                #         "end_loc": intersection_above.other_extents[1],
+                #         "end_magnitude": 1.0,
+                #     }
+                # )
         elif self.geometry.geom_type == "Polygon":
+            for correspondent in self.correspondents_above:
+                if correspondent.other_reaction_type == "point":
+                    point_load = self.create_point_load(
+                        transfer_location=[],
+                        magnitude=0.0,
+                        transfer_source=correspondent.other_tag,
+                        transfer_reaction_index=0,
+                        direction="gravity"
+                    )
+                    transfer_loads['point'].append(point_load)
+                elif correspondent.other_reaction_type == "linear":
+                    dist_load = self.create_distributed_load(
+                        start_location=0.0,
+                        start_magnitude=1.0,
+                        end_location=geom_ops.get_rectangle_centerline(self.geometry).length,
+                        end_magnitude=1.0,
+                        transfer_source=correspondent.other_tag,
+                        transfer_reaction_index=0,
+                        occupancy="",
+                        load_components={},
+                        applied_area=0.0,
+                        direction="gravity",
+                    )
+                    transfer_loads['dist'].append(dist_load)
             for intersection in self.intersections_above:
                 if intersection.other_reaction_type == "point":
                     transfer_loads['point'].append(
@@ -351,32 +403,84 @@ class LoadedElement(Element):
                         }
                     )
                 elif intersection.other_reaction_type == "linear":
-                    # supporting_geometry = [ib.other_geometry for ib in self.correspondents_below]
-                    # supporting_geometry = geom_ops.clean_polygon_supports(supporting_geometry, self.geometry)
-                    # joist_extents = geom_ops.get_joist_extents(
-                    #     self.geometry,
-                    #     supporting_geometry
-                    # )
-                    # start_node, _ = geom_ops.get_start_end_nodes(self.geometry)
-                    # start_x = Point(joist_extents['A']).distance(start_node)
-                    # end_x = Point(joist_extents['B']).distance(start_node)
                     source_member = intersection.other_tag
                     start_x, end_x = intersection.other_extents
                     transfer_loads['dist'].append(
-                    {
-                        "transfer_source": f"{source_member}",
-                        "transfer_reaction_index": intersection.other_index,
-                        "occupancy": "",
-                        "load_components": [],
-                        "applied_area": 0.0,
-                        "start_loc": start_x,
-                        "start_magnitude": 1.0,
-                        "end_loc": end_x,
-                        "end_magnitude": 1.0,
-                    }
-                )
+                        self.create_distributed_load(
+                            start_location=start_x,
+                            start_magnitude=1.0,
+                            end_location=end_x,
+                            end_magnitude=1.0,
+                            transfer_source=f"{source_member}",
+                            transfer_reaction_index=intersection.other_index,
+                            occupancy="",
+                            load_components={},
+                            applied_area=0.0,
+                            direction="gravity"
+                        )
+                    )
+                #     transfer_loads['dist'].append(
+                #     {
+                #         "transfer_source": f"{source_member}",
+                #         "transfer_reaction_index": intersection.other_index,
+                #         "occupancy": "",
+                #         "load_components": [],
+                #         "applied_area": 0.0,
+                #         "start_loc": start_x,
+                #         "start_magnitude": 1.0,
+                #         "end_loc": end_x,
+                #         "end_magnitude": 1.0,
+                #     }
+                # )
+                    
         return transfer_loads
     
+
+    @staticmethod
+    def create_point_load(
+            transfer_location: str,
+            magnitude: float,
+            transfer_source: str,
+            transfer_reaction_index: int,
+            direction: str = "gravity"
+    ):
+
+        return {
+            "location": transfer_location,
+            "magnitude": magnitude,
+            "transfer_source": transfer_source,
+            "transfer_reaction_index": transfer_reaction_index,
+            "direction": direction
+        }
+    
+    @staticmethod
+    def create_distributed_load(
+        start_location: float,
+        start_magnitude: float,
+        end_location: float,
+        end_magnitude: float,
+        transfer_source: str,
+        transfer_reaction_index: int,
+        occupancy: str,
+        load_components: dict,
+        applied_area: float,
+        direction: str,
+    ):
+
+        return {
+            "transfer_source": transfer_source,
+            "transfer_reaction_index": transfer_reaction_index,
+            "occupancy": occupancy,
+            "load_components": load_components,
+            "applied_area": applied_area,
+            "start_loc": start_location,
+            "start_magnitude": start_magnitude,
+            "end_loc": end_location,
+            "end_magnitude": end_magnitude,
+            "direction": direction,
+        }
+
+
     def _get_distributed_loads(self) -> list[dict]:
         """
         Computes the resulting distributed loads from the applied
@@ -521,6 +625,38 @@ def get_collector_extents(
     return {support_a_tag: a_extents, support_b_tag: b_extents}
 
 
+def get_transfer_extents(element: Element) -> tuple[str, dict]:
+    """
+    Returns a tuple of str, extents_dict
+
+    e.g.
+    ("FB0.1", {"A": 12, "B": 23.4})
+
+    For the polygon element that has a linear reaction type.
+    This element could have more than one intersection below
+    if it overlaps multiple beams, for example. It can also 
+    have correspondents that need to have a portion of teh
+    linear load applied to it.
+    """
+    intersection_extents = {}
+    for intersection_below in element.intersections_below:
+        intersection_below: Intersection
+        tag = intersection_below.other_tag
+        other_geom = intersection_below.other_geometry
+        if isinstance(other_geom, LineString):
+            start_coord, _ = geom_ops.get_start_end_nodes(other_geom)
+            overlapping_linestring = element.geometry.intersection(other_geom)
+            overlap_start, overlap_end = geom_ops.get_start_end_nodes(overlapping_linestring)
+            intersection_extents.update(
+                {
+                    tag: (
+                     start_coord.distance(overlap_start), 
+                     start_coord.distance(overlap_end)
+                    )
+                }
+            )
+    return intersection_extents
+
 
 
 def get_geometry_intersections(
@@ -532,7 +668,6 @@ def get_geometry_intersections(
     annots = list(tagged_annotations.keys())
     intersected_annotations = tagged_annotations.copy()
     for i_annot in annots:
-        
         i_attrs = intersected_annotations[i_annot]
         i_rank = i_attrs["rank"]
         i_page = i_annot.page
@@ -544,16 +679,19 @@ def get_geometry_intersections(
             j_page = j_annot.page
             i_geom = i_attrs["geometry"]
             j_geom = j_attrs["geometry"]
-            if i_page != j_page: 
+            if i_page != j_page:
                 continue
-            if i_rank < j_rank:
+            if j_rank > i_rank:
                 intersection = geom_ops.get_intersection(i_geom, j_geom, j_attrs['tag'])
+                other_reaction_type = i_attrs['reaction_type']
                 if intersection is None: continue
                 intersections_below.append(Intersection(*intersection))
             elif i_rank > j_rank:
                 intersection = geom_ops.get_intersection(j_geom, i_geom, j_attrs['tag'])
+                # reaction_type
                 if intersection is None: continue
                 intersections_above.append(Intersection(*intersection))
+
         i_attrs["intersections_above"] = intersections_above
         i_attrs["intersections_below"] = intersections_below
     return intersected_annotations
@@ -571,38 +709,62 @@ def get_geometry_correspondents(
     last_page = descending_pages[-1]
     corresponding_annotations = tagged_annotations.copy()
     prev_page = None
+    annots_prev = {}
     for page in descending_pages:
         if page != last_page:
             next_page = page - 1
             annots_here = annots_by_page[page]
             annots_below = annots_by_page[next_page]
             correspondents_above = {j_attrs['tag']: [] for j_attrs in annots_below.values()}
-            correspondents_below = []
+            correspondents_below = {}
 
             for i_annot, i_attrs in annots_here.items():
                 i_page = i_annot.page
-                correspondents_below = []
+                i_tag = i_attrs['tag']
+                i_geom = i_attrs["geometry"]
+                i_rank = i_attrs["rank"]
+                i_rxn_type = i_attrs.get('reaction_type', "point")
                 for j_annot, j_attrs in annots_below.items():
                     j_attrs = annots_below[j_annot]
                     j_page = j_annot.page
-                    i_geom = i_attrs["geometry"]
                     j_geom = j_attrs["geometry"]
-                    i_tag = i_attrs['tag']
+                    j_rank = j_attrs['rank']
                     j_tag = j_attrs['tag']
+                    j_rxn_type = j_attrs.get('reaction_type', "point")
+                    if i_geom.geom_type == "LineString" and j_geom.geom_type == "LineString":
+                        continue # No correspondence between lines
                     correspondence_ratio = geom_ops.check_corresponds(i_geom, j_geom)
-                    if correspondence_ratio:
-                        correspondents_below.append(Correspondent(correspondence_ratio, j_geom, j_tag))
-                        correspondents_above[j_attrs['tag']].append(Correspondent(correspondence_ratio, i_geom, i_attrs['tag']))
-                corresponding_annotations[i_annot]["correspondents_above"] = correspondents_above.get(i_attrs['tag'], [])
-                corresponding_annotations[i_annot]["correspondents_below"] = correspondents_below
+                    correspondents_below.setdefault(i_tag, [])
+                    if correspondence_ratio and i_rank >= j_rank: # Same rank allowed to transfer in correspondents (e.g. column to column)
+                        correspondents_below[i_tag].append(Correspondent(correspondence_ratio, j_geom, j_tag, other_reaction_type=j_rxn_type))
+                        correspondents_above[j_tag].append(Correspondent(correspondence_ratio, i_geom, i_attrs['tag'], other_reaction_type=i_rxn_type))
+                        corresponding_annotations[j_annot].setdefault("correspondents_above", [])
+                        corresponding_annotations[i_annot].setdefault("correspondents_below", [])
+                        corresponding_annotations[j_annot]["correspondents_above"] = correspondents_above[j_tag]
+                        corresponding_annotations[i_annot]["correspondents_below"] = correspondents_below[i_tag]
+                    else:
+                        # Populate empty fields for annotations with no correspondents
+                        corresponding_annotations[i_annot].setdefault("correspondents_below", [])
+                        corresponding_annotations[i_annot].setdefault("correspondents_above", [])
+                
+            annots_prev = annots_here
                 
         else:
-            annots_here = annots_by_page[page]
+            annots_last = annots_by_page[page]
             if len(descending_pages) == 1: 
                 correspondents_above = {} # There are no correspondents above or below on a single page
-            for i_annot, i_attrs in annots_here.items():
-                corresponding_annotations[i_annot]["correspondents_below"] = []
-                corresponding_annotations[i_annot]["correspondents_above"] = correspondents_above.get(i_attrs['tag'], [])
+            for i_annot, i_attrs in annots_last.items():
+                # For catching correspondents that terminate on the last page 
+                for j_annot, j_attrs in annots_prev.items():
+                    j_tag = j_attrs['tag']
+                    if j_tag in correspondents_below:
+                        for corr in correspondents_below.get(j_tag, []):
+                            if corr.other_tag == i_tag:
+                                correspondents_above[i_tag].append(Correspondent(corr.overlap_ratio, j_attrs['geometry'], j_tag, j_attrs['reaction_type']))
+
+                i_tag = i_attrs['tag']
+                corresponding_annotations[i_annot]['correspondents_above'] = correspondents_above[i_tag]
+                corresponding_annotations[i_annot]['correspondents_below'] = []
         if prev_page is None:
             prev_page = page
     return corresponding_annotations

@@ -5,6 +5,7 @@ from shapely.wkt import loads as wkt_loads
 from shapely import Geometry, GeometryCollection, Point
 from papermodels.datatypes.annotation import Annotation
 from papermodels.loads.load_distribution import LoadingGeometry
+from papermodels.geometry import geom_ops
 from typing import Any, Optional
 import re
 import numpy as np
@@ -84,7 +85,7 @@ def parse_annotations(
         legend_data = legend_text.lower().replace("\r\n", "\n").replace("\r", "\n").replace(f"{legend_identifier.lower()}\n", "").split("\n")
         legend_data = [elem for elem in legend_data if elem]
         annot_attributes = {
-            legend_attr.split(": ")[0]: legend_attr.split(": ")[1]
+            legend_attr.split(": ")[0].lower().replace(" ", "_"): legend_attr.split(": ")[1]
             for legend_attr in legend_data
         }
         for annot in matching_annots:
@@ -101,6 +102,10 @@ def parse_annotations(
                     annot_attr.split("<")[0]
                 )  # .split() to remove trailing HTML tags
             # annot_attrs["rank"] = int(annot_attributes["rank"])
+            annot_attrs.setdefault("reaction_type", "point")
+            annot_attrs['reaction_type'] = annot_attrs['reaction_type'].lower()
+            if annot_geom.geom_type == "Polygon" and annot_attrs['reaction_type'] == "linear":
+                annot_attrs['length'] = geom_ops.get_rectangle_centerline(annot_geom).length
             parsed_annotations.update({annot: annot_attrs})
     return parsed_annotations
 
@@ -122,6 +127,7 @@ def tag_parsed_annotations(
     annots_to_enumerate = {}
     for annot, annot_attrs in annots_to_tag.items():
         tag = annot_attrs.get('tag')
+        # There is an existing annotation
         if tag is not None:
             parsed = parse_tag_components(tag)
             if parsed is not None and len(parsed) == 3: # Tag is not in correct format so ignore
@@ -133,6 +139,7 @@ def tag_parsed_annotations(
                 annots_to_enumerate.update({annot: annot_attrs})
         else:
             annots_to_enumerate.update({annot: annot_attrs})
+
 
     for annot, annot_attrs in annots_to_enumerate.items():
         type_initials = "".join(

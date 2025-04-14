@@ -9,7 +9,7 @@ import hashlib
 from papermodels.datatypes.element import Element, LoadedElement
 from shapely import Point, LineString, Polygon
 from ..geometry import geom_ops as geom
-from ..datatypes.element import Correspondent, Intersection, get_collector_extents
+from ..datatypes.element import Correspondent, Intersection, get_collector_extents, get_transfer_extents
 from ..paper.annotations import (
     Annotation, 
     scale_annotations, 
@@ -89,6 +89,10 @@ class GeometryGraph(nx.DiGraph):
                 for intersection in element.intersections_below:
                     j_tag = intersection.other_tag
                     g.add_edge(element.tag, j_tag)
+            if element.tag in g.collector_elements:
+                for correspondent in element.correspondents_above:
+                    j_tag = correspondent.other_tag
+                    g.add_edge(j_tag, element.tag)
 
         for node in g.collector_elements:
             g.nodes[node]['element'].element_type = "collector"
@@ -111,12 +115,17 @@ class GeometryGraph(nx.DiGraph):
             element: Element = node_attrs['element']
             if node_attrs['start_coord'] is None: # node geometry is polygon
                 updated_intersections_below = []
+                if element.reaction_type == "linear":
+                    all_extents = get_transfer_extents(element)
                 for intersection in element.intersections_below:
+                    extents = all_extents.get(intersection.other_tag)
                     new_intersection = Intersection(
                         intersection.intersecting_region,
                         intersection.other_geometry,
                         intersection.other_tag,
-                        0
+                        0,
+                        intersection.other_reaction_type,
+                        other_extents=extents
                     )
                     updated_intersections_below.append(new_intersection)
             else:
@@ -130,9 +139,9 @@ class GeometryGraph(nx.DiGraph):
                     raise ValueError(f"It seems that this element only has one support: {node}")
                 _, other_tags_below = zip(*sorted_below_ints)
                 updated_intersections_below = []
-                collector_extents = {}
+                extents = {}
                 if element.element_type == "collector" and element.reaction_type == "linear":
-                    collector_extents = get_collector_extents(element)
+                    extents = get_collector_extents(element)
                 for intersection in element.intersections_below:
                     other_tag = intersection.other_tag
 
@@ -142,8 +151,8 @@ class GeometryGraph(nx.DiGraph):
                         intersection.other_geometry,
                         intersection.other_tag,
                         local_index,
-                        other_reaction_type="linear",
-                        other_extents=collector_extents.get(other_tag, None)
+                        other_reaction_type=intersection.other_reaction_type,
+                        other_extents=extents.get(other_tag, None)
                     )
                     updated_intersections_below.append(new_intersection)
                 if node in self.collector_elements and element.subelements is not None:
@@ -184,9 +193,10 @@ class GeometryGraph(nx.DiGraph):
                     )
                     for above_intersection_below in element_above.intersections_below
                 }
-                collector_extents = {}
                 local_index = above_intersections_below[element_tag][0]
                 other_extents = above_intersections_below[element_tag][1]
+                # if element_tag == "FB2.2":
+                #     print(f"{other_extents=}")
                 if element_above.subelements is None:
                     new_intersection = Intersection(
                         intersection.intersecting_region,
