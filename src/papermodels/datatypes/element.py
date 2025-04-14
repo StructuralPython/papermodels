@@ -370,7 +370,7 @@ class LoadedElement(Element):
             for correspondent in self.correspondents_above:
                 if correspondent.other_reaction_type == "point":
                     point_load = self.create_point_load(
-                        transfer_location=1,
+                        transfer_location=[],
                         magnitude=0.0,
                         transfer_source=correspondent.other_tag,
                         transfer_reaction_index=0,
