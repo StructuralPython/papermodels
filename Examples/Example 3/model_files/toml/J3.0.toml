@@ -1,0 +1,98 @@
+[element_attributes]
+tag = "J3.0"
+length = 11.304499999999997
+orientation = "horizontal"
+vert_correspondent_below = []
+vert_correspondent_above = []
+horz_intersects_above = []
+horz_intersects_below = [
+    "FB3.0",
+    "FB3.1",
+]
+
+[element_geometry]
+geometry = "LINESTRING (24.4456 33.5136, 24.4456 22.2091)"
+supports = [
+    { location = 0.1999999999999993, fixity = "pin" },
+    { location = 11.262, fixity = "roller" },
+]
+
+[loads]
+point_loads = []
+
+[[loads.distributed_loads]]
+transfer_source = ""
+transfer_reaction_index = ""
+occupancy = "residential"
+load_components = []
+applied_area = 11.304500000001
+start_loc = 0
+start_magnitude = 0.08846
+end_loc = 11.304499999998997
+end_magnitude = 0.08846
+
+[[loads.distributed_loads]]
+transfer_source = ""
+transfer_reaction_index = ""
+occupancy = "big stuff"
+load_components = []
+applied_area = 1.7221335998520368
+start_loc = 2.5909000000010014
+start_magnitude = 0.260088
+end_loc = 4.313033599851245
+end_magnitude = 0.260088
+
+[[loads.distributed_loads]]
+transfer_source = ""
+transfer_reaction_index = ""
+occupancy = "big stuff"
+load_components = []
+applied_area = 0.015572703606804747
+start_loc = 4.313033599852245
+start_magnitude = 0.260088
+end_loc = 4.344179007065822
+end_magnitude = 0.0
+
+[[loads.distributed_loads]]
+transfer_source = ""
+transfer_reaction_index = ""
+occupancy = "big stuff"
+load_components = []
+applied_area = 0.0
+start_loc = 4.344179007066822
+start_magnitude = 0.0
+end_loc = 7.714311962557517
+end_magnitude = 0.0
+
+[[loads.distributed_loads]]
+transfer_source = ""
+transfer_reaction_index = ""
+occupancy = "big stuff"
+load_components = []
+applied_area = 0.02197366333444141
+start_loc = 7.714311962558517
+start_magnitude = 0.0
+end_loc = 7.758259289227354
+end_magnitude = 0.260088
+
+[[loads.distributed_loads]]
+transfer_source = ""
+transfer_reaction_index = ""
+occupancy = "big stuff"
+load_components = []
+applied_area = 2.08297924711648
+start_loc = 7.758259289228354
+start_magnitude = 0.260088
+end_loc = 9.841238536342665
+end_magnitude = 0.260088
+
+[[loads.distributed_loads]]
+transfer_source = ""
+transfer_reaction_index = ""
+occupancy = "big stuff"
+load_components = []
+applied_area = 0.002193676782213114
+start_loc = 9.841238536343665
+start_magnitude = 0.260088
+end_loc = 9.845625889908087
+end_magnitude = 0.0
