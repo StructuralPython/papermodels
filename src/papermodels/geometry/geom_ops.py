@@ -156,46 +156,56 @@ def get_joist_extents(
     Point objects which represent the "i" (start) and "j" (end) locations on the supports
     given in 'joist_supports' which support the 'joist_prototype'.
 
-    'joist_supports' is a list of two LineString where each LineString only has one line segment
+    'joist_supports' is a list of LineString where each LineString only has one line segment
         (the relevant line segment which provides the support to 'joist_prototype')
     """
     supports_bbox = get_system_bounds(joist_prototype, joist_supports)
     
     magnitude_max = get_magnitude(supports_bbox)
-    joist_vector = get_direction_vector(joist_prototype)
-    ordered_supports = determine_support_order(joist_prototype, joist_supports)
-    a_support, b_support = ordered_supports["A"], ordered_supports["B"]
+    joist_vector = get_direction_vector(joist_prototype).flatten()
+    zero_vector = np.array([0, 1]) # "up"
+    print(f"{joist_vector=}")
+    joist_angle = get_vector_angle(joist_vector, zero_vector)
+    joist_origin, joist_end = get_start_end_nodes(joist_prototype)
+    joist_origin = np.array(joist_origin.coords[0])
+    left_coords = []
+    right_coords = []
+    for joist_support in joist_supports:
+        start_coord, end_coord = joist_support.coords
+        start_coord_angle = get_vector_angle(joist_vector, np.array(start_coord) - joist_origin)
+        end_coord_angle = get_vector_angle(joist_vector, np.array(end_coord) - joist_origin)
+        print(np.array(end_coord) - joist_origin)
+        print(f"{joist_angle=} | {start_coord_angle=} | {end_coord_angle=}")
+        if start_coord_angle > joist_angle:
+            right_coords.append(start_coord)
+        elif joist_angle > start_coord_angle:
+            left_coords.append(start_coord)
+        if end_coord_angle > joist_angle:
+            right_coords.append(end_coord)
+        elif joist_angle > end_coord_angle:
+            left_coords.append(end_coord)
+    closest_left_coord = min(left_coords, key=lambda x: Point(x).distance(joist_prototype))
+    closest_right_coord = min(right_coords, key=lambda x: Point(x).distance(joist_prototype))
+    closest_left_distance = Point(closest_left_coord).distance(joist_prototype)
+    closest_right_distance = Point(closest_right_coord).distance(joist_prototype)
+    joist_vector_normal = rotate_90(joist_vector, ccw=True)
+    joist_left = LineString([
+        project_node(joist_origin, joist_vector_normal, magnitude=closest_left_distance),
+        project_node(joist_end, joist_vector_normal, magnitude=closest_left_distance)
+    ])
+    joist_right = LineString([
+        project_node(joist_origin, -joist_vector_normal, magnitude=closest_right_distance),
+        project_node(joist_end, -joist_vector_normal, magnitude=closest_right_distance)
+    ])
+    # extents = []
+    # for joist_support in joist_supports:
+    #     extent = (joist_support.intersection(joist_left), joist_support.intersection(joist_right))
+    #     extents.append(extent)
+    extents = {}
+    extents['A'] = (joist_supports[0].intersection(joist_left), joist_supports[0].intersection(joist_right))
+    extents['B'] = (joist_supports[1].intersection(joist_left), joist_supports[1].intersection(joist_right))
 
-    ai_node, aj_node = get_start_end_nodes(a_support)
-
-    ai_to_b_jnode = project_node(ai_node, joist_vector, magnitude_max)
-    ai_to_b_ray = LineString([ai_node, ai_to_b_jnode])
-    aj_to_b_jnode = project_node(aj_node, joist_vector, magnitude_max)
-    aj_to_b_ray = LineString([aj_node, aj_to_b_jnode])
-
-    bi_node, bj_node = get_start_end_nodes(b_support)
-
-    bi_to_a_jnode = project_node(bi_node, -joist_vector, magnitude_max)
-    bi_to_a_ray = LineString([bi_node, bi_to_a_jnode])
-    bj_to_a_jnode = project_node(bj_node, -joist_vector, magnitude_max)
-    bj_to_a_ray = LineString([bj_node, bj_to_a_jnode])
-
-    extents_a = [ai_node, aj_node]
-    extents_b = [bi_node, bj_node]
-
-    # Project A onto B
-    if ai_to_b_ray.intersects(b_support):
-        extents_b[0] = ai_to_b_ray & b_support
-    if aj_to_b_ray.intersects(b_support):
-        extents_b[1] = aj_to_b_ray & b_support
-
-    # Project B onto A
-    if bi_to_a_ray.intersects(a_support):
-        extents_a[0] = bi_to_a_ray & a_support
-    if bj_to_a_ray.intersects(a_support):
-        extents_a[1] = bj_to_a_ray & a_support
-
-    return {"A": tuple(extents_a), "B": tuple(extents_b)}
+    return extents
 
 
 def get_cantilever_segments(
@@ -468,6 +478,12 @@ def trapezoid_area(h: float, b2: float, b1: float) -> float:
     return area
 
 
+def get_vector_angle(v1, v2) -> float:
+    """
+    Returns the angle between two vectors
+    """
+    angle = np.arccos(np.dot(v1, v2) / np.linalg.norm(v1 * v2))
+    return angle
 
 def create_linestring(points: list[tuple]) -> LineString:
     return LineString(points)

@@ -127,7 +127,7 @@ class JoistArrayModel:
     ) -> JoistArrayModel:
         joist_array = cls(
             element, spacing, initial_offset, joist_at_start, joist_at_end, cantilever_tolerance
-        )
+        )left
         # joist_array.show_svg()
         return joist_array.to_subelements()
     
