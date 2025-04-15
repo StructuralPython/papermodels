@@ -111,23 +111,27 @@ class Element:
         """
         Generates an Element from provided geometries
         """
-        inters_above = {
-            above_tag: Intersection(*geom_ops.get_intersection(elem_geom, above_geom, above_tag))
-            for above_tag, above_geom in intersections_above.items()
-
-        } if intersections_above is not None else {}
-        inters_below = {
-            below_tag: Intersection(*geom_ops.get_intersection(elem_geom, below_geom, below_tag))
-            for below_tag, below_geom in intersections_below.items()
-        } if intersections_below is not None else {}
+        inters_above = []
+        inters_below = []
+        if intersections_above is not None:
+            inters_above = [
+                Intersection(*geom_ops.get_intersection(elem_geom, above_geom, above_tag))
+                for above_tag, above_geom in intersections_above.items()]
+        
+        if intersections_below is not None:
+            inters_below = [
+                Intersection(*geom_ops.get_intersection(elem_geom, below_geom, below_tag))
+                for below_tag, below_geom in intersections_below.items() 
+                if intersections_below is not None 
+            ]
 
         return cls(
             tag=elem_tag,
             geometry=elem_geom,
             intersections_above=inters_above,
             intersections_below=inters_below,
-            correspondents_above=correspondents_above or {},
-            correspondents_below=correspondents_below or {},
+            correspondents_above=correspondents_above or [],
+            correspondents_below=correspondents_below or [],
         )
 
     @classmethod
