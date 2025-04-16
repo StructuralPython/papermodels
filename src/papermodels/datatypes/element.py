@@ -285,7 +285,7 @@ class LoadedElement(Element):
         if self.geometry.geom_type == "LineString":
             coords_a, coords_b = self.geometry.coords
             coords_a, coords_b = Point(coords_a), Point(coords_b)
-            ordered_coords = geom_ops.order_nodes_positive(coords_a, coords_b)
+            ordered_coords = geom_ops.order_nodes_positive([coords_a, coords_b])
             start_coord = ordered_coords[0]
             support_locations = geom_ops.get_local_intersection_ordinates(
                 start_coord,
@@ -309,7 +309,7 @@ class LoadedElement(Element):
         if self.geometry.geom_type == "LineString":
             coords_a, coords_b = self.geometry.coords
             coords_a, coords_b = Point(coords_a), Point(coords_b)
-            ordered_coords = geom_ops.order_nodes_positive(coords_a, coords_b)
+            ordered_coords = geom_ops.order_nodes_positive([coords_a, coords_b])
             start_coord = ordered_coords[0]
             transfer_locations = geom_ops.get_local_intersection_ordinates(
                 start_coord,
@@ -604,29 +604,14 @@ def get_collector_extents(
     for idx, poly_support_geom in enumerate(poly_support_geoms):
         clean_support_geom = support_geoms[idx]
         cleaned_supports_map.update({clean_support_geom: poly_support_geom})
-    try:
-        ordered_support_geoms = geom_ops.determine_support_order(collector_prototype.geometry, support_geoms)
-    except TypeError as e:
-        print(f"Check: {collector_prototype.tag}")
-        raise e
-    support_a_tag = support_tags_by_geom[cleaned_supports_map[ordered_support_geoms['A']]]
-    support_b_tag = support_tags_by_geom[cleaned_supports_map[ordered_support_geoms['B']]]
-    collector_extents = geom_ops.get_joist_extents(collector_prototype.geometry, list(ordered_support_geoms.values()))
-    support_a = ordered_support_geoms['A']
-    support_b = ordered_support_geoms['B']
-    support_a_start_node, _ = geom_ops.get_start_end_nodes(support_a)
-    support_b_start_node, _ = geom_ops.get_start_end_nodes(support_b)
-
-    a_extents = (
-        Point(collector_extents['A'][0]).distance(support_a_start_node),
-        Point(collector_extents['A'][1]).distance(support_a_start_node),
-        )
-    b_extents = (
-        Point(collector_extents['B'][0]).distance(support_b_start_node),
-        Point(collector_extents['B'][1]).distance(support_b_start_node),
-        )
-    
-    return {support_a_tag: a_extents, support_b_tag: b_extents}
+    ordered_support_geoms = geom_ops.sort_supports(collector_prototype.geometry, support_geoms)
+    extents = geom_ops.get_joist_extents(collector_prototype.geometry, ordered_support_geoms)
+    tagged_extents = {}
+    for idx, extent in enumerate(extents):
+        support_geom = ordered_support_geoms[idx]
+        support_tag = support_tags_by_geom[support_geom]
+        tagged_extents.update({support_tag: extent})
+    return tagged_extents
 
 
 def get_transfer_extents(element: Element) -> tuple[str, dict]:

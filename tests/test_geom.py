@@ -1,4 +1,4 @@
-from shapely import LineString, Polygon, Geometry, GeometryCollection, MultiPoint
+from shapely import Point, LineString, Polygon, Geometry, GeometryCollection, MultiPoint
 from shapely.affinity import translate
 from shapely import wkt
 from math import isclose
@@ -28,5 +28,29 @@ def test_get_joist_extents():
     ls2 = LineString([[-23, 300], [350, 335]])
     j1 = LineString([[140.0, -23.4], [100.0, 390.3]])
     extents = geom_ops.get_joist_extents(j1, [ls1, ls2])
-    assert wkt.dumps(MultiPoint(extents['A']), rounding_precision=3) == 'MULTIPOINT (20.981 304.127, 273.716 327.842)'
-    assert wkt.dumps(MultiPoint(extents['B']), rounding_precision=3) == 'MULTIPOINT (50.000 4.000, 300.000 56.000)'
+    assert (
+        wkt.dumps(MultiPoint(extents[0] + extents[1]), trim=True, rounding_precision=3) 
+        == 'MULTIPOINT (273.716 327.842, 20.981 304.127, 300 56, 50 4)'
+    )
+    ls1 = LineString([[0, 0], [0, 100]])
+    ls2 = LineString([[50, -20], [50, 80]])
+    j1 = LineString([[-20, 40], [60, 40]])
+    extents = geom_ops.get_joist_extents(j1, [ls1, ls2])
+    assert (
+        wkt.dumps(MultiPoint(extents[0] + extents[1]), trim=True, rounding_precision=3)
+        == 'MULTIPOINT (0 80, 0 0, 50 80, 50 0)'
+    )
+
+
+def test_order_nodes_positive():
+    p1 = Point([0, 0])
+    p2 = Point([0, 10])
+    p3 = Point([10, 10])
+    p4 = Point([12, 0])
+    p5 = Point([5, -10])
+    p6 = Point([0.1, -12])
+
+    assert geom_ops.order_nodes_positive([p6, p1]) == (p1, p6)
+    assert geom_ops.order_nodes_positive([p4, p3]) == (p3, p4)
+    assert geom_ops.order_nodes_positive([p6, p5]) == (p6, p5)
+    assert geom_ops.order_nodes_positive([p2, p1]) == (p1, p2)

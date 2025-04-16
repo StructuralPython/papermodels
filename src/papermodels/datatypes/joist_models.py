@@ -89,7 +89,7 @@ class JoistArrayModel:
         self._cantilever_tolerance = cantilever_tolerance
         self._extents = geom_ops.get_joist_extents(self.joist_prototype, self.joist_supports)
 
-        self._supports = geom_ops.determine_support_order(self.joist_prototype, self.joist_supports)
+        self._supports = geom_ops.sort_supports(self.joist_prototype, self.joist_supports)
         self._cantilevers = geom_ops.get_cantilever_segments(self.joist_prototype, self._supports)
         self.vector_parallel = geom_ops.get_direction_vector(self.joist_prototype)
         self.vector_normal = geom_ops.rotate_90(self.vector_parallel, ccw=True)
@@ -127,7 +127,7 @@ class JoistArrayModel:
     ) -> JoistArrayModel:
         joist_array = cls(
             element, spacing, initial_offset, joist_at_start, joist_at_end, cantilever_tolerance
-        )left
+        )
         # joist_array.show_svg()
         return joist_array.to_subelements()
     
@@ -182,11 +182,11 @@ class JoistArrayModel:
 
         if index != 0 and index != len(self.joist_locations) - 1:
             new_centroid = geom_ops.project_node(
-                start_centroid, self.vector_normal, joist_distance # orig -ve
+                start_centroid, -self.vector_normal, joist_distance # orig -ve
             )
 
             system_bounds = geom_ops.get_system_bounds(
-                self._joist_prototype, list(self._supports.values())
+                self._joist_prototype, list(self._supports)
             )
             projection_distance = geom_ops.get_magnitude(system_bounds)
             ray_aj = geom_ops.project_node(
@@ -197,9 +197,9 @@ class JoistArrayModel:
                 new_centroid, self.vector_parallel, projection_distance # orig +ve
             )
             ray_b = LineString([new_centroid, ray_bj])
-            # display(GeometryCollection([start_centroid, self._supports['A'], ray_a, self._supports['B'], self._extents['A'][0], self._extents['B'][0]]))
-            support_a_loc = ray_a.intersection(self._supports["A"])
-            support_b_loc = ray_b.intersection(self._supports["B"])
+            # display(GeometryCollection([start_centroid, self.get_extent_edge("start"), new_centroid, self._supports[0], self._supports[-1],]))
+            support_a_loc = ray_a.intersection(self._supports[0])
+            support_b_loc = ray_b.intersection(self._supports[-1])
 
             end_a = support_a_loc
             end_b = support_b_loc
@@ -207,12 +207,12 @@ class JoistArrayModel:
         # These clauses req'd to deal with floating point error possible
         # on the end joists (occurs after performing project_node)
         elif index == 0:
-            end_a = support_a_loc = self._extents["A"][0]
-            end_b = support_b_loc = self._extents["B"][0]
+            end_a = support_a_loc = self._extents[0][0]
+            end_b = support_b_loc = self._extents[-1][0]
         elif index == len(self.joist_locations) - 1:
-            end_a = support_a_loc = self._extents["A"][1]
-            end_b = support_b_loc = self._extents["B"][1]
-
+            end_a = support_a_loc = self._extents[0][1]
+            end_b = support_b_loc = self._extents[-1][1]
+        
         if self._cantilevers["A"]:
             end_a = geom_ops.project_node(
                 support_a_loc, -self.vector_parallel, self._cantilevers["A"]
@@ -230,11 +230,11 @@ class JoistArrayModel:
         'edge': one of {'start', 'end'}
         """
         if edge == "start":
-            node_i = self._extents["A"][0]
-            node_j = self._extents["B"][0]
+            node_i = self._extents[0][0]
+            node_j = self._extents[-1][0]
         elif edge == "end":
-            node_i = self._extents["A"][1]
-            node_j = self._extents["B"][1]
+            node_i = self._extents[0][1]
+            node_j = self._extents[-1][1]
         return LineString([node_i, node_j])
 
     def get_joist_trib_widths(self, index) -> tuple[float, float]:

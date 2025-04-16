@@ -72,7 +72,7 @@ class GeometryGraph(nx.DiGraph):
             start_coord = None
             if element.geometry.geom_type == "LineString":
                 coords_a, coords_b = element.geometry.coords
-                ordered_coords = geom.order_nodes_positive(Point(coords_a), Point(coords_b))
+                ordered_coords = geom.order_nodes_positive([Point(coords_a), Point(coords_b)])
                 start_coord = ordered_coords[0]
             g.add_node(
                 element.tag, 
