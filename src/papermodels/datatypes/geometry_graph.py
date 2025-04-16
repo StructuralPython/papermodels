@@ -445,7 +445,7 @@ class GeometryGraph(nx.DiGraph):
             if element.element_type == "collector" and element.subelements is not None:
                 for sub_elem in element.subelements:
                     le = LoadedElement.from_element_with_loads(sub_elem, loading_geoms=loading_geoms_on_plane)
-                    loaded_elements.append({node: le})
+                    loaded_elements.update({node: le})
             else:
                 le = LoadedElement.from_element_with_loads(node_attrs['element'], loading_geoms=loading_geoms_on_plane)
                 loaded_elements.update({node: le})

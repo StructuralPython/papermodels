@@ -149,7 +149,7 @@ def clean_polygon_supports(support_geoms: list[LineString | Polygon], joist_prot
 
 
 def get_joist_extents(
-    joist_prototype: LineString, joist_supports: list[LineString]
+    joist_prototype: LineString, joist_supports: list[LineString], eps: float = 1e-6
 ) -> dict[str, tuple[Point, Point]]:
     """
     Returns the extents for the supports "A" and "B". Each extent is represented by a tuple of
@@ -158,6 +158,8 @@ def get_joist_extents(
 
     'joist_supports' is a list of LineString where each LineString only has one line segment
         (the relevant line segment which provides the support to 'joist_prototype')
+    'eps' is a small tolerance amount to deal with floating point error in the extent
+        calcualtion.
     """
     supports_bbox = get_system_bounds(joist_prototype, joist_supports)
     magnitude_max = get_magnitude(supports_bbox)
@@ -184,17 +186,27 @@ def get_joist_extents(
     closest_right_distance = Point(closest_right_coord).distance(joist_prototype)
     joist_vector_normal = rotate_90(joist_vector, ccw=True)
     joist_left = LineString([
-        project_node(Point(joist_origin), joist_vector_normal, magnitude=closest_left_distance),
-        project_node(Point(joist_end), joist_vector_normal, magnitude=closest_left_distance)
+        project_node(Point(joist_origin), joist_vector_normal, magnitude=closest_left_distance - eps),
+        project_node(Point(joist_end), joist_vector_normal, magnitude=closest_left_distance - eps)
     ])
     joist_right = LineString([
-        project_node(Point(joist_origin), -joist_vector_normal, magnitude=closest_right_distance),
-        project_node(Point(joist_end), -joist_vector_normal, magnitude=closest_right_distance)
+        project_node(Point(joist_origin), -joist_vector_normal, magnitude=closest_right_distance - eps),
+        project_node(Point(joist_end), -joist_vector_normal, magnitude=closest_right_distance - eps)
     ])
     ordered_joist_supports = sort_supports(joist_prototype, joist_supports)
     extents = []
-    for linestring in ordered_joist_supports:
-        extents.append((linestring.intersection(joist_left), linestring.intersection(joist_right)))
+    # from IPython.display import display
+    # from shapely import GeometryCollection
+    for support_linestring in ordered_joist_supports:
+        left_extent = support_linestring.intersection(joist_left)
+        right_extent = support_linestring.intersection(joist_right)
+        # display(GeometryCollection([joist_left, support_linestring]))
+
+        # Make sure the intersection geometries are not empty before proceeding
+        # If one or more is empty, there is a problem that needs investigating
+        assert not left_extent.is_empty
+        assert not right_extent.is_empty
+        extents.append((left_extent, right_extent))
     return extents
 
 
@@ -348,11 +360,7 @@ def project_node(node: Point, vector: np.ndarray, magnitude: float):
     """
     scaled_vector = vector * magnitude
     projected_node = np.array(node.coords[0]) + scaled_vector
-    try:
-        return Point(projected_node)
-    except ValueError:
-        print(f"{node=} | {vector=} | {magnitude=} | {scaled_vector=} | {projected_node=}")
-        raise ValueError
+    return Point(projected_node)
 
 def rotate_90(v: np.ndarray, precision: int = 6, ccw=True) -> tuple[float, float]:
     """
@@ -361,19 +369,11 @@ def rotate_90(v: np.ndarray, precision: int = 6, ccw=True) -> tuple[float, float
     'precision': round result to this many decimal places
     'ccw': if True, rotate counter-clockwise (clockwise, otherwise)
     """
-    v_angle = np.arctan2(v[1], v[0])
-
+    # v_angle = np.arctan2(v[1], v[0])
     if ccw:
-        if 0 < v_angle <= math.pi / 2: # Positive x-bias
-            angle = -math.pi / 2
-        else:
             angle = math.pi/2
     else:
-        if 0 < v_angle <= math.pi / 2: # Positive x-bias
-            angle = math.pi/2
-        else:
             angle = -math.pi / 2
-
     rot = np.array(
         [
             [round(math.cos(angle), precision), -round(math.sin(angle), precision)],

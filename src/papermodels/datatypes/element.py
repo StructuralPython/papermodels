@@ -605,7 +605,11 @@ def get_collector_extents(
         clean_support_geom = support_geoms[idx]
         cleaned_supports_map.update({clean_support_geom: poly_support_geom})
     ordered_support_geoms = geom_ops.sort_supports(collector_prototype.geometry, support_geoms)
-    extents = geom_ops.get_joist_extents(collector_prototype.geometry, ordered_support_geoms)
+    try:
+        extents = geom_ops.get_joist_extents(collector_prototype.geometry, ordered_support_geoms)
+    except AssertionError as e:
+        raise AssertionError(f"No intersection within joist extents: {collector_prototype.tag=}")
+    
     tagged_extents = {}
     for idx, extent in enumerate(extents):
         support_geom = ordered_support_geoms[idx]

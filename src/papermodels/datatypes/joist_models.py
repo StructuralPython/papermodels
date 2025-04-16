@@ -77,9 +77,14 @@ class JoistArrayModel:
         joist_at_end: bool = False,
         cantilever_tolerance: float = 1e-2,
     ):
-        self.joist_prototype = LineString(geom_ops.get_start_end_nodes(element.geometry))
-        self.joist_supports = geom_ops.clean_polygon_supports([ib.other_geometry for ib in element.intersections_below])
-
+        try:
+            self.joist_prototype = LineString(geom_ops.get_start_end_nodes(element.geometry))
+        except NotImplementedError:
+            raise AssertionError(f"The geometry of {element.tag=} is being used as a joist prototype incorrectly.")
+        try:
+            self.joist_supports = geom_ops.clean_polygon_supports([ib.other_geometry for ib in element.intersections_below], self.joist_prototype)
+        except AssertionError:
+            raise AssertionError(f"No intersection at cleaned_support: {element.tag=}. Is geometry right on the edge of the support?")
         self.joist_support_tags = [ib.other_tag for ib in element.intersections_below]
         self.id = element.tag
         self.plane_id = element.plane_id
@@ -87,7 +92,10 @@ class JoistArrayModel:
         self.initial_offset = float(initial_offset)
         self._joist_prototype = self.joist_prototype
         self._cantilever_tolerance = cantilever_tolerance
-        self._extents = geom_ops.get_joist_extents(self.joist_prototype, self.joist_supports)
+        try:
+            self._extents = geom_ops.get_joist_extents(self.joist_prototype, self.joist_supports)
+        except AssertionError as e:
+            raise AssertionError(f"No intersection within joist extents: {element.tag=}")
 
         self._supports = geom_ops.sort_supports(self.joist_prototype, self.joist_supports)
         self._cantilevers = geom_ops.get_cantilever_segments(self.joist_prototype, self._supports)
@@ -153,6 +161,9 @@ class JoistArrayModel:
                 joist_geom,
                 sub_id,
                 intersections_below=intersections_below,
+                intersections_above=[],
+                correspondents_below=[],
+                correspondents_above=[],
                 plane_id=self.plane_id,
                 element_type="collector",
                 subelements=None,
