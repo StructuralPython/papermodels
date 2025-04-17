@@ -111,23 +111,27 @@ class Element:
         """
         Generates an Element from provided geometries
         """
-        inters_above = {
-            above_tag: Intersection(*geom_ops.get_intersection(elem_geom, above_geom, above_tag))
-            for above_tag, above_geom in intersections_above.items()
-
-        } if intersections_above is not None else {}
-        inters_below = {
-            below_tag: Intersection(*geom_ops.get_intersection(elem_geom, below_geom, below_tag))
-            for below_tag, below_geom in intersections_below.items()
-        } if intersections_below is not None else {}
+        inters_above = []
+        inters_below = []
+        if intersections_above is not None:
+            inters_above = [
+                Intersection(*geom_ops.get_intersection(elem_geom, above_geom, above_tag))
+                for above_tag, above_geom in intersections_above.items()]
+        
+        if intersections_below is not None:
+            inters_below = [
+                Intersection(*geom_ops.get_intersection(elem_geom, below_geom, below_tag))
+                for below_tag, below_geom in intersections_below.items() 
+                if intersections_below is not None 
+            ]
 
         return cls(
             tag=elem_tag,
             geometry=elem_geom,
             intersections_above=inters_above,
             intersections_below=inters_below,
-            correspondents_above=correspondents_above or {},
-            correspondents_below=correspondents_below or {},
+            correspondents_above=correspondents_above or [],
+            correspondents_below=correspondents_below or [],
         )
 
     @classmethod
@@ -281,7 +285,7 @@ class LoadedElement(Element):
         if self.geometry.geom_type == "LineString":
             coords_a, coords_b = self.geometry.coords
             coords_a, coords_b = Point(coords_a), Point(coords_b)
-            ordered_coords = geom_ops.order_nodes_positive(coords_a, coords_b)
+            ordered_coords = geom_ops.order_nodes_positive([coords_a, coords_b])
             start_coord = ordered_coords[0]
             support_locations = geom_ops.get_local_intersection_ordinates(
                 start_coord,
@@ -305,7 +309,7 @@ class LoadedElement(Element):
         if self.geometry.geom_type == "LineString":
             coords_a, coords_b = self.geometry.coords
             coords_a, coords_b = Point(coords_a), Point(coords_b)
-            ordered_coords = geom_ops.order_nodes_positive(coords_a, coords_b)
+            ordered_coords = geom_ops.order_nodes_positive([coords_a, coords_b])
             start_coord = ordered_coords[0]
             transfer_locations = geom_ops.get_local_intersection_ordinates(
                 start_coord,
@@ -592,7 +596,10 @@ def get_collector_extents(
     prototype would spread over the other_geometry. The (start_x, end_x) locations 
     refer to ordinates on other_geometry, not on the collector_prototype.
     """
-    support_tags_by_geom = {ib.other_geometry: ib.other_tag for ib in collector_prototype.intersections_below}
+    support_tags_by_geom = {
+        geom_ops.clean_polygon_supports([ib.other_geometry], collector_prototype.geometry)[0]: ib.other_tag 
+        for ib in collector_prototype.intersections_below
+    }
     poly_support_geoms = list(support_tags_by_geom.keys())
     support_geoms = geom_ops.clean_polygon_supports(poly_support_geoms, collector_prototype.geometry)
     
@@ -600,29 +607,22 @@ def get_collector_extents(
     for idx, poly_support_geom in enumerate(poly_support_geoms):
         clean_support_geom = support_geoms[idx]
         cleaned_supports_map.update({clean_support_geom: poly_support_geom})
+    ordered_support_geoms = geom_ops.sort_supports(collector_prototype.geometry, support_geoms)
     try:
-        ordered_support_geoms = geom_ops.determine_support_order(collector_prototype.geometry, support_geoms)
-    except TypeError as e:
-        print(f"Check: {collector_prototype.tag}")
-        raise e
-    support_a_tag = support_tags_by_geom[cleaned_supports_map[ordered_support_geoms['A']]]
-    support_b_tag = support_tags_by_geom[cleaned_supports_map[ordered_support_geoms['B']]]
-    collector_extents = geom_ops.get_joist_extents(collector_prototype.geometry, list(ordered_support_geoms.values()))
-    support_a = ordered_support_geoms['A']
-    support_b = ordered_support_geoms['B']
-    support_a_start_node, _ = geom_ops.get_start_end_nodes(support_a)
-    support_b_start_node, _ = geom_ops.get_start_end_nodes(support_b)
+        extents = geom_ops.get_joist_extents(collector_prototype.geometry, ordered_support_geoms)
+    except AssertionError as e:
+        raise AssertionError(f"No intersection within joist extents: {collector_prototype.tag=}")
 
-    a_extents = (
-        Point(collector_extents['A'][0]).distance(support_a_start_node),
-        Point(collector_extents['A'][1]).distance(support_a_start_node),
-        )
-    b_extents = (
-        Point(collector_extents['B'][0]).distance(support_b_start_node),
-        Point(collector_extents['B'][1]).distance(support_b_start_node),
-        )
     
-    return {support_a_tag: a_extents, support_b_tag: b_extents}
+    tagged_extents = {}
+    for idx, extent in enumerate(extents):
+        support_geom = ordered_support_geoms[idx]
+        support_start, _ = geom_ops.get_start_end_nodes(support_geom)
+        support_tag = support_tags_by_geom[support_geom]
+        extent_start = round(extent[0].distance(support_start), 3)
+        extent_end = round(extent[1].distance(support_start), 3)
+        tagged_extents.update({support_tag: (extent_start, extent_end)})
+    return tagged_extents
 
 
 def get_transfer_extents(element: Element) -> tuple[str, dict]:
@@ -746,24 +746,13 @@ def get_geometry_correspondents(
                         # Populate empty fields for annotations with no correspondents
                         corresponding_annotations[i_annot].setdefault("correspondents_below", [])
                         corresponding_annotations[i_annot].setdefault("correspondents_above", [])
-                
-            annots_prev = annots_here
-                
         else:
             annots_last = annots_by_page[page]
             if len(descending_pages) == 1: 
                 correspondents_above = {} # There are no correspondents above or below on a single page
             for i_annot, i_attrs in annots_last.items():
-                # For catching correspondents that terminate on the last page 
-                # for j_annot, j_attrs in annots_prev.items():
-                #     j_tag = j_attrs['tag']
-                #     if j_tag in correspondents_below:
-                #         for corr in correspondents_below.get(j_tag, []):
-                #             if corr.other_tag == i_tag:
-                #                 correspondents_above[i_tag].append(Correspondent(corr.overlap_ratio, j_attrs['geometry'], j_tag, j_attrs['reaction_type']))
-
                 i_tag = i_attrs['tag']
-                corresponding_annotations[i_annot]['correspondents_above'] = correspondents_above[i_tag]
+                corresponding_annotations[i_annot]['correspondents_above'] = correspondents_above.get(i_tag, [])
                 corresponding_annotations[i_annot]['correspondents_below'] = []
         if prev_page is None:
             prev_page = page

@@ -72,7 +72,7 @@ class GeometryGraph(nx.DiGraph):
             start_coord = None
             if element.geometry.geom_type == "LineString":
                 coords_a, coords_b = element.geometry.coords
-                ordered_coords = geom.order_nodes_positive(Point(coords_a), Point(coords_b))
+                ordered_coords = geom.order_nodes_positive([Point(coords_a), Point(coords_b)])
                 start_coord = ordered_coords[0]
             g.add_node(
                 element.tag, 
@@ -115,6 +115,7 @@ class GeometryGraph(nx.DiGraph):
             element: Element = node_attrs['element']
             if node_attrs['start_coord'] is None: # node geometry is polygon
                 updated_intersections_below = []
+                all_extents = {}
                 if element.reaction_type == "linear":
                     all_extents = get_transfer_extents(element)
                 for intersection in element.intersections_below:
@@ -445,7 +446,7 @@ class GeometryGraph(nx.DiGraph):
             if element.element_type == "collector" and element.subelements is not None:
                 for sub_elem in element.subelements:
                     le = LoadedElement.from_element_with_loads(sub_elem, loading_geoms=loading_geoms_on_plane)
-                    loaded_elements.append({node: le})
+                    loaded_elements.update({sub_elem.tag: le})
             else:
                 le = LoadedElement.from_element_with_loads(node_attrs['element'], loading_geoms=loading_geoms_on_plane)
                 loaded_elements.update({node: le})
