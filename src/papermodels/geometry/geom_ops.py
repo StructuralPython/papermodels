@@ -110,7 +110,7 @@ def get_linestring_start_node(ls: LineString) -> Point:
 
 
 
-def clean_polygon_supports(support_geoms: list[LineString | Polygon], joist_prototype: Optional[LineString] = None):
+def clean_polygon_supports(support_geoms: list[LineString | Polygon], joist_prototype: LineString):
     """
     Converts any Polygon in support_geoms into LineStrings. The LineStrings
     are created depending on where the joist prototype lands within the polygon.
@@ -128,9 +128,6 @@ def clean_polygon_supports(support_geoms: list[LineString | Polygon], joist_prot
     for support_geom in support_geoms:
         if support_geom.geom_type == "Polygon":
             support_lines = explode_polygon(support_geom)
-            if joist_prototype is None:
-                support_line = get_rectangle_centerline(support_geom)
-                cleaned_supports.append(support_line)
             support_intersections = joist_prototype.intersects(np.array(support_lines))
             if sum(support_intersections) == 1: # Intersects on one edge only
                 intersecting_line_index = int(support_intersections.nonzero()[0][0])
