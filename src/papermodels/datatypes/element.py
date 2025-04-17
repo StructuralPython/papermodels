@@ -746,24 +746,13 @@ def get_geometry_correspondents(
                         # Populate empty fields for annotations with no correspondents
                         corresponding_annotations[i_annot].setdefault("correspondents_below", [])
                         corresponding_annotations[i_annot].setdefault("correspondents_above", [])
-                
-            annots_prev = annots_here
-                
         else:
             annots_last = annots_by_page[page]
             if len(descending_pages) == 1: 
                 correspondents_above = {} # There are no correspondents above or below on a single page
             for i_annot, i_attrs in annots_last.items():
-                # For catching correspondents that terminate on the last page 
-                # for j_annot, j_attrs in annots_prev.items():
-                #     j_tag = j_attrs['tag']
-                #     if j_tag in correspondents_below:
-                #         for corr in correspondents_below.get(j_tag, []):
-                #             if corr.other_tag == i_tag:
-                #                 correspondents_above[i_tag].append(Correspondent(corr.overlap_ratio, j_attrs['geometry'], j_tag, j_attrs['reaction_type']))
-
                 i_tag = i_attrs['tag']
-                corresponding_annotations[i_annot]['correspondents_above'] = correspondents_above[i_tag]
+                corresponding_annotations[i_annot]['correspondents_above'] = correspondents_above.get(i_tag, [])
                 corresponding_annotations[i_annot]['correspondents_below'] = []
         if prev_page is None:
             prev_page = page

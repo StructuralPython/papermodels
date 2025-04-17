@@ -115,6 +115,7 @@ class GeometryGraph(nx.DiGraph):
             element: Element = node_attrs['element']
             if node_attrs['start_coord'] is None: # node geometry is polygon
                 updated_intersections_below = []
+                all_extents = {}
                 if element.reaction_type == "linear":
                     all_extents = get_transfer_extents(element)
                 for intersection in element.intersections_below:
