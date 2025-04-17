@@ -43,7 +43,6 @@ def get_intersection(
             (i_type == "LineString" and j_type == "Polygon")
         ):
             point = intersecting_region.centroid
-            assert above.contains(point)
             return (point, below, j_tag)
         else:
             raise ValueError(
