@@ -6,6 +6,7 @@ from shapely import Geometry, GeometryCollection, Point
 from papermodels.datatypes.annotation import Annotation
 from papermodels.loads.load_distribution import LoadingGeometry
 from papermodels.geometry import geom_ops
+from papermodels.datatypes.exceptions import LegendError, GeometryError
 from typing import Any, Optional
 import re
 import numpy as np
@@ -84,10 +85,15 @@ def parse_annotations(
         legend_text = strip_html_tags(legend_item.text)
         legend_data = legend_text.lower().replace("\r\n", "\n").replace("\r", "\n").replace(f"{legend_identifier.lower()}\n", "").split("\n")
         legend_data = [elem for elem in legend_data if elem]
-        annot_attributes = {
-            legend_attr.split(": ")[0].lower().replace(" ", "_"): legend_attr.split(": ")[1]
-            for legend_attr in legend_data
-        }
+        annot_attributes = {}
+        for legend_attr in legend_data:
+            try:
+                key, value = legend_attr.split(":")
+            except ValueError as e:
+                raise LegendError(f"Incorrect legend format on the following annotation: {legend_data}")
+            key = key.strip().lower().replace(" ", "_")
+            value = value.strip()
+            annot_attributes.update({key: value})
         for annot in matching_annots:
             if annot in legend: 
                 continue
