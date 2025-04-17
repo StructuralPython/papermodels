@@ -31,7 +31,7 @@ occupancy = ""
 applied_area = 0.0
 start_loc = 0.0
 start_magnitude = 1.0
-end_loc = 18.221
+end_loc = 18.067
 end_magnitude = 1.0
 direction = "gravity"
 

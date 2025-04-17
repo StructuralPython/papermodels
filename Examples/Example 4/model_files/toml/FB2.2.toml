@@ -16,7 +16,7 @@ horz_intersects_below = [
 [element_geometry]
 geometry = "LINESTRING (33.7228 27.8626, 14.8544 27.8626)"
 supports = [
-    { location = 18.544178193975128, fixity = "pin" },
+    { location = 18.714930124379904, fixity = "pin" },
     { location = 0.30244237147365816, fixity = "roller" },
 ]
 
@@ -30,7 +30,7 @@ occupancy = ""
 applied_area = 0.0
 start_loc = 0.338
 start_magnitude = 1.0
-end_loc = 18.559
+end_loc = 18.404
 end_magnitude = 1.0
 direction = "gravity"
 

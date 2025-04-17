@@ -11,16 +11,14 @@ horz_intersects_below = [
     "CT2.2",
     "CT2.3",
     "CT2.4",
-    "FB2.3",
 ]
 
 [element_geometry]
-geometry = "LINESTRING (33.4133 33.4711, 15.1313 33.4711)"
+geometry = "LINESTRING (33.2588 33.4529, 14.9768 33.4529)"
 supports = [
-    { location = 17.9534, fixity = "pin" },
-    { location = 0.3222000000000005, fixity = "roller" },
-    { location = 13.418099999999999, fixity = "roller" },
-    { location = 18.271764106873245, fixity = "roller" },
+    { location = 18.107899999999997, fixity = "pin" },
+    { location = 0.47669999999999924, fixity = "roller" },
+    { location = 13.572599999999998, fixity = "roller" },
 ]
 
 [loads]
@@ -31,7 +29,7 @@ transfer_source = "J2.0"
 transfer_reaction_index = 2
 occupancy = ""
 applied_area = 0.0
-start_loc = 0.061
+start_loc = 0.215
 start_magnitude = 1.0
 end_loc = 18.282
 end_magnitude = 1.0
