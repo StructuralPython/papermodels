@@ -1,0 +1,36 @@
+[element_attributes]
+tag = "FB1.3"
+length = 10.836427660903755
+orientation = "horizontal"
+vert_correspondent_below = []
+vert_correspondent_above = []
+horz_intersects_above = [
+    "J1.1",
+]
+horz_intersects_below = [
+    "CT1.4",
+    "CT1.6",
+]
+
+[element_geometry]
+geometry = "LINESTRING (28.5737 33.5636, 28.6263 22.7273)"
+supports = [
+    { location = 0.39340463458925407, fixity = "pin" },
+    { location = 10.784827053011519, fixity = "roller" },
+]
+
+[loads]
+point_loads = []
+
+[[loads.distributed_loads]]
+transfer_source = "J1.1"
+transfer_reaction_index = 0
+occupancy = ""
+applied_area = 0.0
+start_loc = 0.445
+start_magnitude = 1.0
+end_loc = 10.836
+end_magnitude = 1.0
+direction = "gravity"
+
+[loads.distributed_loads.load_components]

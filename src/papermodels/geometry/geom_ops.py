@@ -13,6 +13,7 @@ from shapely import (
 )
 import shapely.ops as ops
 import shapely.affinity as aff
+from papermodels.datatypes.exceptions import GeometryError
 
 Geometry = Union[LineString, Polygon]
 IntersectingGeometry = Union[Point, LineString]
@@ -134,8 +135,13 @@ def clean_polygon_supports(support_geoms: list[LineString | Polygon], joist_prot
                 # Ensure there are no missing intersections on the support line
                 assert support_line.intersects(joist_prototype)
             # elif sum(support_intersections) == 2:
-            else:
+            elif sum(support_intersections) == 0:
+                assert support_geom.intersects(support_lines)
+                raise GeometryError(f"The geometry {support_geom.wkt} does not intersect {joist_prototype.wkt}")
+            elif sum(support_intersections) == 2:
                 # Ensure there are no missing intersections on the support line
+                # Can sometimes be caused by a joist intersecting with a column
+                # (joists should not be "supported" by columns)
                 support_line = get_rectangle_centerline(support_geom)
                 assert support_line.intersects(joist_prototype)
             cleaned_supports.append(support_line)
