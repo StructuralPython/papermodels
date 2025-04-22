@@ -3,3 +3,6 @@ class LegendError(Exception):
 
 class GeometryError(Exception):
     pass
+
+class AnnotationError(Exception):
+    pass

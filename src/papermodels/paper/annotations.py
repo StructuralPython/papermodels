@@ -1,15 +1,18 @@
 from __future__ import annotations
 from copy import deepcopy
+from decimal import Decimal
 from dataclasses import asdict
 from shapely.wkt import loads as wkt_loads
-from shapely import Geometry, GeometryCollection, Point
+from shapely import Geometry, GeometryCollection, Point, Polygon
 from papermodels.datatypes.annotation import Annotation
 from papermodels.loads.load_distribution import LoadingGeometry
 from papermodels.geometry import geom_ops
-from papermodels.datatypes.exceptions import LegendError, GeometryError
+from papermodels.datatypes.exceptions import LegendError, GeometryError, AnnotationError
 from typing import Any, Optional
 import re
 import numpy as np
+from numpy.typing import ArrayLike
+
 
 
 def annotations_to_shapely(
@@ -183,6 +186,171 @@ def _annotation_to_wkt(annot: Annotation) -> str:
     elif annot.object_type in ("Polygon", "Rectangle", "Square"):
         grouped_vertices = _group_vertices_str(annot.vertices, close=True)
         return f"POLYGON(({grouped_vertices}))"
+    
+    
+def assign_page_id_to_annotations(annots: list[Annotation], page_containers: list[Annotation], left_to_right: bool = True) -> list[list[Annotation]]:
+    """
+    Returns a list of Annotation representing 'annots' after they have been assigned to their page container
+    in 'page_containers'.
+    """
+    page_annot_map = enumerate_page_annotations(page_containers, left_to_right)
+    sorted_annots = sort_annotations_by_page_polygon(annots, page_annot_map)
+    aligned_annotations = align_annotations_to_pages(sorted_annots)
+    page_indexed_annots = []
+    for page_id, annots_on_page in enumerate(aligned_annotations.values()):
+        page_indexed_annots.append([])
+        for annot in annots_on_page:
+            new_annotation = Annotation(
+                page=page_id,
+                object_type=annot.object_type,
+                text=annot.text,
+                vertices=annot.vertices,
+                line_color=annot.line_color,
+                fill_color=annot.fill_color,
+                line_type=annot.line_type,
+                line_weight=annot.line_weight,
+                line_opacity=annot.line_opacity,
+                fill_opacity=annot.fill_opacity,
+                matrix=annot.matrix,
+                local_id=annot.local_id
+            )
+            page_indexed_annots[page_id].append(new_annotation)
+    return page_indexed_annots
+
+
+def enumerate_page_annotations(page_annots: list[Annotation], left_to_right: bool = True) -> dict[Polygon, int]:
+    """
+    Returns the annotations in 'annots' that correspond to page-demarcation
+    polygons organized in a seqential fashion.
+    """
+    page_geoms_by_page = get_page_geom_by_page_index(page_annots)
+    enumerated_page_annotations = {}
+    counter = 0
+    for page_geoms in page_geoms_by_page.values():
+        reverse=False
+        if not left_to_right:
+            reverse=True
+        sorted_page_geoms = sorted(page_geoms, key=lambda x: x.centroid.coords[0], reverse=reverse)
+        for page_geom in sorted_page_geoms:
+            enumerated_page_annotations.update({counter: page_geom})
+            counter += 1
+    return enumerated_page_annotations
+
+
+def sort_annotations_by_page_polygon(annots: list[Annotation], page_geom_map: dict[int, Polygon]) -> dict[Polygon, list[Annotation]]:
+    """
+    Sorts each annotation into its own list[Annotation] coresponding to which page they are contained in.
+    """
+    acc = {}
+    for annot in annots:
+        annot_geom = annotation_to_shapely(annot)
+        for page_poly in page_geom_map.values():
+            acc.setdefault(page_poly, [])
+            if page_poly.contains(annot_geom):
+                acc[page_poly].append(annot)
+    return acc
+
+
+def align_annotations_to_pages(
+    annotations_by_page: dict[Polygon, list[Annotation]],
+) -> list[list[Annotation]]:
+    """
+    Returns a copy of 'annotations_by_page' but with all annotations aligned
+    within their respective pages by their origin points. The distance between
+    the page origin points and the page corner is set by the distance of the
+    first origin on the first page.
+    """
+    acc = {}
+    counter = 0
+    for page_poly, page_annots in annotations_by_page.items():
+        try:
+            origin_annot = next((page_annot for page_annot in page_annots if page_annot.text == "origin"))
+        except StopIteration:
+            raise AnnotationError(f"The 'page' annotation with index={counter} appears to be missing an 'origin' annotation.")
+        if counter == 0:
+            global_offset = get_origin_offset(origin_annot, page_poly)
+        origin_centroid = get_origin_centroid(origin_annot)
+        page_origin = get_page_bottom_left_corner(page_poly)
+        shifted_annots = reset_annotations_to_origin(page_annots, page_origin, origin_centroid, global_offset)
+        acc.update({page_poly: shifted_annots})
+        counter += 1
+    return acc
+        
+
+def reset_annotations_to_origin(
+    annots_on_page: list[Annotation],
+    page_origin_xy: ArrayLike,
+    origin_centroid_xy: ArrayLike,
+    global_offset: ArrayLike
+) -> list[Annotation]:
+    """
+    Translates all of the annotations in 'annots_on_page' so that the origin
+    annotation (contained within 'annots_on_page') is located at 'xy_offset' 
+    from the bottom-left corner.
+    """
+    updated_annots = []
+    local_offset = origin_centroid_xy - page_origin_xy
+    local_delta = local_offset - global_offset
+    translation_vector = page_origin_xy - global_offset + local_delta
+    for annot in annots_on_page:
+        vertices = annot.vertices
+        translated_vertices = _translate_vertices(vertices, offset_x=-translation_vector[0], offset_y=-translation_vector[1])
+        updated_annot = Annotation(
+            annot.page,
+            annot.object_type,
+            text=annot.text,
+            vertices=translated_vertices,
+            line_color=annot.line_color,
+            fill_color=annot.fill_color,
+            line_type=annot.line_type,
+            line_weight=annot.line_weight,
+            line_opacity=annot.line_opacity,
+            fill_opacity=annot.fill_opacity,
+            matrix=annot.matrix,
+            local_id=annot.local_id
+        )
+        updated_annots.append(updated_annot)
+    return updated_annots
+        
+
+def get_origin_offset(origin_annot: Annotation, page_poly: Polygon) -> ArrayLike:
+    """
+    Returns the xy offset of the 'origin_annot' to the bottom-left corner of the 'page_annot'.
+    """
+    origin_centroid = get_origin_centroid(origin_annot)
+    page_origin = get_page_bottom_left_corner(page_poly)
+    return origin_centroid - page_origin
+
+
+def get_origin_centroid(origin_annot: Annotation) -> ArrayLike:
+    """
+    Returns the centroid of the 'origin_annot' as an xy tuple.
+    """
+    poly = annotation_to_shapely(origin_annot)
+    return np.array(poly.centroid.coords[0])
+
+
+def get_page_bottom_left_corner(page_poly: Polygon) -> ArrayLike:
+    """
+    Returns the coordinate fo the bottom left hand corner of the 'page_annot'
+    (a rectangle)
+    """
+    minx, miny, _, __ = page_poly.bounds
+    page_point = Point(minx, miny)
+    return np.array(page_point.coords[0])
+
+
+def get_page_geom_by_page_index(page_annots: list[Annotation]) -> dict[int, list[Polygon]]:
+    """
+    Returns a dictionary that organizes the 'page_annots' by their page id.
+    """
+    page_geoms = {}
+    for page_annot in page_annots:
+        page_geom = annotation_to_shapely(page_annot)
+        page_id = page_annot.page
+        page_geoms.setdefault(page_id, [])
+        page_geoms[page_id].append(page_geom)
+    return page_geoms
 
 
 def parse_existing_annot_tag(text_contents: str) -> Optional[str]:
@@ -222,7 +390,7 @@ def filter_annotations(annots: list[Annotation], properties: dict) -> list[Annot
 
 def scale_annotations(
     annots: list[Annotation],
-    scale: float,
+    scale: Decimal,
     paper_origin: Optional[tuple[float, float]] = None,
     round_precision: int = 4
 ) -> list[Annotation]:
@@ -237,7 +405,7 @@ def scale_annotations(
     scaled_annotations = []
     for annot in annots:
         annot_dict = asdict(annot).copy()
-        scaled_vertices = scale_vertices(annot.vertices, scale, round_precision=round_precision)
+        scaled_vertices = scale_vertices(annot.vertices, scale, round_precision=round_precision, paper_origin=paper_origin)
         annot_dict["vertices"] = scaled_vertices
         scaled_annotations.append(Annotation(**annot_dict))
     return scaled_annotations
@@ -245,7 +413,7 @@ def scale_annotations(
 
 def scale_vertices(
     vertices: list[float],
-    scale: float,
+    scale: Decimal,
     paper_origin: Optional[tuple[float, float]] = None,
     round_precision: int = 4
 ) -> Annotation:
@@ -264,21 +432,21 @@ def scale_vertices(
     return tuple(scaled_vertices)
 
 
-
 def _translate_vertices(
-    vertices: list[float], offset_x: float, offset_y: float
+    vertices: list[Decimal], offset_x: float, offset_y: float
 ) -> Annotation:
     """
     Returns a list of float representing 'verticies' translated by 'offset_x' and 'offset_y'.
     """
-    coord_array = np.array(_group_vertices(vertices))
+    vertices_floats = [float(vertex) for vertex in vertices]
+    coord_array = np.array(_group_vertices(vertices_floats))
     offset_array = np.array([offset_x, offset_y])
     translated_array = coord_array + offset_array
-    flattened_array = translated_array.flatten()
-    return list(flattened_array)
+    flattened_array = tuple([Decimal(x) for x in translated_array.flatten()])
+    return flattened_array
 
 
-def _group_vertices(vertices: str, close=False) -> list[tuple[float, float]]:
+def _group_vertices(vertices: list[Decimal | float], close=False) -> list[tuple[float, float]]:
     """
     Returns a list of (x, y) tuples from a list of vertices in the format of:
     'x1 y1 x2 y2 x3 y3 ... xn yn'

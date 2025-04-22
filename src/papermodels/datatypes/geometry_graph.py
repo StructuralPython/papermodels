@@ -16,10 +16,12 @@ from ..paper.annotations import (
     parse_annotations, 
     parsed_annotations_to_loading_geometry,
     filter_annotations,
-    tag_parsed_annotations
+    tag_parsed_annotations,
+    assign_page_id_to_annotations
 )
 from ..paper.plot import plot_annotations
 from ..paper import pdf
+from ..datatypes.exceptions import AnnotationError
 from rich.progress import track
 from rich import print
 import numpy.typing as npt
@@ -196,8 +198,6 @@ class GeometryGraph(nx.DiGraph):
                 }
                 local_index = above_intersections_below[element_tag][0]
                 other_extents = above_intersections_below[element_tag][1]
-                # if element_tag == "FB2.2":
-                #     print(f"{other_extents=}")
                 if element_above.subelements is None:
                     new_intersection = Intersection(
                         intersection.intersecting_region,
@@ -358,26 +358,28 @@ class GeometryGraph(nx.DiGraph):
         page_ids = sorted(set([annot.page for annot in annots]), reverse=True)
         legend_entries = [annot for annot in annotations if legend_identifier in annot.text.lower()]
         non_legend_entries = [annot for annot in annotations if legend_identifier not in annot.text.lower()]
-        annots_by_page = [
-            [annot for annot in non_legend_entries if annot.page == page_id] for page_id in page_ids
-        ]
+        page_entries = [annot for annot in annotations if "page" in annot.text.lower()]
+        origin_entries = [annot for annot in annotations if "origin" in annot.text.lower()]
+        if page_entries:
+            if len(page_entries) != len(origin_entries):
+                raise AnnotationError(
+                    "An 'origin' annotation must be present for each 'page' annotation. "
+                    f"{len(page_entries)=} | {len(origin_entries)=}"
+                )
+            other_annots = [annot for annot in annotations if annot not in page_entries]
+            annots_by_page = assign_page_id_to_annotations(other_annots, page_entries)
+        else:
+            annots_by_page = [
+                [annot for annot in non_legend_entries if annot.page == page_id] for page_id in page_ids
+            ]
         load_entries = {}
         trib_area_entries = {}
         structural_element_entries = {}
         parsed_annotations_acc = {}
         raw_annotations_acc = {}
         for annots_in_page in annots_by_page:
-            # Scale taking origin into account
-            origin_annots = [annot for annot in annots_in_page if "origin" in annot.text.lower()]
-            origin_on_page = None
-            if len(origin_annots) > 1:
-                raise ValueError(f"There should only be one origin per page. Found: {origin_annots=}")
-            elif origin_annots == 1:
-                origin_annot = origin_annots[0]
-                origin_on_page = parse_origin_annotation(origin_annot)
-
             if scale is not None:
-                scaled_annots_in_page = scale_annotations(annots_in_page, scale, origin_on_page)
+                scaled_annots_in_page = scale_annotations(annots_in_page, scale)
 
             # Separate annotation types
             parsed_annotations = parse_annotations(scaled_annots_in_page, legend_entries, legend_identifier)
