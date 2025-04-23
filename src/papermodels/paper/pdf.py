@@ -6,8 +6,10 @@ import re
 from decimal import Decimal
 from papermodels.datatypes.annotation import Annotation
 from papermodels.paper.annotations import scale_annotations
+from papermodels.geometry import geom_ops
 import pathlib
 import parse
+import numpy as np
 
 
 def load_pdf_annotations(pdf_path: pathlib.Path | str, show_skipped: bool = False) -> list[Annotation]:
@@ -21,8 +23,9 @@ def load_pdf_annotations(pdf_path: pathlib.Path | str, show_skipped: bool = Fals
         annots_in_pdf = []
         skipped_annots = []
         for page_num, page_data in enumerate(pdf_obj.pages):
+            rotate = page_data.get("/Rotate", None)
             for annot_idx, annot in enumerate(page_data.obj.Annots):
-                pm_annot = pike_annotation_to_pm_annotation(annot, annot_idx, page_num)
+                pm_annot = pike_annotation_to_pm_annotation(annot, annot_idx, page_num, rotate)
                 if pm_annot is not None:
                     annots_in_pdf.append(pm_annot)
                 else:
@@ -85,7 +88,7 @@ def compare_annotations(pm_annot: Annotation, pike_annot: pike.Annotation, page_
     return pm_annot == converted
 
 
-def pike_annotation_to_pm_annotation(annot, annot_idx: int, page_idx: int) -> Optional[Annotation]:
+def pike_annotation_to_pm_annotation(annot, annot_idx: int, page_idx: int, rotate: Optional[int] = None) -> Optional[Annotation]:
     """
     Returns either an Annotation object or None. None is returned if:
         - The annotation has a "parent" key
@@ -135,6 +138,14 @@ def pike_annotation_to_pm_annotation(annot, annot_idx: int, page_idx: int) -> Op
     else:
         print(f"Cannot read (yet): {annot_type}")
         return None
+    if rotate == 90:
+        vertex_array = geom_ops.vertices_to_array(vertices)
+        rotated_vertices = geom_ops.rotate_90_coords(vertex_array, ccw=True)
+        vertices = geom_ops.flatten_vertex_array(rotated_vertices)
+    elif rotate == 270:
+        vertex_array = geom_ops.vertices_to_array(vertices)
+        rotated_vertices = geom_ops.rotate_90_coords(vertex_array, ccw=False)
+        vertices = geom_ops.flatten_vertex_array(rotated_vertices)
     text = str(annot.get("/Contents", ""))
     rc = annot.get("/RC")
     text = parse_html_text_content(str(rc)) if rc is not None else text
@@ -156,6 +167,7 @@ def pike_annotation_to_pm_annotation(annot, annot_idx: int, page_idx: int) -> Op
     line_width = stream_dict.get("w", (1,))[0]
     line_type = None
     matrix = (1, 0, 0, 1, 0, 0)
+
     annotation = Annotation(
         object_type=annot_type,
         page=page_idx,

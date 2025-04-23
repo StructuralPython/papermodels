@@ -166,6 +166,7 @@ def tag_parsed_annotations(
 
     return annots_to_tag
 
+
 def parse_tag_components(tag: str) -> tuple[str, int, int]:
     """
     Returns a tuple of the tag components: type abbrev., page_id, tag_idx
@@ -175,16 +176,17 @@ def parse_tag_components(tag: str) -> tuple[str, int, int]:
     if results is not None:
         return results.groups()
 
+
 def _annotation_to_wkt(annot: Annotation) -> str:
     """
     Returns a WKT string representing the geometry in 'annot'. The WKT
     string can be loaded with shapely.wkt.loads (see shapely documentation)
     """
     if annot.object_type == "PolyLine" or annot.object_type == "Line":
-        grouped_vertices = _group_vertices_str(annot.vertices)
+        grouped_vertices = geom_ops._group_vertices_str(annot.vertices)
         return f"LINESTRING({grouped_vertices})"
     elif annot.object_type in ("Polygon", "Rectangle", "Square"):
-        grouped_vertices = _group_vertices_str(annot.vertices, close=True)
+        grouped_vertices = geom_ops._group_vertices_str(annot.vertices, close=True)
         return f"POLYGON(({grouped_vertices}))"
     
     
@@ -294,7 +296,7 @@ def reset_annotations_to_origin(
     translation_vector = page_origin_xy - global_offset + local_delta
     for annot in annots_on_page:
         vertices = annot.vertices
-        translated_vertices = _translate_vertices(vertices, offset_x=-translation_vector[0], offset_y=-translation_vector[1])
+        translated_vertices = geom_ops._translate_vertices(vertices, offset_x=-translation_vector[0], offset_y=-translation_vector[1])
         updated_annot = Annotation(
             annot.page,
             annot.object_type,
@@ -405,83 +407,10 @@ def scale_annotations(
     scaled_annotations = []
     for annot in annots:
         annot_dict = asdict(annot).copy()
-        scaled_vertices = scale_vertices(annot.vertices, scale, round_precision=round_precision, paper_origin=paper_origin)
+        scaled_vertices = geom_ops.scale_vertices(annot.vertices, scale, round_precision=round_precision, paper_origin=paper_origin)
         annot_dict["vertices"] = scaled_vertices
         scaled_annotations.append(Annotation(**annot_dict))
     return scaled_annotations
-
-
-def scale_vertices(
-    vertices: list[float],
-    scale: Decimal,
-    paper_origin: Optional[tuple[float, float]] = None,
-    round_precision: int = 4
-) -> Annotation:
-    """
-    Scale the annotation. Each vertex in 'annot' will be multiplied
-    by 'scale'.
-    If 'paper_origin' is provided, then the annotation coordinates will have their origin reset
-    to 'paper_origin'. Note that 'paper_origin' is the unscaled coordinate space (i.e. in points)
-    """
-    if paper_origin is not None:
-        offset_x = paper_origin[0]
-        offset_y = paper_origin[1]
-        vertices = _translate_vertices(vertices, offset_x, offset_y)
-
-    scaled_vertices = [round(vertex * scale, round_precision) for vertex in vertices]
-    return tuple(scaled_vertices)
-
-
-def _translate_vertices(
-    vertices: list[Decimal], offset_x: float, offset_y: float
-) -> Annotation:
-    """
-    Returns a list of float representing 'verticies' translated by 'offset_x' and 'offset_y'.
-    """
-    vertices_floats = [float(vertex) for vertex in vertices]
-    coord_array = np.array(_group_vertices(vertices_floats))
-    offset_array = np.array([offset_x, offset_y])
-    translated_array = coord_array + offset_array
-    flattened_array = tuple([Decimal(x) for x in translated_array.flatten()])
-    return flattened_array
-
-
-def _group_vertices(vertices: list[Decimal | float], close=False) -> list[tuple[float, float]]:
-    """
-    Returns a list of (x, y) tuples from a list of vertices in the format of:
-    'x1 y1 x2 y2 x3 y3 ... xn yn'
-    """
-    grouped_vertices = []
-    coordinates = []
-    for idx, ordinate in enumerate(vertices):
-        if idx % 2:
-            coordinates.append(ordinate)
-            grouped_vertices.append([coordinates])
-            coordinates = []
-        else:
-            coordinates.append(ordinate)
-    if close:
-        grouped_vertices.append(grouped_vertices[0])
-    return grouped_vertices
-
-
-def _group_vertices_str(vertices: str, close=False) -> str:
-    """
-    Returns a list of (x, y) tuples from a list of vertices in the format of:
-    'x1 y1 x2 y2 x3 y3 ... xn yn'
-    """
-    acc = []
-    coordinates = []
-    for idx, ordinate in enumerate(vertices):
-        if idx % 2:
-            coordinates.append(f"{ordinate}")
-            acc.append(" ".join(coordinates))
-            coordinates = []
-        else:
-            coordinates.append(f"{ordinate}")
-    if close:
-        acc.append(acc[0])
-    return ", ".join(acc)
 
 
 def strip_html_tags(s: str) -> str:

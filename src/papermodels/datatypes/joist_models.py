@@ -100,7 +100,7 @@ class JoistArrayModel:
         self._supports = geom_ops.sort_supports(self.joist_prototype, self.joist_supports)
         self._cantilevers = geom_ops.get_cantilever_segments(self.joist_prototype, self._supports)
         self.vector_parallel = geom_ops.get_direction_vector(self.joist_prototype)
-        self.vector_normal = geom_ops.rotate_90(self.vector_parallel, ccw=True)
+        self.vector_normal = geom_ops.rotate_90_vector(self.vector_parallel, ccw=True)
         self.joist_at_start = float(joist_at_start)
         self.joist_at_end = float(joist_at_end)
         self.joist_locations = geom_ops.get_joist_locations(
