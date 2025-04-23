@@ -46,6 +46,7 @@ def collector_trib_model(
     collector_element = Element(
         e.geometry,
         e.tag,
+        0,
         e.intersections_above,
         e.intersections_below,
         e.correspondents_above,

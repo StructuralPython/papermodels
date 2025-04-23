@@ -32,9 +32,12 @@ def get_intersection(
         intersecting_region = above.intersection(below.exterior)
     elif i_type == "Polygon" and j_type == "LineString":
         intersecting_region = below.intersection(above.exterior)
+        if intersecting_region.is_empty:
+            intersecting_region = below.intersection(above)
     else:
         intersecting_region = above.intersection(below)
-
+    if intersecting_region.is_empty:
+        return None
     all_linestrings = i_type == j_type == "LineString"
     if intersecting_region.geom_type == "Point" and all_linestrings:
         return (intersecting_region, below, j_tag)
@@ -51,7 +54,11 @@ def get_intersection(
                 "Could not get intersecting region for MultiPoint. Should not see this error.\n"
                 f"{above.wkt=} | {below.wkt=}"
             )
+    elif intersecting_region.geom_type == "LineString":
+        return (intersecting_region, below, j_tag)
     elif intersecting_region.geom_type == "Point": # LineString and Polygon intersection @ boundary
+        return (intersecting_region, below, j_tag)
+    elif intersecting_region.geom_type == "Polygon": # Polygon point/line load intersecting with another polygon
         return (intersecting_region, below, j_tag)
     else:
         return None
