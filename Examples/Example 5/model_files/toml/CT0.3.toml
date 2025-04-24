@@ -1,0 +1,25 @@
+[element_attributes]
+tag = "CT0.3"
+orientation = "vertical"
+vert_correspondent_below = []
+vert_correspondent_above = []
+horz_intersects_above = [
+    "FB0.3",
+]
+horz_intersects_below = []
+
+[element_attributes.length]
+
+[element_geometry]
+geometry = "POLYGON ((38.104 26.649, 37.51 26.649, 37.51 27.127, 38.104 27.127, 38.104 26.649))"
+supports = []
+
+[loads]
+distributed_loads = []
+
+[[loads.point_loads]]
+location = []
+magnitude = 0
+transfer_source = "FB0.3"
+transfer_reaction_idx = 1
+direction = "gravity"
