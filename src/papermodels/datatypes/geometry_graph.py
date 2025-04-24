@@ -480,12 +480,12 @@ class GeometryGraph(nx.DiGraph):
             for annot, annot_attrs in parsed_annotations.items():
                 if "occupancy" in annot_attrs:
                     load_entries.update({annot: annot_attrs})
-                elif "type" in annot_attrs and annot_attrs['type'].lower() == "trib":
+                elif "type" in annot_attrs and "trib area" in annot_attrs['type'].lower():
                     trib_area_entries.update({annot: annot_attrs})
                 else:
                     structural_element_entries.update({annot: annot_attrs})
 
-        elements = Element.from_parsed_annotations(structural_element_entries)
+        elements = Element.from_parsed_annotations(structural_element_entries, trib_area_entries)
         graph = cls.from_elements(elements, do_not_process=do_not_process)
         graph.parsed_annotations = tag_parsed_annotations(parsed_annotations_acc)
         graph.raw_annotations = tag_parsed_annotations(raw_annotations_acc)
