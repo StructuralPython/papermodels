@@ -3,7 +3,7 @@ from typing import Optional, Union, NamedTuple
 import numpy as np
 import numpy.typing as npt
 from shapely import Point, LineString, Polygon
-import shapely
+from shapely import wkt
 from .annotation import Annotation
 from ..paper.annotations import (
     parse_annotations,
@@ -235,7 +235,6 @@ E00 = Element(
 class LoadedElement(Element):
     loading_geoms: Optional[ld.LoadingGeometry] = None
     applied_loading_areas: Optional[list[tuple[Polygon, npt.ArrayLike]]] = None
-    model: Optional[dict] = None
 
     """
     'loading_areas' - A list of tuples. Each tuple consists of a Polygon and a dict of
@@ -251,14 +250,12 @@ class LoadedElement(Element):
         this parameter.
 
 
-    TODO: # HERE: Need to apply loading to sub-elements 
     """
     def __post_init__(self):
         """
         Populates self.applied_loading_areas
         """
         self.applied_loading_areas = self._get_intersecting_loads()
-        self.model = self._build_model()
                 
         
     def _get_intersecting_loads(self) -> list[tuple[Polygon, dict]]:
@@ -281,7 +278,8 @@ class LoadedElement(Element):
         """
         return {}
     
-    def _build_model(self) -> dict:
+    
+    def model(self, precision=3) -> dict:
         """
         Returns the structured beam dict for serialization
         """
@@ -290,14 +288,15 @@ class LoadedElement(Element):
             orientation = "horizontal"
         elif self.geometry.geom_type == "Polygon":
             orientation = "vertical"
-        length = self.get_length()
-        support_locations = self._get_support_locations()
+        length = round(self.get_length(), precision)
+        support_locations = self._get_support_locations(precision)
         transfer_loads = {}
         if self.element_type == "transfer":
-            transfer_loads = self._get_transfer_loads()
-        distributed_loads = self._get_distributed_loads()
+            transfer_loads = self._get_transfer_loads(precision)
+        distributed_loads = self._get_distributed_loads(precision)
 
-        model = {
+
+        elem_model = {
             "element_attributes":
                 {
                     "tag": self.tag,
@@ -310,7 +309,7 @@ class LoadedElement(Element):
                 },
             "element_geometry":
                 {
-                    "geometry": self.geometry.wkt,
+                    "geometry": wkt.dumps(self.geometry, trim=True, rounding_precision=precision),
                     "supports": support_locations,
                 },
             "loads": {
@@ -318,7 +317,8 @@ class LoadedElement(Element):
                 "distributed_loads": transfer_loads.get('dist', []) + distributed_loads
             }
         }
-        return model
+        return elem_model
+
 
     def get_length(self):
         """
@@ -332,7 +332,7 @@ class LoadedElement(Element):
             return {}
 
 
-    def _get_support_locations(self):
+    def _get_support_locations(self, precision: int):
         """
         Calculates the support locations from the intersections below
         """
@@ -350,12 +350,12 @@ class LoadedElement(Element):
                 fixity = "roller"
                 if idx == 0:
                     fixity = "pin"
-                supports_acc.append({"location": support_location, "fixity": fixity})
+                supports_acc.append({"location": round(support_location, precision), "fixity": fixity})
             return supports_acc
         else:
             return []
     
-    def _get_transfer_loads(self):
+    def _get_transfer_loads(self, precision: int):
         """
         Calculates the transfer load locations from the intersections above
         """
@@ -382,26 +382,18 @@ class LoadedElement(Element):
                     )
                 if transfer_type == "point":
                     point_load = self.create_point_load(
-                        transfer_location=transfer_location,
+                        transfer_location=round(transfer_location, precision),
                         magnitude=0.0,
                         transfer_source=f"{source_member}",
                         transfer_reaction_index=reaction_idx,
                         direction="gravity",
                     )
-                    transfer_loads['point'].append(
-                        {
-                            "location": transfer_location,
-                            "magnitude": 0,
-                            "transfer_source": f"{source_member}",
-                            "transfer_reaction_index": reaction_idx,
-                            "direction": "gravity"
-                        }
-                    )
+                    transfer_loads['point'].append(point_load)
                 elif transfer_type == "linear":
                     dist_load = self.create_distributed_load(
-                        start_location=intersection_above.other_extents[0],
+                        start_location=round(intersection_above.other_extents[0], precision),
                         start_magnitude=1.0,
-                        end_location=intersection_above.other_extents[1],
+                        end_location=round(intersection_above.other_extents[1], precision),
                         end_magnitude=1.0,
                         transfer_source=f"{source_member}",
                         transfer_reaction_index=intersection_above.other_index,
@@ -427,7 +419,7 @@ class LoadedElement(Element):
                     dist_load = self.create_distributed_load(
                         start_location=0.0,
                         start_magnitude=1.0,
-                        end_location=geom_ops.get_rectangle_centerline(self.geometry).length,
+                        end_location=round(geom_ops.get_rectangle_centerline(self.geometry).length, precision),
                         end_magnitude=1.0,
                         transfer_source=correspondent.other_tag,
                         transfer_reaction_index=0,
@@ -453,9 +445,9 @@ class LoadedElement(Element):
                     start_x, end_x = intersection.other_extents
                     transfer_loads['dist'].append(
                         self.create_distributed_load(
-                            start_location=start_x,
+                            start_location=round(start_x, precision),
                             start_magnitude=1.0,
-                            end_location=end_x,
+                            end_location=round(end_x, precision),
                             end_magnitude=1.0,
                             transfer_source=f"{source_member}",
                             transfer_reaction_index=intersection.other_index,
@@ -514,7 +506,7 @@ class LoadedElement(Element):
         }
 
 
-    def _get_distributed_loads(self) -> list[dict]:
+    def _get_distributed_loads(self, precision: int) -> list[dict]:
         """
         Computes the resulting distributed loads from the applied
         loading areas
@@ -546,11 +538,11 @@ class LoadedElement(Element):
                         "transfer_reaction_index": "", 
                         "occupancy": applied_loading.occupancy,
                         "load_components": applied_loading.load_components or [],
-                        "applied_area": intersected_poly.area * trapezoid_ratio,
-                        "start_loc": start_x,
-                        "start_magnitude": start_y,
-                        "end_loc": end_x,
-                        "end_magnitude":  end_y,
+                        "applied_area": round(intersected_poly.area * trapezoid_ratio, precision),
+                        "start_loc": round(start_x, precision),
+                        "start_magnitude": round(start_y, precision),
+                        "end_loc": round(end_x, precision),
+                        "end_magnitude":  round(end_y, precision),
                     }
                     distributed_loads.append(dist_load)
             return distributed_loads
@@ -655,8 +647,8 @@ def get_collector_extents(
         support_geom = ordered_support_geoms[idx]
         support_start, _ = geom_ops.get_start_end_nodes(support_geom)
         support_tag = support_tags_by_geom[support_geom]
-        extent_start = round(extent[0].distance(support_start), 3)
-        extent_end = round(extent[1].distance(support_start), 3)
+        extent_start = extent[0].distance(support_start)
+        extent_end = extent[1].distance(support_start)
         tagged_extents.update({support_tag: (extent_start, extent_end)})
     return tagged_extents
 
