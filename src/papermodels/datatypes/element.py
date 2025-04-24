@@ -157,7 +157,7 @@ class Element:
         for annot_attrs in annotations_w_intersect_corrs.values():
             element_family = annot_attrs['tag'][0]
             geometry = annot_attrs['geometry']
-            if geometry.geom_type == "LineString":
+            if geometry.geom_type == "LineString" and trib_annotations:
                 intersection_mask = geometry.intersects(trib_area_geoms)
                 intersection_lines = trib_area_geoms[intersection_mask]
                 get_intersection_lengths = np.vectorize(lambda x: x.length)
@@ -288,7 +288,7 @@ class LoadedElement(Element):
             orientation = "horizontal"
         elif self.geometry.geom_type == "Polygon":
             orientation = "vertical"
-        length = round(self.get_length(), precision)
+        length = round(self.get_length(), precision) if self.get_length() else {}
         support_locations = self._get_support_locations(precision)
         transfer_loads = {}
         if self.element_type == "transfer":
@@ -550,19 +550,19 @@ class LoadedElement(Element):
             return []
 
 
-    def dump_toml(self, fp):
+    def dump_toml(self, fp, precision=3):
         """
         Dumps the .model attribute to a TOML file
         """
-        tomli_w.dump(self.model, fp)
+        tomli_w.dump(self.model(precision), fp)
         return fp
     
         
-    def dump_json(self, fp):
+    def dump_json(self, fp, precision=3):
         """
         Dumps the .model attribute to a TOML file
         """
-        json.dump(self.model, fp, indent=2)
+        json.dump(self.model(precision), fp, indent=2)
         return fp
         
     

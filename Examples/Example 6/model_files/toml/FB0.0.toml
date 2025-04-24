@@ -1,0 +1,67 @@
+[element_attributes]
+tag = "FB0.0"
+length = 13.788
+orientation = "horizontal"
+vert_correspondent_below = []
+vert_correspondent_above = []
+horz_intersects_above = []
+horz_intersects_below = [
+    "CT0.0",
+    "CT0.1",
+    "CT0.2",
+]
+
+[element_geometry]
+geometry = "LINESTRING (11.3188 20.6399, 25.1068 20.6399)"
+supports = [
+    { location = 0.2897, fixity = "pin" },
+    { location = 4.5039, fixity = "roller" },
+    { location = 11.2539, fixity = "roller" },
+]
+
+[loads]
+point_loads = []
+
+[[loads.distributed_loads]]
+transfer_source = ""
+transfer_reaction_index = ""
+occupancy = "f"
+load_components = []
+applied_area = 20.0363
+start_loc = 0.1905
+start_magnitude = 0.1579
+end_loc = 6.5243
+end_magnitude = 0.1579
+
+[[loads.distributed_loads]]
+transfer_source = ""
+transfer_reaction_index = ""
+occupancy = "a"
+load_components = []
+applied_area = 1.0266
+start_loc = 8.6197
+start_magnitude = 0.0
+end_loc = 9.3431
+end_magnitude = 0.3771
+
+[[loads.distributed_loads]]
+transfer_source = ""
+transfer_reaction_index = ""
+occupancy = "a"
+load_components = []
+applied_area = 5.3384
+start_loc = 9.3431
+start_magnitude = 0.3771
+end_loc = 11.2368
+end_magnitude = 0.372
+
+[[loads.distributed_loads]]
+transfer_source = ""
+transfer_reaction_index = ""
+occupancy = "a"
+load_components = []
+applied_area = 1.1617
+start_loc = 11.2368
+start_magnitude = 0.372
+end_loc = 12.0667
+end_magnitude = 0.0

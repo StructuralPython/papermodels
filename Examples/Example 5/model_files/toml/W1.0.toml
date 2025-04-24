@@ -1,0 +1,46 @@
+[element_attributes]
+tag = "W1.0"
+length = 30.011
+orientation = "vertical"
+vert_correspondent_below = [
+    "WLL0.0",
+]
+vert_correspondent_above = []
+horz_intersects_above = [
+    "J1.1",
+    "J1.2",
+]
+horz_intersects_below = []
+
+[element_geometry]
+geometry = "POLYGON ((44.634 26.394, 14.623 26.394, 14.623 26.837, 44.634 26.837, 44.634 26.394))"
+supports = []
+
+[loads]
+point_loads = []
+
+[[loads.distributed_loads]]
+transfer_source = "J1.1"
+transfer_reaction_index = 0
+occupancy = ""
+applied_area = 0.0
+start_loc = 0.188
+start_magnitude = 1.0
+end_loc = 18.443
+end_magnitude = 1.0
+direction = "gravity"
+
+[loads.distributed_loads.load_components]
+
+[[loads.distributed_loads]]
+transfer_source = "J1.2"
+transfer_reaction_index = 0
+occupancy = ""
+applied_area = 0.0
+start_loc = 18.97
+start_magnitude = 1.0
+end_loc = 30.011
+end_magnitude = 1.0
+direction = "gravity"
+
+[loads.distributed_loads.load_components]
