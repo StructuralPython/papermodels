@@ -86,15 +86,15 @@ class GeometryGraph(nx.DiGraph):
             if element.correspondents_below is not None:
                 for correspondent in element.correspondents_below:
                     j_tag = correspondent.other_tag
-                    g.add_edge(element.tag, j_tag)
+                    g.add_edge(element.tag, j_tag, edge_type="correspondent")
             if element.intersections_below is not None:
                 for intersection in element.intersections_below:
                     j_tag = intersection.other_tag
-                    g.add_edge(element.tag, j_tag)
+                    g.add_edge(element.tag, j_tag, edge_type="intersection")
             if element.tag in g.collector_elements:
                 for correspondent in element.correspondents_above:
                     j_tag = correspondent.other_tag
-                    g.add_edge(j_tag, element.tag)
+                    g.add_edge(j_tag, element.tag, edge_type="correspondent")
 
         for node in g.collector_elements:
             g.nodes[node]['element'].element_type = "collector"
@@ -107,9 +107,33 @@ class GeometryGraph(nx.DiGraph):
 
         g.add_intersection_indexes_below()
         g.add_intersection_indexes_above()
-    
+        # g.remove_excess_correspondent_load_paths()
         return g
     
+
+    # def remove_excess_correspondent_load_paths(self):
+    #     """
+    #     Removes edges from self if node has two edges with edge type "correspondent".
+    #     The edge that is prioritized is the edge that terminates at an element with
+    #     rank 0 (thereby indicating it transfers out).
+    #     """
+    #     sorted_nodes = nx.topological_sort(self)
+    #     for node in sorted_nodes:
+    #         dependents = self.successors(node)
+    #         correspondent_tags = []
+    #         for dependent in dependents:
+    #             edge_attrs = self.edges[(node, dependent)]
+    #             if edge_attrs['edge_type'] == "correspondent":
+    #                 correspondent_tags.append(dependent)
+    #         if len(correspondent_tags) > 1:
+    #             for correspondent in correspondent_tags:
+    #                 element_rank = self.nodes[correspondent]['element'].rank
+    #                 if element_rank == 0:
+    #                     correspondent_to_keep = correspondent
+    #                     break
+    #                 elif element_rank
+
+
     def add_intersection_indexes_below(self):
         sorted_nodes = nx.topological_sort(self)
         for node in sorted_nodes:
@@ -439,18 +463,33 @@ class GeometryGraph(nx.DiGraph):
             loading_geoms_by_plane[lg_plane].append(loading_geom)
 
         loaded_elements = {}
-        for node in self.nodes:
+        for node in nx.topological_sort(self):
             node_attrs = self.nodes[node]
             element = node_attrs['element']
             element.element_type = "collector" if node in collector_elements else "transfer"
             element_plane_id = node_attrs['element'].plane_id
             loading_geoms_on_plane = loading_geoms_by_plane.get(element_plane_id, [])
+            # Using predecessors and successors allows us to easily remove incorrect edges
+            # that main be contained with individual elements. Specifically, the correspondents
+            # above do not get included. The graph is defined entirely from edges pointing "downward".
+            predecessors = list(self.predecessors(node))
+            successors = list(self.successors(node))
             if element.element_type == "collector" and element.subelements is not None:
                 for sub_elem in element.subelements:
-                    le = LoadedElement.from_element_with_loads(sub_elem, loading_geoms=loading_geoms_on_plane)
+                    le = LoadedElement.from_element_with_loads(
+                        sub_elem, 
+                        loading_geoms=loading_geoms_on_plane, 
+                        predecessors=predecessors, 
+                        successors=successors
+                    )
                     loaded_elements.update({sub_elem.tag: le})
             else:
-                le = LoadedElement.from_element_with_loads(node_attrs['element'], loading_geoms=loading_geoms_on_plane)
+                le = LoadedElement.from_element_with_loads(
+                    node_attrs['element'], 
+                    loading_geoms=loading_geoms_on_plane, 
+                    predecessors=predecessors, 
+                    successors=successors
+                )
                 loaded_elements.update({node: le})
         return loaded_elements
             

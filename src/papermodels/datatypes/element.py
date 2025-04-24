@@ -38,6 +38,7 @@ class Correspondent(NamedTuple):
     overlap_ratio: float
     other_geometry: Polygon
     other_tag: str
+    other_rank: int
     other_reaction_type: str = "point"
     other_extents: Optional[tuple] = None
 
@@ -79,6 +80,7 @@ class Element:
 
     geometry: Geometry
     tag: Optional[str | int] = None
+    rank: Optional[int] = None
     intersections_above: Optional[list[tuple]] = None
     intersections_below: Optional[list[tuple]] = None
     correspondents_above: Optional[list[dict]] = None
@@ -151,12 +153,15 @@ class Element:
 
         elements = []
         for annot_attrs in annotations_w_intersect_corrs.values():
+            element_family = annot_attrs['tag'][0]
             if correspond_with_like_only:
-                corrs_a = [cor for cor in annot_attrs['correspondents_above'] if annot_attrs['tag'][0] == cor.other_tag[0]]
-                corrs_b = [cor for cor in annot_attrs['correspondents_below'] if annot_attrs['tag'][0] == cor.other_tag[0]]
+                corrs_a = prioritize_correspondents(annot_attrs['correspondents_above'], element_family)
+                corrs_b = prioritize_correspondents(annot_attrs['correspondents_below'], element_family)
+
             element = cls(
                 tag=annot_attrs["tag"],
                 geometry=annot_attrs["geometry"],
+                rank=annot_attrs['rank'],
                 intersections_above=annot_attrs["intersections_above"],
                 intersections_below=annot_attrs["intersections_below"],
                 correspondents_above=corrs_a,
@@ -174,7 +179,36 @@ class Element:
             acc.append(intersection_tuple[1])
         return acc
 
+def prioritize_correspondents(correspondents: list[Correspondent], family: str) -> list[Correspondent]:
+    """
+    Filters 'correspondents' such that:
+        - Only one correspondent exists in the list
+        - That correspondent is of the same "family"
+        - The rank is either 0 or the same as 'rank'
 
+    The purpose of this filtering is to ensure that the top of a vertical element only corresponds with
+    one element below it, either as a continuation of the same type of element (e.g. a column continuing
+    down the structure) or as the point load that results from transferring out the bottom of the
+    element to some other element (e.g. the bottom of a column transferring out to a beam).
+    """
+    filtered_transfers = []
+    filtered_same_family = []
+    for correspondent in correspondents:
+        corr_family = correspondent.other_tag[0]
+        corr_rank = correspondent.other_rank
+        if corr_rank == 0: # If the element transfers out
+            filtered_transfers.append(correspondent)
+        elif corr_family == family:
+            filtered_same_family.append(correspondent)
+    if filtered_transfers:
+        largest_overlap = sorted(filtered_transfers, key=lambda x: x.overlap_ratio, reverse=True)[0]
+        return [largest_overlap]
+    if filtered_same_family:
+        largest_overlap = sorted(filtered_same_family, key=lambda x: x.overlap_ratio, reverse=True)[0]
+        return [largest_overlap]
+    else:
+        return []
+    
 # Examples
 E00 = Element(
     tag="FB1.1",
@@ -246,19 +280,18 @@ class LoadedElement(Element):
             orientation = "horizontal"
         elif self.geometry.geom_type == "Polygon":
             orientation = "vertical"
-
+        length = self.get_length()
         support_locations = self._get_support_locations()
         transfer_loads = {}
         if self.element_type == "transfer":
             transfer_loads = self._get_transfer_loads()
         distributed_loads = self._get_distributed_loads()
 
-
         model = {
             "element_attributes":
                 {
                     "tag": self.tag,
-                    "length": self.geometry.length if self.geometry.geom_type == "LineString" else {},
+                    "length": length,
                     "orientation": orientation,
                     "vert_correspondent_below": [corr.other_tag for corr in self.correspondents_below],
                     "vert_correspondent_above": [corr.other_tag for corr in self.correspondents_above],
@@ -276,6 +309,17 @@ class LoadedElement(Element):
             }
         }
         return model
+
+    def get_length(self):
+        """
+        Calculates the length fo the element, if applicable
+        """
+        if self.geometry.geom_type == "LineString":
+            return self.geometry.length
+        elif self.geometry.geom_type == "Polygon" and self.reaction_type == "linear":
+            return geom_ops.get_rectangle_centerline(self.geometry).length
+        else:
+            return {}
 
 
     def _get_support_locations(self):
@@ -357,19 +401,7 @@ class LoadedElement(Element):
                         direction="gravity"
                     )
                     transfer_loads['dist'].append(dist_load)
-                #     transfer_loads['dist'].append(
-                #     {
-                #         "transfer_source": f"{source_member}",
-                #         "transfer_reaction_index": intersection_above.other_index,
-                #         "occupancy": "",
-                #         "load_components": [],
-                #         "applied_area": 0.0,
-                #         "start_loc": intersection_above.other_extents[0],
-                #         "start_magnitude": 1.0,
-                #         "end_loc": intersection_above.other_extents[1],
-                #         "end_magnitude": 1.0,
-                #     }
-                # )
+
         elif self.geometry.geom_type == "Polygon":
             for correspondent in self.correspondents_above:
                 if correspondent.other_reaction_type == "point":
@@ -423,19 +455,6 @@ class LoadedElement(Element):
                             direction="gravity"
                         )
                     )
-                #     transfer_loads['dist'].append(
-                #     {
-                #         "transfer_source": f"{source_member}",
-                #         "transfer_reaction_index": intersection.other_index,
-                #         "occupancy": "",
-                #         "load_components": [],
-                #         "applied_area": 0.0,
-                #         "start_loc": start_x,
-                #         "start_magnitude": 1.0,
-                #         "end_loc": end_x,
-                #         "end_magnitude": 1.0,
-                #     }
-                # )
                     
         return transfer_loads
     
@@ -535,6 +554,7 @@ class LoadedElement(Element):
         """
         tomli_w.dump(self.model, fp)
         return fp
+    
         
     def dump_json(self, fp):
         """
@@ -545,47 +565,53 @@ class LoadedElement(Element):
         
     
     @classmethod
-    def from_element_with_loads(cls, elem: Element, loading_geoms: dict[Polygon, Union[str | npt.ArrayLike]], trib_area: Optional[Polygon] = None):
+    def from_element_with_loads(
+        cls, 
+        elem: Element, 
+        loading_geoms: dict[Polygon, Union[str | npt.ArrayLike]], 
+        trib_area: Optional[Polygon] = None,
+        predecessors: Optional[list[str]] = None,
+        successors: Optional[list[str]] = None,
+        ):
         """
-        Returns a LoadedElement
+        Returns a LoadedElement. Validates the intersections and correspondents against the
+        supplied 'predecessors' and 'successors' from the graph. Intersections and correspondents
+        that do not exist in the 'predecessors' or 'successors' are excluded.
         """
+        cleaned_intersections_above = []
+        for intersection in elem.intersections_above:
+            if intersection.other_tag in predecessors:
+                cleaned_intersections_above.append(intersection)
+        cleaned_intersections_below = []
+        for intersection in elem.intersections_below:
+            if intersection.other_tag in successors:
+                cleaned_intersections_below.append(intersection)
+        cleaned_correspondents_above = []
+        for correspondent in elem.correspondents_above:
+            if correspondent.other_tag in predecessors:
+                cleaned_correspondents_above.append(correspondent)
+        cleaned_correspondents_below = []
+        for correspondent in elem.correspondents_below:
+            if correspondent.other_tag in successors:
+                cleaned_correspondents_below.append(correspondent)
+
+
         return cls(
             elem.geometry,
             elem.tag,
-            elem.intersections_above,
-            elem.intersections_below,
-            elem.correspondents_above,
-            elem.correspondents_below,
+            elem.rank,
+            cleaned_intersections_above,
+            cleaned_intersections_below,
+            cleaned_correspondents_above,
+            cleaned_correspondents_below,
             elem.plane_id,
             element_type=elem.element_type,
             subelements=elem.subelements,
             trib_area=elem.trib_area or trib_area,
             loading_geoms=loading_geoms,
+            reaction_type=elem.reaction_type
         )
 
-
-
-# ## This example shows a beam that is connected to a joist and a column on the same page
-# ## and with that column having a correspondent on the page below
-# E01 = Element(
-#     tag="C1.1",
-#     # type="Column",
-#     # page=1,
-#     geometry=Polygon([[100.0, 100.0], [100.0, 103.0], [103.0, 103.0], [103.0, 100.0]]),
-#     intersections_below=[("FB1.1", Point([101.5, 53.5]))],
-#     correspondents_below=["C0.1"],
-#     # page_label="L02",
-# )
-
-# E02 = Element(
-#     tag="C0.1",
-#     # type="Column",
-#     # page=0,
-#     geometry=Polygon([[100.0, 100.0], [100.0, 103.0], [103.0, 103.0], [103.0, 100.0]]),
-#     intersections=[],
-#     correspondents=["C1.1"],
-#     # page_label="L01",
-# )
 
 def get_collector_extents(
     collector_prototype: Element,
@@ -655,6 +681,25 @@ def get_transfer_extents(element: Element) -> tuple[str, dict]:
                     )
                 }
             )
+        elif isinstance(other_geom, Polygon) and isinstance(element.geometry, Polygon):
+            # The element will be a rank 0 element which means it is a load source
+            # and the other_geom of the intersection below will be the physical
+            # element of which the extents should be measured by.
+            intersecting_region = intersection_below.intersecting_region
+            other_geom = intersection_below.other_geometry
+            other_geom_centerline = geom_ops.get_rectangle_centerline(other_geom)
+            start_coord, _ = geom_ops.get_start_end_nodes(other_geom_centerline)
+            intersecting_centerline = geom_ops.get_rectangle_centerline(intersecting_region)
+            inter_start_coord, inter_end_coord = geom_ops.get_start_end_nodes(intersecting_centerline)
+            intersection_extents.update(
+                {
+                    tag: (
+                        start_coord.distance(inter_start_coord),
+                        start_coord.distance(inter_end_coord),
+                    )
+                }
+            )
+
     return intersection_extents
 
 
@@ -679,22 +724,41 @@ def get_geometry_intersections(
             j_page = j_annot.page
             i_geom = i_attrs["geometry"]
             j_geom = j_attrs["geometry"]
+
             if i_page != j_page:
                 continue
             if j_rank > i_rank:
+                if i_geom.geom_type == j_geom.geom_type == "Polygon":
+                    if not check_eligible_polygon_intersection(i_attrs['tag'], j_attrs['tag']):
+                        continue
                 intersection = geom_ops.get_intersection(i_geom, j_geom, j_attrs['tag'])
-                other_reaction_type = i_attrs['reaction_type']
                 if intersection is None: continue
                 intersections_below.append(Intersection(*intersection))
             elif i_rank > j_rank:
+                if i_geom.geom_type == j_geom.geom_type == "Polygon":
+                    if not check_eligible_polygon_intersection(i_attrs['tag'], j_attrs['tag']):
+                        continue
                 intersection = geom_ops.get_intersection(j_geom, i_geom, j_attrs['tag'])
                 # reaction_type
                 if intersection is None: continue
                 intersections_above.append(Intersection(*intersection))
+            # if i_attrs['tag'] in ("FB0.3", "WLL0.0") and j_attrs['tag'] in ("FB0.3", "WLL0.0"):
+            #     print("Match")
+            #     from IPython.display import display
+            #     display(intersection)
+            #     print(f"{i_attrs['tag']} | {j_attrs['tag']}")
 
         i_attrs["intersections_above"] = intersections_above
         i_attrs["intersections_below"] = intersections_below
     return intersected_annotations
+
+
+def check_eligible_polygon_intersection(i_tag, j_tag) -> bool:
+    """
+    Returns True if 'i_tag' and 'j_tag' indicate the polygon elements
+    are of the same 'family'
+    """
+    return i_tag[0] == j_tag[0]
 
 
 def get_geometry_correspondents(
@@ -736,8 +800,8 @@ def get_geometry_correspondents(
                     correspondence_ratio = geom_ops.check_corresponds(i_geom, j_geom)
                     correspondents_below.setdefault(i_tag, [])
                     if correspondence_ratio and i_rank >= j_rank: # Same rank allowed to transfer in correspondents (e.g. column to column)
-                        correspondents_below[i_tag].append(Correspondent(correspondence_ratio, j_geom, j_tag, other_reaction_type=j_rxn_type))
-                        correspondents_above[j_tag].append(Correspondent(correspondence_ratio, i_geom, i_attrs['tag'], other_reaction_type=i_rxn_type))
+                        correspondents_below[i_tag].append(Correspondent(correspondence_ratio, j_geom, j_tag, other_rank=j_rank, other_reaction_type=j_rxn_type))
+                        correspondents_above[j_tag].append(Correspondent(correspondence_ratio, i_geom, i_attrs['tag'], other_rank=i_rank, other_reaction_type=i_rxn_type))
                         corresponding_annotations[j_annot].setdefault("correspondents_above", [])
                         corresponding_annotations[i_annot].setdefault("correspondents_below", [])
                         corresponding_annotations[j_annot]["correspondents_above"] = correspondents_above[j_tag]
