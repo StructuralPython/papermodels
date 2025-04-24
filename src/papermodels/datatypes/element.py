@@ -280,7 +280,7 @@ class LoadedElement(Element):
             orientation = "horizontal"
         elif self.geometry.geom_type == "Polygon":
             orientation = "vertical"
-
+        length = self.get_length()
         support_locations = self._get_support_locations()
         transfer_loads = {}
         if self.element_type == "transfer":
@@ -291,7 +291,7 @@ class LoadedElement(Element):
             "element_attributes":
                 {
                     "tag": self.tag,
-                    "length": self.geometry.length if self.geometry.geom_type == "LineString" else {},
+                    "length": length,
                     "orientation": orientation,
                     "vert_correspondent_below": [corr.other_tag for corr in self.correspondents_below],
                     "vert_correspondent_above": [corr.other_tag for corr in self.correspondents_above],
@@ -309,6 +309,17 @@ class LoadedElement(Element):
             }
         }
         return model
+
+    def get_length(self):
+        """
+        Calculates the length fo the element, if applicable
+        """
+        if self.geometry.geom_type == "LineString":
+            return self.geometry.length
+        elif self.geometry.geom_type == "Polygon" and self.reaction_type == "linear":
+            return geom_ops.get_rectangle_centerline(self.geometry).length
+        else:
+            return {}
 
 
     def _get_support_locations(self):
@@ -598,6 +609,7 @@ class LoadedElement(Element):
             subelements=elem.subelements,
             trib_area=elem.trib_area or trib_area,
             loading_geoms=loading_geoms,
+            reaction_type=elem.reaction_type
         )
 
 
@@ -670,9 +682,13 @@ def get_transfer_extents(element: Element) -> tuple[str, dict]:
                 }
             )
         elif isinstance(other_geom, Polygon) and isinstance(element.geometry, Polygon):
-            element_centerline = geom_ops.get_rectangle_centerline(element.geometry)
-            start_coord, _ = geom_ops.get_start_end_nodes(element_centerline)
+            # The element will be a rank 0 element which means it is a load source
+            # and the other_geom of the intersection below will be the physical
+            # element of which the extents should be measured by.
             intersecting_region = intersection_below.intersecting_region
+            other_geom = intersection_below.other_geometry
+            other_geom_centerline = geom_ops.get_rectangle_centerline(other_geom)
+            start_coord, _ = geom_ops.get_start_end_nodes(other_geom_centerline)
             intersecting_centerline = geom_ops.get_rectangle_centerline(intersecting_region)
             inter_start_coord, inter_end_coord = geom_ops.get_start_end_nodes(intersecting_centerline)
             intersection_extents.update(
