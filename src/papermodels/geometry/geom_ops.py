@@ -1,7 +1,8 @@
+from decimal import Decimal
 import math
 from typing import Optional, Union
 import numpy as np
-
+from numpy.typing import ArrayLike
 from shapely import (
     Point,
     MultiPoint,
@@ -186,7 +187,7 @@ def get_joist_extents(
     closest_right_coord = min(right_coords, key=lambda x: Point(x).distance(joist_prototype))
     closest_left_distance = Point(closest_left_coord).distance(joist_prototype)
     closest_right_distance = Point(closest_right_coord).distance(joist_prototype)
-    joist_vector_normal = rotate_90(joist_vector, ccw=True)
+    joist_vector_normal = rotate_90_vector(joist_vector, ccw=True)
     joist_left = LineString([
         project_node(Point(joist_origin), joist_vector_normal, magnitude=closest_left_distance - eps),
         project_node(Point(joist_end), joist_vector_normal, magnitude=closest_left_distance - eps)
@@ -364,7 +365,103 @@ def project_node(node: Point, vector: np.ndarray, magnitude: float):
     projected_node = np.array(node.coords[0]) + scaled_vector
     return Point(projected_node)
 
-def rotate_90(v: np.ndarray, precision: int = 6, ccw=True) -> tuple[float, float]:
+
+def scale_vertices(
+    vertices: list[Decimal],
+    scale: Decimal,
+    paper_origin: Optional[tuple[Decimal, Decimal]] = None,
+    round_precision: int = 4
+) -> tuple[Decimal | float]:
+    """
+    Scale the vertices in relation to the origin or in relation to 'paper_origin'.
+
+    If 'paper_origin' is provided, then the annotation coordinates will have their origin reset
+    to 'paper_origin'. Note that 'paper_origin' is the unscaled coordinate space (i.e. in points)
+    """
+    if paper_origin is not None:
+        offset_x = paper_origin[0]
+        offset_y = paper_origin[1]
+        vertices = _translate_vertices(vertices, offset_x, offset_y)
+
+    scaled_vertices = [round(vertex * scale, round_precision) for vertex in vertices]
+    return tuple(scaled_vertices)
+
+
+def _translate_vertices(
+    vertices: list[Decimal], offset_x: float, offset_y: float
+) -> tuple[Decimal]:
+    """
+    Returns a list of float representing 'verticies' translated by 'offset_x' and 'offset_y'.
+    """
+    vertices_floats = [float(vertex) for vertex in vertices]
+    coord_array = np.array(_group_vertices(vertices_floats))
+    offset_array = np.array([offset_x, offset_y])
+    translated_array = coord_array + offset_array
+    flattened_array = flatten_vertex_array(translated_array)
+    return flattened_array
+
+
+
+def _group_vertices(vertices: list[Decimal | float], close=False) -> list[tuple[Decimal, Decimal]]:
+    """
+    Returns a list of (x, y) tuples from a list of vertices in the format of:
+    'x1 y1 x2 y2 x3 y3 ... xn yn'
+    """
+    grouped_vertices = []
+    coordinates = []
+    for idx, ordinate in enumerate(vertices):
+        if idx % 2:
+            coordinates.append(ordinate)
+            grouped_vertices.append(coordinates)
+            coordinates = []
+        else:
+            coordinates.append(ordinate)
+    if close:
+        grouped_vertices.append(grouped_vertices[0])
+
+    return grouped_vertices
+
+
+def vertices_to_array(vertices: list[Decimal]) -> ArrayLike:
+    """
+    Returns a numpy array representing 'vertices' but reshaped to (n, 2)
+    """
+    return np.array(_group_vertices(vertices), dtype=float)
+
+
+def flatten_vertex_array(v: ArrayLike, precision=6) -> tuple[Decimal]:
+    """
+    Returns a flattened version of 'v' in the format of 
+    (x1, y1, x2, y2, x3, y3, ..., xn, yn) where 'v' is either
+    a row or column-based vector of shape (2, n) or (n, 2) rounded to
+    'precision'.
+
+    The returned array is in the format of a tuple of Decimal objects
+    for use in pdf annotations
+    """
+    return tuple([round(Decimal(x), precision) for x in v.flatten()])
+
+
+
+def _group_vertices_str(vertices: str, close=False) -> str:
+    """
+    Returns a list of (x, y) tuples from a list of vertices in the format of:
+    'x1 y1 x2 y2 x3 y3 ... xn yn'
+    """
+    acc = []
+    coordinates = []
+    for idx, ordinate in enumerate(vertices):
+        if idx % 2:
+            coordinates.append(f"{ordinate}")
+            acc.append(" ".join(coordinates))
+            coordinates = []
+        else:
+            coordinates.append(f"{ordinate}")
+    if close:
+        acc.append(acc[0])
+    return ", ".join(acc)
+
+def rotate_90_vector(v: ArrayLike, precision: int = 6, ccw=True) -> tuple[float, float]:
     """
     Rotate the vector components, 'x1' and 'y1' by 90 degrees.
 
@@ -383,6 +480,27 @@ def rotate_90(v: np.ndarray, precision: int = 6, ccw=True) -> tuple[float, float
         ]
     )
     return rot @ v
+
+
+def rotate_90_coords(v: ArrayLike, precision: int = 6, ccw=True) -> tuple[float, float]:
+    """
+    Rotate the vector components, 'x1' and 'y1' by 90 degrees.
+
+    'precision': round result to this many decimal places
+    'ccw': if True, rotate counter-clockwise (clockwise, otherwise)
+    """
+    # v_angle = np.arctan2(v[1], v[0])
+    if ccw:
+            angle = math.pi/2
+    else:
+            angle = -math.pi / 2
+    rot = np.array(
+        [
+            [round(math.cos(angle), precision), -round(math.sin(angle), precision)],
+            [round(math.sin(angle), precision), round(math.cos(angle), precision)],
+        ]
+    )
+    return v @ rot
 
 
 def rotate_to_horizontal(line: LineString, geoms: list[Geometry]):
