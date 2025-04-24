@@ -107,32 +107,99 @@ class GeometryGraph(nx.DiGraph):
 
         g.add_intersection_indexes_below()
         g.add_intersection_indexes_above()
-        # g.remove_excess_correspondent_load_paths()
+        g.remove_excess_correspondent_load_paths()
         return g
     
 
-    # def remove_excess_correspondent_load_paths(self):
-    #     """
-    #     Removes edges from self if node has two edges with edge type "correspondent".
-    #     The edge that is prioritized is the edge that terminates at an element with
-    #     rank 0 (thereby indicating it transfers out).
-    #     """
-    #     sorted_nodes = nx.topological_sort(self)
-    #     for node in sorted_nodes:
-    #         dependents = self.successors(node)
-    #         correspondent_tags = []
-    #         for dependent in dependents:
-    #             edge_attrs = self.edges[(node, dependent)]
-    #             if edge_attrs['edge_type'] == "correspondent":
-    #                 correspondent_tags.append(dependent)
-    #         if len(correspondent_tags) > 1:
-    #             for correspondent in correspondent_tags:
-    #                 element_rank = self.nodes[correspondent]['element'].rank
-    #                 if element_rank == 0:
-    #                     correspondent_to_keep = correspondent
-    #                     break
-    #                 elif element_rank
+    def remove_excess_correspondent_load_paths(self):
+        """
+        Removes edges from the graph for the following conditions:
 
+        1. A Polygon node that has more than one "correspondent" edge. The "correspondent"
+            edge leading to a node with rank 0 is prioritized. If no node with rank 0
+            is present, the edge leading to the node with the larger overlap ratio is
+            prioritized. This prevents a correspondent load above from transferring
+            to both its "end load" and to a correspondent below at the same time. The load
+            path from above should terminate at the "end load" and the end load should transfer
+            to whatever it intersects with.
+        2. A Polygon node, with a "point" reaction type, that has an "intersection" edge
+            and one or more "correspondent" edges. If an "intersection" edge is present,
+            then the "correspondent" edges will be remove. This represents the condition
+            of platform-framing where a post will land on the floor framing, and transfer
+            through it to the supporting post below.
+
+        Modifications to the implementation of this function can adjust how load paths are
+        conceptually created. For example, to implement baloon framing, the second rule
+        can be omitted.
+        """
+        sorted_nodes = nx.topological_sort(self)
+        for node in sorted_nodes:
+            element = self.nodes[node]['element']
+            dependents = list(self.successors(node))
+            dependent_edges = [(node, dep) for dep in dependents]
+            edge_properties = [self.edges[edge]['edge_type'] for edge in dependent_edges]
+            # Rule 1
+            if element.geometry.geom_type == "Polygon" and edge_properties.count("correspondent") > 1:
+                dep_to_keep = None
+                max_overlap = 0.0
+                for idx, dep in dependents:
+                    # Keep the rank 0
+                    if self.nodes[dep]['element'].rank == 0:
+                        dep_to_keep = idx
+                        break
+                    else:
+                        # Or find the correspondent with the largest overlap ratio
+                        dep_overlap_ratio = next((corr.overlap_ratio for corr in self.nodes[node]['element'].correspondents_below if corr.other_tag==dep))
+                        if dep_overlap_ratio > max_overlap:
+                            dep_to_keep = idx
+                            max_overlap = dep_overlap_ratio
+
+                # Remove the edges
+                if dep_to_keep is not None:
+                    for idx, edge in enumerate(dependent_edges):
+                        if idx != dep_to_keep:
+                            self.remove_edge(*edge)
+                
+            # Rule 2
+            if (
+                element.geometry.geom_type == "Polygon" 
+                and element.reaction_type == "point" 
+                and "intersection" in edge_properties
+                and element.rank == 0
+            ):
+                dep_to_keep = None
+                secondary_dep_to_keep = None
+                # We only want to keep one intersection
+                if edge_properties.count("intersection") > 1:
+                    # Go through each intersection
+                    dep_overlap_length = 0.0
+                    dep_overlap_area = 0.0
+                    for idx, dep in enumerate(dependents):
+                        if edge_properties[idx] == "intersection":
+                            dependent_geometry = self.nodes[dep]['element'].geometry
+                            element_geometry = element.geometry
+                            if dependent_geometry.geom_type == "LineString":
+                                overlap_length = element_geometry.intersection(dependent_geometry).length
+                                if overlap_length > dep_overlap_length:
+                                    dep_to_keep = idx
+                                    dep_overlap_length = overlap_length
+                            elif dependent_geometry.geom_type == "Polygon":
+                                dep_element = self.nodes[dep]['element']
+                                if dep_element.reaction_type == "point": # Points should transfer to points
+                                    overlap_area = element_geometry.intersection(dep_element.geometry).area
+                                    if overlap_area > dep_overlap_area:
+                                        secondary_dep_to_keep = idx
+                                        dep_overlap_area = overlap_area
+                else:
+                    dep_to_keep = edge_properties.index("intersection")
+
+                if dep_to_keep is None and secondary_dep_to_keep is not None:
+                    dep_to_keep = secondary_dep_to_keep
+
+                for idx, edge in enumerate(dependent_edges):
+                    if idx != dep_to_keep:
+                        self.remove_edge(*edge)
+                
 
     def add_intersection_indexes_below(self):
         sorted_nodes = nx.topological_sort(self)
