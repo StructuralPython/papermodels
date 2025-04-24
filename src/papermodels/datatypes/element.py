@@ -139,7 +139,8 @@ class Element:
     @classmethod
     def from_parsed_annotations(
         cls,
-        parsed_annotations: dict[Annotation, dict], 
+        parsed_annotations: dict[Annotation, dict],
+        trib_annotations: Optional[dict[Annotation, dict]] = None,
         correspond_with_like_only: bool = True,
     ) -> list["Element"]:
         """
@@ -150,10 +151,18 @@ class Element:
         tagged_annotations = tag_parsed_annotations(parsed_annotations)
         annotations_w_intersect = get_geometry_intersections(tagged_annotations)
         annotations_w_intersect_corrs = get_geometry_correspondents(annotations_w_intersect)
-
+        trib_area_geoms = np.array([annot_attrs['geometry'] for annot_attrs in trib_annotations.values()])
+        matching_trib_poly = None
         elements = []
         for annot_attrs in annotations_w_intersect_corrs.values():
             element_family = annot_attrs['tag'][0]
+            geometry = annot_attrs['geometry']
+            if geometry.geom_type == "LineString":
+                intersection_mask = geometry.intersects(trib_area_geoms)
+                intersection_lines = trib_area_geoms[intersection_mask]
+                get_intersection_lengths = np.vectorize(lambda x: x.length)
+                matching_trib_index = np.argmax(get_intersection_lengths) # The matching trib is the one that is mostly in the trib poly
+                matching_trib_poly = trib_area_geoms[matching_trib_index]
             if correspond_with_like_only:
                 corrs_a = prioritize_correspondents(annot_attrs['correspondents_above'], element_family)
                 corrs_b = prioritize_correspondents(annot_attrs['correspondents_below'], element_family)
@@ -167,7 +176,8 @@ class Element:
                 correspondents_above=corrs_a,
                 correspondents_below=corrs_b,
                 plane_id=annot_attrs.get("page_label", None),
-                reaction_type=annot_attrs.get('reaction_type', 'point')
+                reaction_type=annot_attrs.get('reaction_type', 'point'),
+                trib_area=matching_trib_poly
             )
             elements.append(element)
         return elements
@@ -742,11 +752,6 @@ def get_geometry_intersections(
                 # reaction_type
                 if intersection is None: continue
                 intersections_above.append(Intersection(*intersection))
-            # if i_attrs['tag'] in ("FB0.3", "WLL0.0") and j_attrs['tag'] in ("FB0.3", "WLL0.0"):
-            #     print("Match")
-            #     from IPython.display import display
-            #     display(intersection)
-            #     print(f"{i_attrs['tag']} | {j_attrs['tag']}")
 
         i_attrs["intersections_above"] = intersections_above
         i_attrs["intersections_below"] = intersections_below
