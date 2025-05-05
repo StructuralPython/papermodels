@@ -142,7 +142,7 @@ class GeometryGraph(nx.DiGraph):
             if element.geometry.geom_type == "Polygon" and edge_properties.count("correspondent") > 1:
                 dep_to_keep = None
                 max_overlap = 0.0
-                for idx, dep in dependents:
+                for idx, dep in enumerate(dependents):
                     # Keep the rank 0
                     if self.nodes[dep]['element'].rank == 0:
                         dep_to_keep = idx
