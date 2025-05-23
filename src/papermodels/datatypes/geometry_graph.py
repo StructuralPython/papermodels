@@ -101,12 +101,13 @@ class GeometryGraph(nx.DiGraph):
         
         for node in g.transfer_elements:
             g.nodes[node]['element'].element_type = "transfer"
-
+        
+        g.add_intersection_indexes_below()
+        g.add_intersection_indexes_above()
+        
         if do_not_process:
             return g
 
-        g.add_intersection_indexes_below()
-        g.add_intersection_indexes_above()
         g.remove_excess_correspondent_load_paths()
         return g
     
@@ -149,7 +150,17 @@ class GeometryGraph(nx.DiGraph):
                         break
                     else:
                         # Or find the correspondent with the largest overlap ratio
-                        dep_overlap_ratio = next((corr.overlap_ratio for corr in self.nodes[node]['element'].correspondents_below if corr.other_tag==dep))
+                        try:
+                            dep_overlap_ratio = next((corr.overlap_ratio for corr in element.correspondents_below if corr.other_tag==dep))
+                        except StopIteration:
+                            raise ValueError(
+                                f"Number of dependents does not match number of correspondents_below.\n"
+                                "This can happen if a polygon element is corresponding with more than one "
+                                "polygons on the page below and the ranks of the polygons below are not "
+                                "quite right. If you are intending to transfer out this polygon to a frame member "
+                                "then check to make sure that the transfer element below has a rank of 0.\n"
+                                f"{node=}\n{dependents=}\n{element.correspondents_below=}"
+                            )
                         if dep_overlap_ratio > max_overlap:
                             dep_to_keep = idx
                             max_overlap = dep_overlap_ratio
@@ -341,12 +352,20 @@ class GeometryGraph(nx.DiGraph):
         for node in collectors:
             node_attrs = self.nodes[node]
             node_element = node_attrs['element']
+            # If an incorrect geometry type makes its way into the element_constructor
+            # e.g. a polygon is being entered as a joist in a joist-based element_constructor
+            # then the element_constructor should return None
+            # This prevents an error from being thrown if, for example, unconnected elements
+            # are drawn. Unconnected elements have no precedents therefore they are (currently)
+            # being categorized as collectors. However, I think incompatible geometries
+            # should simply be ignored and not included as part of the processing.
             new_elem = element_constructor(node_element, *args, **kwargs)
-            if as_subelements:
-                node_element.subelements = new_elem
-            else:
-                # assert isinstance(new_elem, Element) # Not an iterable of multiple elements
-                node_attrs['element'] = new_elem
+            if new_elem is not None:
+                if as_subelements:
+                    node_element.subelements = new_elem
+                else:
+                    # assert isinstance(new_elem, Element) # Not an iterable of multiple elements
+                    node_attrs['element'] = new_elem
         self.add_intersection_indexes_below()
         self.add_intersection_indexes_above()
 

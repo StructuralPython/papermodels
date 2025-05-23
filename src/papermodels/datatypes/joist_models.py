@@ -78,10 +78,7 @@ class JoistArrayModel:
         joist_at_end: bool = False,
         cantilever_tolerance: float = 1e-2,
     ):
-        try:
-            self.joist_prototype = LineString(geom_ops.get_start_end_nodes(element.geometry))
-        except NotImplementedError:
-            raise AssertionError(f"The geometry of {element.tag=} is being used as a joist prototype incorrectly.")
+        self.joist_prototype = LineString(geom_ops.get_start_end_nodes(element.geometry))
         try:
             self.joist_supports = geom_ops.clean_polygon_supports([ib.other_geometry for ib in element.intersections_below], self.joist_prototype)
         except AssertionError:
@@ -134,6 +131,8 @@ class JoistArrayModel:
         joist_at_end: bool = False,
         cantilever_tolerance: float = 1e-2,
     ) -> JoistArrayModel:
+        if element.geometry.geom_type != "LineString":
+            return None
         joist_array = cls(
             element, spacing, initial_offset, joist_at_start, joist_at_end, cantilever_tolerance
         )
