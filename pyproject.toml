@@ -24,9 +24,16 @@ dependencies = [
     "pycba",
     "rich",
     "forallpeople",
-    "tomli-w"
+    "tomli-w",
+    "ezdxf"
 ]
 
 
 [project.urls]
 Home = "https://github.com/structuralpython/papermodels"
+
+[dependency-groups]
+dev = [
+    "ipykernel>=6.29.5",
+    "pygraphviz>=1.14",
+]
