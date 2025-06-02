@@ -125,18 +125,20 @@ class GeometryGraph(nx.DiGraph):
             to whatever it intersects with.
         2. A Polygon node, with a "point" reaction type, that has an "intersection" edge
             and one or more "correspondent" edges. If an "intersection" edge is present,
-            then the "correspondent" edges will be remove. This represents the condition
+            then the "correspondent" edges will be removed. This represents the condition
             of platform-framing where a post will land on the floor framing, and transfer
-            through it to the supporting post below.
+            through it to the supporting post below and the floor framing should receive
+            a "crushing" load from the posts above and below without the posts directly
+            transferring to each other.
         3. A LineString node that has intersections_below with other LineStrings and the
-        intersecting_region (Point) is within a Polygon that is also an intersection_below.
-        This represents the condition where a frame element connects to another frame element,
-        fully transfering to the other frame element, at the same location where the
-        supporting frame element is transferring to a column. This rule is intended to prevent
-        both frame elements transferring their load to a column in addition to the supported
-        frame element transferring load to the supporting frame element. The correct load
-        path should be FB0.1 -> FB0.2 -> column instead of FB0.1 -> column with FB0.1 -> FB0.2 ->
-        column.
+            intersecting_region (Point) is within a Polygon that is also an intersection_below.
+            This represents the condition where a frame element connects to another frame element,
+            fully transfering to the other frame element, at the same location where the
+            supporting frame element is transferring to a column. This rule is intended to prevent
+            both frame elements transferring their load to a column in addition to the supported
+            frame element transferring load to the supporting frame element. The correct load
+            path should be FB0.1 -> FB0.2 -> column instead of FB0.1 -> column with FB0.1 -> FB0.2 ->
+            column.
 
         Modifications to the implementation of this function can adjust how load paths are
         conceptually created. For example, to implement baloon framing, the second rule
@@ -156,7 +158,11 @@ class GeometryGraph(nx.DiGraph):
                     if inter_poly.contains(pt):
                         hits.append((node, inter_id))
             # Rule 1
-            if element.geometry.geom_type == "Polygon" and edge_properties.count("correspondent") > 1:
+            if (
+                element.geometry.geom_type == "Polygon" 
+                and edge_properties.count("correspondent") > 1
+                and element.reaction_type == "point"                
+            ):
                 dep_to_keep = None
                 max_overlap = 0.0
                 for idx, dep in enumerate(dependents):
