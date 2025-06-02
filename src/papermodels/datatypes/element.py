@@ -436,7 +436,7 @@ class LoadedElement(Element):
                             "location": [],
                             "magnitude": 0,
                             "transfer_source": intersection.other_tag,
-                            "transfer_reaction_idx": intersection.other_index,
+                            "transfer_reaction_index": intersection.other_index,
                             "direction": "gravity"
                         }
                     )
