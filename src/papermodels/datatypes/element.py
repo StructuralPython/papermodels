@@ -359,20 +359,34 @@ class LoadedElement(Element):
         """
         Calculates the transfer load locations from the intersections above
         """
+        # It is possible to calculate the load eccentricity for columns based
+        # on the getting the transfer_locations relative to the column centroid.
+        # Perhaps a future feature.
         transfer_loads = {"point": [], "dist": []}
         if self.geometry.geom_type == "LineString":
             coords_a, coords_b = self.geometry.coords
         elif self.geometry.geom_type == "Polygon" and self.reaction_type == "linear":
             centerline = geom_ops.get_rectangle_centerline(self.geometry)
             coords_a, coords_b = centerline.coords
+        elif self.geometry.geom_type == "Polygon" and self.reaction_type == "point":
+            coords_a, coords_b = self.geometry.centroid, self.geometry.centroid
 
-        coords_a, coords_b = Point(coords_a), Point(coords_b)
-        ordered_coords = geom_ops.order_nodes_positive([coords_a, coords_b])
-        start_coord = ordered_coords[0]
-        transfer_locations = geom_ops.get_local_intersection_ordinates(
-            start_coord,
-            [intersection[0] for intersection in self.intersections_above]
-        )
+        # This applies to most scenarios
+        if not self.geometry.geom_type == "Polygon" and self.reaction_type == "point":
+            coords_a, coords_b = Point(coords_a), Point(coords_b)
+            ordered_coords = geom_ops.order_nodes_positive([coords_a, coords_b])
+            start_coord = ordered_coords[0]
+            transfer_locations = geom_ops.get_local_intersection_ordinates(
+                start_coord,
+                [intersection.intersecting_region for intersection in self.intersections_above]
+            )
+        else: # But not when it is a column
+            start_coord = coords_a
+            # This is where teh eccentricity can be calculated based on using the 
+            # intersection.intersecting_region instead of start_coord
+            transfer_locations = geom_ops.get_local_intersection_ordinates(
+                start_coord, [start_coord for intersection in self.intersections_above]
+            )
 
         # Intersections
         for idx, transfer_location in enumerate(transfer_locations):
