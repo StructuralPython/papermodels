@@ -582,7 +582,8 @@ class LoadedElement(Element):
         """
         cleaned_intersections_above = []
         for intersection in elem.intersections_above:
-            if intersection.other_tag in predecessors:
+            other_tag = intersection.other_tag.split("-")[0] # Sub-elements have a hyphen in their name
+            if other_tag in predecessors:
                 cleaned_intersections_above.append(intersection)
         cleaned_intersections_below = []
         for intersection in elem.intersections_below:
