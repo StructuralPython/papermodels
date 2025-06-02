@@ -128,6 +128,15 @@ class GeometryGraph(nx.DiGraph):
             then the "correspondent" edges will be remove. This represents the condition
             of platform-framing where a post will land on the floor framing, and transfer
             through it to the supporting post below.
+        3. A LineString node that has intersections_below with other LineStrings and the
+        intersecting_region (Point) is within a Polygon that is also an intersection_below.
+        This represents the condition where a frame element connects to another frame element,
+        fully transfering to the other frame element, at the same location where the
+        supporting frame element is transferring to a column. This rule is intended to prevent
+        both frame elements transferring their load to a column in addition to the supported
+        frame element transferring load to the supporting frame element. The correct load
+        path should be FB0.1 -> FB0.2 -> column instead of FB0.1 -> column with FB0.1 -> FB0.2 ->
+        column.
 
         Modifications to the implementation of this function can adjust how load paths are
         conceptually created. For example, to implement baloon framing, the second rule
@@ -139,6 +148,13 @@ class GeometryGraph(nx.DiGraph):
             dependents = list(self.successors(node))
             dependent_edges = [(node, dep) for dep in dependents]
             edge_properties = [self.edges[edge]['edge_type'] for edge in dependent_edges]
+            intersection_below_points  = [inter.intersecting_region for inter in element.intersections_below if inter.other_geometry.geom_type == "LineString"]
+            intersection_below_polygons = [(inter.other_tag, inter.other_geometry) for inter in element.intersections_below if inter.other_geometry.geom_type == "Polygon"]
+            intersection_points_in_polygon_below = hits = []
+            for pt in intersection_below_points:
+                for inter_id, inter_poly in intersection_below_polygons:
+                    if inter_poly.contains(pt):
+                        hits.append((node, inter_id))
             # Rule 1
             if element.geometry.geom_type == "Polygon" and edge_properties.count("correspondent") > 1:
                 dep_to_keep = None
@@ -210,6 +226,16 @@ class GeometryGraph(nx.DiGraph):
                 for idx, edge in enumerate(dependent_edges):
                     if idx != dep_to_keep:
                         self.remove_edge(*edge)
+
+            # Rule 3
+            if (
+                element.geometry.geom_type == "LineString"
+                and intersection_points_in_polygon_below
+            ):
+                for edge in intersection_points_in_polygon_below:
+                    self.remove_edge(*edge)
+                
+                    
                 
 
     def add_intersection_indexes_below(self):
