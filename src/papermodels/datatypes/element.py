@@ -359,56 +359,76 @@ class LoadedElement(Element):
         """
         Calculates the transfer load locations from the intersections above
         """
+        # It is possible to calculate the load eccentricity for columns based
+        # on the getting the transfer_locations relative to the column centroid.
+        # Perhaps a future feature.
         transfer_loads = {"point": [], "dist": []}
         if self.geometry.geom_type == "LineString":
             coords_a, coords_b = self.geometry.coords
+        elif self.geometry.geom_type == "Polygon" and self.reaction_type == "linear":
+            centerline = geom_ops.get_rectangle_centerline(self.geometry)
+            coords_a, coords_b = centerline.coords
+        elif self.geometry.geom_type == "Polygon" and self.reaction_type == "point":
+            coords_a, coords_b = self.geometry.centroid, self.geometry.centroid
+
+        # This applies to most scenarios
+        if not self.geometry.geom_type == "Polygon" and self.reaction_type == "point":
             coords_a, coords_b = Point(coords_a), Point(coords_b)
             ordered_coords = geom_ops.order_nodes_positive([coords_a, coords_b])
             start_coord = ordered_coords[0]
             transfer_locations = geom_ops.get_local_intersection_ordinates(
                 start_coord,
-                [intersection[0] for intersection in self.intersections_above]
+                [intersection.intersecting_region for intersection in self.intersections_above]
             )
-            for idx, transfer_location in enumerate(transfer_locations):
-                intersection_above: Intersection = self.intersections_above[idx]
-                transfer_type = intersection_above.other_reaction_type
-                source_member = intersection_above.other_tag
-                reaction_idx = intersection_above.other_index
-                if reaction_idx is None:
-                    raise ValueError(
-                        "The .other_index attribute within the .intersections_above list"
-                        " is not calculated. Generate LoadedElement objects through the GeometryGraph"
-                        " interface in order to populate this necessary index."
-                    )
-                if transfer_type == "point":
-                    point_load = self.create_point_load(
-                        transfer_location=round(transfer_location, precision),
-                        magnitude=0.0,
-                        transfer_source=f"{source_member}",
-                        transfer_reaction_index=reaction_idx,
-                        direction="gravity",
-                    )
-                    transfer_loads['point'].append(point_load)
-                elif transfer_type == "linear":
-                    dist_load = self.create_distributed_load(
-                        start_location=round(intersection_above.other_extents[0], precision),
-                        start_magnitude=1.0,
-                        end_location=round(intersection_above.other_extents[1], precision),
-                        end_magnitude=1.0,
-                        transfer_source=f"{source_member}",
-                        transfer_reaction_index=intersection_above.other_index,
-                        occupancy="",
-                        load_components={},
-                        applied_area=0.0,
-                        direction="gravity"
-                    )
-                    transfer_loads['dist'].append(dist_load)
+        else: # But not when it is a column
+            start_coord = coords_a
+            # This is where teh eccentricity can be calculated based on using the 
+            # intersection.intersecting_region instead of start_coord
+            transfer_locations = geom_ops.get_local_intersection_ordinates(
+                start_coord, [start_coord for intersection in self.intersections_above]
+            )
 
-        elif self.geometry.geom_type == "Polygon":
+        # Intersections
+        for idx, transfer_location in enumerate(transfer_locations):
+            intersection_above: Intersection = self.intersections_above[idx]
+            transfer_type = intersection_above.other_reaction_type
+            source_member = intersection_above.other_tag
+            reaction_idx = intersection_above.other_index
+            if reaction_idx is None:
+                raise ValueError(
+                    "The .other_index attribute within the .intersections_above list"
+                    " is not calculated. Generate LoadedElement objects through the GeometryGraph"
+                    " interface in order to populate this necessary index."
+                )
+            if transfer_type == "point":
+                point_load = self.create_point_load(
+                    transfer_location=round(transfer_location, precision),
+                    magnitude=0.0,
+                    transfer_source=f"{source_member}",
+                    transfer_reaction_index=reaction_idx,
+                    direction="gravity",
+                )
+                transfer_loads['point'].append(point_load)
+            elif transfer_type == "linear":
+                dist_load = self.create_distributed_load(
+                    start_location=round(intersection_above.other_extents[0], precision),
+                    start_magnitude=1.0,
+                    end_location=round(intersection_above.other_extents[1], precision),
+                    end_magnitude=1.0,
+                    transfer_source=f"{source_member}",
+                    transfer_reaction_index=intersection_above.other_index,
+                    occupancy="",
+                    load_components={},
+                    applied_area=0.0,
+                    direction="gravity"
+                )
+                transfer_loads['dist'].append(dist_load)
+
+        if self.geometry.geom_type == "Polygon":
             for correspondent in self.correspondents_above:
                 if correspondent.other_reaction_type == "point":
                     point_load = self.create_point_load(
-                        transfer_location=[],
+                        transfer_location=transfer_locations,
                         magnitude=0.0,
                         transfer_source=correspondent.other_tag,
                         transfer_reaction_index=0,
@@ -429,34 +449,6 @@ class LoadedElement(Element):
                         direction="gravity",
                     )
                     transfer_loads['dist'].append(dist_load)
-            for intersection in self.intersections_above:
-                if intersection.other_reaction_type == "point":
-                    transfer_loads['point'].append(
-                        {
-                            "location": [],
-                            "magnitude": 0,
-                            "transfer_source": intersection.other_tag,
-                            "transfer_reaction_index": intersection.other_index,
-                            "direction": "gravity"
-                        }
-                    )
-                elif intersection.other_reaction_type == "linear":
-                    source_member = intersection.other_tag
-                    start_x, end_x = intersection.other_extents
-                    transfer_loads['dist'].append(
-                        self.create_distributed_load(
-                            start_location=round(start_x, precision),
-                            start_magnitude=1.0,
-                            end_location=round(end_x, precision),
-                            end_magnitude=1.0,
-                            transfer_source=f"{source_member}",
-                            transfer_reaction_index=intersection.other_index,
-                            occupancy="",
-                            load_components={},
-                            applied_area=0.0,
-                            direction="gravity"
-                        )
-                    )
                     
         return transfer_loads
     
