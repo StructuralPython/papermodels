@@ -61,7 +61,6 @@ class Overlap:
 OL0 = Overlap(x0=-5.0, x1=10.0, ma=-4.0, ba=15.0, mb=2, bb=-2.0)
 OL1 = Overlap(x0=12.3, x1=16.3, ma=0.5, ba=6.1, mb=-3.34, bb=2.5)
 
-
 @dataclass
 class Singularity:
     """
@@ -84,6 +83,7 @@ class Singularity:
     m: float
     y0: float
     precision: int
+    eps: float = 1e-12
 
     def __call__(self, x: float) -> float:
         """
@@ -98,7 +98,7 @@ class Singularity:
 
     def __neg__(self):
         return Singularity(self.x0, self.x1, -self.m, -self.y0, self.precision)
-    
+
 
 def get_distributed_loads_from_projected_polygons(
     member: LineString,
@@ -177,7 +177,7 @@ def singularities_to_polygon(los: list[Singularity], xy: bool = False) -> Polygo
     Returns a Polygon in the shape of the singularity function.
     If 'xy' is True, function returns a list of x-coords and a list of y-coords
     """
-    sorted_sings = sorted(los, key=lambda x: x.x1)
+    sorted_sings = sorted(los, key=lambda x: x.x0)
     x_acc = []
     prev_x = None
     n = None

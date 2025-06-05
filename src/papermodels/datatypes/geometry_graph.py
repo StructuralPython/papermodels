@@ -101,14 +101,16 @@ class GeometryGraph(nx.DiGraph):
         
         for node in g.transfer_elements:
             g.nodes[node]['element'].element_type = "transfer"
-        
-        g.add_intersection_indexes_below()
-        g.add_intersection_indexes_above()
-        
+
         if do_not_process:
             return g
-
+        
         g.remove_excess_correspondent_load_paths()
+        g.add_intersection_indexes_below()
+        g.add_intersection_indexes_above()
+
+
+        
         return g
     
 
@@ -242,19 +244,23 @@ class GeometryGraph(nx.DiGraph):
                     self.remove_edge(*edge)
                 
                     
-                
-
     def add_intersection_indexes_below(self):
         sorted_nodes = nx.topological_sort(self)
         for node in sorted_nodes:
             node_attrs = self.nodes[node]
             element: Element = node_attrs['element']
+            dependents = list(self.successors(node))
+            dependent_intersections = [
+                intersection 
+                for intersection in element.intersections_below 
+                if intersection.other_tag in dependents
+            ]
             if node_attrs['start_coord'] is None: # node geometry is polygon
                 updated_intersections_below = []
                 all_extents = {}
                 if element.reaction_type == "linear":
                     all_extents = get_transfer_extents(element)
-                for intersection in element.intersections_below:
+                for intersection in dependent_intersections:
                     extents = all_extents.get(intersection.other_tag)
                     new_intersection = Intersection(
                         intersection.intersecting_region,
@@ -268,7 +274,7 @@ class GeometryGraph(nx.DiGraph):
             else:
                 start_coord = Point(node_attrs['start_coord'])
                 intersection_below_local_coords = []
-                for intersection in node_attrs['element'].intersections_below:
+                for intersection in dependent_intersections:
                     below_local_coord = start_coord.distance(intersection.intersecting_region)
                     intersection_below_local_coords.append((below_local_coord, intersection.other_tag))
                 sorted_below_ints = sorted(intersection_below_local_coords, key=lambda x: x[0])
@@ -279,9 +285,8 @@ class GeometryGraph(nx.DiGraph):
                 extents = {}
                 if element.element_type == "collector" and element.reaction_type == "linear":
                     extents = get_collector_extents(element)
-                for intersection in element.intersections_below:
+                for intersection in dependent_intersections:
                     other_tag = intersection.other_tag
-
                     local_index = other_tags_below.index(other_tag)
                     new_intersection = Intersection(
                         intersection.intersecting_region,
@@ -293,7 +298,6 @@ class GeometryGraph(nx.DiGraph):
                     )
                     updated_intersections_below.append(new_intersection)
                 if node in self.collector_elements and element.subelements is not None:
-
                     for subelem in element.subelements:
                         sub_updated_intersections_below = []
                         for sub_intersection in subelem.intersections_below:
@@ -320,15 +324,27 @@ class GeometryGraph(nx.DiGraph):
             indexed_intersections_above = []
             element = self.nodes[node]['element']
             element_tag = element.tag
-            for intersection in self.nodes[node]['element'].intersections_above:
+            predecessors = list(self.predecessors(node))
+            predecessor_intersections = [
+                intersection
+                for intersection in element.intersections_above
+                if intersection.other_tag in predecessors
+            ]
+            for intersection in predecessor_intersections:
                 other_tag = intersection.other_tag
                 element_above: Element = self.nodes[other_tag]['element']
+                above_dependents = list(self.successors(other_tag))
+                element_above_dependent_intersections = [
+                    intersection
+                    for intersection in element_above.intersections_below
+                    if node in above_dependents
+                ]
                 above_intersections_below = {
                     above_intersection_below.other_tag: (
                         above_intersection_below.other_index,
                         above_intersection_below.other_extents
                     )
-                    for above_intersection_below in element_above.intersections_below
+                    for above_intersection_below in element_above_dependent_intersections
                 }
                 local_index = above_intersections_below[element_tag][0]
                 other_extents = above_intersections_below[element_tag][1]
