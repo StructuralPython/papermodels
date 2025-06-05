@@ -368,6 +368,7 @@ class LoadedElement(Element):
         elif self.geometry.geom_type == "Polygon" and self.reaction_type == "linear":
             centerline = geom_ops.get_rectangle_centerline(self.geometry)
             coords_a, coords_b = centerline.coords
+            coords_a, coords_b = Point(coords_a), Point(coords_b)
         elif self.geometry.geom_type == "Polygon" and self.reaction_type == "point":
             coords_a, coords_b = self.geometry.centroid, self.geometry.centroid
 
