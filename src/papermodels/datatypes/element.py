@@ -411,6 +411,12 @@ class LoadedElement(Element):
                 )
                 transfer_loads['point'].append(point_load)
             elif transfer_type == "linear":
+                if len(intersection_above.other_extents) == 2:
+                    source_start_extent = []
+                    source_end_extent = []
+                elif len(intersection_above.other_extents) == 4:
+                    source_start_extent = round(intersection_above.other_extents[2], precision)
+                    source_end_extent = round(intersection_above.other_extents[3], precision)
                 dist_load = self.create_distributed_load(
                     start_location=round(intersection_above.other_extents[0], precision),
                     start_magnitude=1.0,
@@ -418,6 +424,8 @@ class LoadedElement(Element):
                     end_magnitude=1.0,
                     transfer_source=f"{source_member}",
                     transfer_reaction_index=intersection_above.other_index,
+                    transfer_source_start_extent=source_start_extent,
+                    transfer_source_end_extent=source_end_extent,
                     occupancy="",
                     load_components={},
                     applied_area=0.0,
@@ -437,13 +445,22 @@ class LoadedElement(Element):
                     )
                     transfer_loads['point'].append(point_load)
                 elif correspondent.other_reaction_type == "linear":
+                    source_member = correspondent.other_tag
+                    if len(intersection_above.other_extents) == 2:
+                        source_start_extent = []
+                        source_end_extent = []
+                    elif len(intersection_above.other_extents) == 4:
+                        source_start_extent = round(intersection_above.other_extents[2], precision)
+                        source_end_extent = round(intersection_above.other_extents[3], precision)
                     dist_load = self.create_distributed_load(
-                        start_location=0.0,
+                        start_location=round(intersection_above.other_extents[0], precision),
                         start_magnitude=1.0,
-                        end_location=round(geom_ops.get_rectangle_centerline(self.geometry).length, precision),
+                        end_location=round(intersection_above.other_extents[1], precision),
                         end_magnitude=1.0,
-                        transfer_source=correspondent.other_tag,
+                        transfer_source=f"{source_member}",
                         transfer_reaction_index=0,
+                        transfer_source_start_extent=source_start_extent,
+                        transfer_source_end_extent=source_end_extent,
                         occupancy="",
                         load_components={},
                         applied_area=0.0,
@@ -479,6 +496,8 @@ class LoadedElement(Element):
         end_magnitude: float,
         transfer_source: str,
         transfer_reaction_index: int,
+        transfer_source_start_extent: float,
+        transfer_source_end_extent: float,
         occupancy: str,
         load_components: dict,
         applied_area: float,
@@ -488,6 +507,8 @@ class LoadedElement(Element):
         return {
             "transfer_source": transfer_source,
             "transfer_reaction_index": transfer_reaction_index,
+            "transfer_source_start_extent": transfer_source_start_extent,
+            "transfer_source_end_extent": transfer_source_end_extent,
             "occupancy": occupancy,
             "load_components": load_components,
             "applied_area": applied_area,
@@ -652,7 +673,10 @@ def get_transfer_extents(element: Element) -> tuple[str, dict]:
     Returns a tuple of str, extents_dict
 
     e.g.
-    ("FB0.1", {"A": 12, "B": 23.4})
+    {"FB0.1": (2.5, 6.5, 0.3, 4.3)}
+
+    Where the first two values describe the extents of the _transferred_ elemnt
+    and the last two values describe the extents of the _transferring_ element.
 
     For the polygon element that has a linear reaction type.
     This element could have more than one intersection below
@@ -666,14 +690,18 @@ def get_transfer_extents(element: Element) -> tuple[str, dict]:
         tag = intersection_below.other_tag
         other_geom = intersection_below.other_geometry
         if isinstance(other_geom, LineString):
-            start_coord, _ = geom_ops.get_start_end_nodes(other_geom)
+            below_start_coord, _ = geom_ops.get_start_end_nodes(other_geom) # extents are in reference to "below" geometry
+            above_start_coord, _ = geom_ops.get_rectangle_centerline(element.geometry).coords
+            above_start_coord = Point(above_start_coord)
             overlapping_linestring = element.geometry.intersection(other_geom)
             overlap_start, overlap_end = geom_ops.get_start_end_nodes(overlapping_linestring)
             intersection_extents.update(
                 {
                     tag: (
-                     start_coord.distance(overlap_start), 
-                     start_coord.distance(overlap_end)
+                     below_start_coord.distance(overlap_start), 
+                     below_start_coord.distance(overlap_end),
+                     above_start_coord.distance(overlap_start), # Extents in relation to transferring element
+                     above_start_coord.distance(overlap_end) # Extents in relation to transferring element
                     )
                 }
             )
@@ -684,14 +712,18 @@ def get_transfer_extents(element: Element) -> tuple[str, dict]:
             intersecting_region = intersection_below.intersecting_region
             other_geom = intersection_below.other_geometry
             other_geom_centerline = geom_ops.get_rectangle_centerline(other_geom)
-            start_coord, _ = geom_ops.get_start_end_nodes(other_geom_centerline)
+            below_start_coord, _ = geom_ops.get_start_end_nodes(other_geom_centerline)
+            above_start_coord, _ = geom_ops.get_rectangle_centerline(element.geometry).coords
+            above_start_coord = Point(above_start_coord)
             intersecting_centerline = geom_ops.get_rectangle_centerline(intersecting_region)
             inter_start_coord, inter_end_coord = geom_ops.get_start_end_nodes(intersecting_centerline)
             intersection_extents.update(
                 {
                     tag: (
-                        start_coord.distance(inter_start_coord),
-                        start_coord.distance(inter_end_coord),
+                        below_start_coord.distance(inter_start_coord),
+                        below_start_coord.distance(inter_end_coord),
+                        above_start_coord.distance(inter_start_coord),
+                        above_start_coord.distance(inter_end_coord),
                     )
                 }
             )
