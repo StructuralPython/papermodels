@@ -139,8 +139,8 @@ class GeometryGraph(nx.DiGraph):
             supporting frame element is transferring to a column. This rule is intended to prevent
             both frame elements transferring their load to a column in addition to the supported
             frame element transferring load to the supporting frame element. The correct load
-            path should be FB0.1 -> FB0.2 -> column instead of FB0.1 -> column with FB0.1 -> FB0.2 ->
-            column.
+            path should be |FB0.1 -> FB0.2 -> column| instead of |FB0.1 -> column| with 
+            |FB0.1 -> FB0.2 -> column| also.
 
         Modifications to the implementation of this function can adjust how load paths are
         conceptually created. For example, to implement baloon framing, the second rule
