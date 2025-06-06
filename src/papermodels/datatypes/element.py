@@ -434,28 +434,38 @@ class LoadedElement(Element):
                 transfer_loads['dist'].append(dist_load)
 
         if self.geometry.geom_type == "Polygon":
-            for correspondent in self.correspondents_above:
-                if correspondent.other_reaction_type == "point":
+            for correspondent_above in self.correspondents_above:
+                if correspondent_above.other_reaction_type == "point":
                     point_load = self.create_point_load(
                         transfer_location=transfer_locations,
                         magnitude=0.0,
-                        transfer_source=correspondent.other_tag,
+                        transfer_source=correspondent_above.other_tag,
                         transfer_reaction_index=0,
                         direction="gravity"
                     )
                     transfer_loads['point'].append(point_load)
-                elif correspondent.other_reaction_type == "linear":
-                    source_member = correspondent.other_tag
-                    if len(intersection_above.other_extents) == 2:
+                elif correspondent_above.other_reaction_type == "linear":
+                    source_member = correspondent_above.other_tag
+                    if correspondent_above.other_extents is None:
+                        target_start_extent = []
+                        target_end_extent = []
                         source_start_extent = []
                         source_end_extent = []
-                    elif len(intersection_above.other_extents) == 4:
-                        source_start_extent = round(intersection_above.other_extents[2], precision)
-                        source_end_extent = round(intersection_above.other_extents[3], precision)
+                    elif len(correspondent_above.other_extents) == 2:
+                        target_start_extent = round(correspondent_above.other_extents[0])
+                        target_end_extent = round(correspondent_above.other_extents[1])
+                        source_start_extent = []
+                        source_end_extent = []
+                    elif len(correspondent_above.other_extents) == 4:
+                        target_start_extent = round(correspondent_above.other_extents[0])
+                        target_end_extent = round(correspondent_above.other_extents[1])
+                        source_start_extent = round(correspondent_above.other_extents[2], precision)
+                        source_end_extent = round(correspondent_above.other_extents[3], precision)
+
                     dist_load = self.create_distributed_load(
-                        start_location=round(intersection_above.other_extents[0], precision),
+                        start_location=target_start_extent,
                         start_magnitude=1.0,
-                        end_location=round(intersection_above.other_extents[1], precision),
+                        end_location=target_end_extent,
                         end_magnitude=1.0,
                         transfer_source=f"{source_member}",
                         transfer_reaction_index=0,
