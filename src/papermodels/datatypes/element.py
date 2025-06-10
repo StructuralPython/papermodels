@@ -452,13 +452,13 @@ class LoadedElement(Element):
                         source_start_extent = []
                         source_end_extent = []
                     elif len(correspondent_above.other_extents) == 2:
-                        target_start_extent = round(correspondent_above.other_extents[0])
-                        target_end_extent = round(correspondent_above.other_extents[1])
+                        target_start_extent = round(correspondent_above.other_extents[0], precision)
+                        target_end_extent = round(correspondent_above.other_extents[1], precision)
                         source_start_extent = []
                         source_end_extent = []
                     elif len(correspondent_above.other_extents) == 4:
-                        target_start_extent = round(correspondent_above.other_extents[0])
-                        target_end_extent = round(correspondent_above.other_extents[1])
+                        target_start_extent = round(correspondent_above.other_extents[0], precision)
+                        target_end_extent = round(correspondent_above.other_extents[1], precision)
                         source_start_extent = round(correspondent_above.other_extents[2], precision)
                         source_end_extent = round(correspondent_above.other_extents[3], precision)
 
@@ -738,7 +738,30 @@ def get_transfer_extents(element: Element) -> tuple[str, dict]:
                 }
             )
 
-    return intersection_extents
+    correspondent_extents = {}
+    for correspondent_below in element.correspondents_below:
+            tag = correspondent_below.other_tag
+            other_geom = correspondent_below.other_geometry
+            intersecting_region = element.geometry.intersection(other_geom)
+            other_geom_centerline = geom_ops.get_rectangle_centerline(other_geom)
+            below_start_coord, _ = geom_ops.get_start_end_nodes(other_geom_centerline)
+            above_start_coord, _ = geom_ops.get_rectangle_centerline(element.geometry).coords
+            above_start_coord = Point(above_start_coord)
+            intersecting_centerline = geom_ops.get_rectangle_centerline(intersecting_region)
+            inter_start_coord, inter_end_coord = geom_ops.get_start_end_nodes(intersecting_centerline)
+            correspondent_extents.update(
+                {
+                    tag: (
+                        below_start_coord.distance(inter_start_coord),
+                        below_start_coord.distance(inter_end_coord),
+                        above_start_coord.distance(inter_start_coord),
+                        above_start_coord.distance(inter_end_coord),
+                    )
+                }
+            )
+
+
+    return intersection_extents | correspondent_extents
 
 
 
