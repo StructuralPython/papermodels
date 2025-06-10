@@ -255,11 +255,17 @@ class GeometryGraph(nx.DiGraph):
                 for intersection in element.intersections_below 
                 if intersection.other_tag in dependents
             ]
+            dependent_correspondents = [
+                correspondent
+                for correspondent in element.correspondents_below
+                if correspondent.other_tag in dependents
+            ]
             if node_attrs['start_coord'] is None: # node geometry is polygon
                 updated_intersections_below = []
                 all_extents = {}
                 if element.reaction_type == "linear":
                     all_extents = get_transfer_extents(element)
+
                 for intersection in dependent_intersections:
                     extents = all_extents.get(intersection.other_tag)
                     new_intersection = Intersection(
@@ -271,6 +277,20 @@ class GeometryGraph(nx.DiGraph):
                         other_extents=extents
                     )
                     updated_intersections_below.append(new_intersection)
+
+                updated_correspondents_below = []
+                for correspondent in dependent_correspondents:
+                    extents = all_extents.get(correspondent.other_tag)
+                    new_correspondent = Correspondent(
+                        correspondent.overlap_ratio,
+                        correspondent.other_geometry,
+                        correspondent.other_tag,
+                        correspondent.other_rank,
+                        correspondent.other_reaction_type,
+                        extents,
+                    )
+                    updated_correspondents_below.append(new_correspondent)
+                    element.correspondents_below = updated_correspondents_below
             else:
                 start_coord = Point(node_attrs['start_coord'])
                 intersection_below_local_coords = []
@@ -330,6 +350,11 @@ class GeometryGraph(nx.DiGraph):
                 for intersection in element.intersections_above
                 if intersection.other_tag in predecessors
             ]
+            predecessor_correspondents = [
+                correspondent
+                for correspondent in element.correspondents_above
+                if correspondent.other_tag in predecessors
+            ]
             for intersection in predecessor_intersections:
                 other_tag = intersection.other_tag
                 element_above: Element = self.nodes[other_tag]['element']
@@ -371,7 +396,33 @@ class GeometryGraph(nx.DiGraph):
                         )
                         indexed_intersections_above.append(new_sub_intersection)
 
+            indexed_correspondents_above = []
+            for correspondent in predecessor_correspondents:
+                other_tag = correspondent.other_tag
+                element_above: Element = self.nodes[other_tag]['element']
+                above_dependents = list(self.successors(other_tag))
+                element_above_dependent_correspondents = [
+                    correspondent
+                    for correspondent in element_above.correspondents_below
+                    if element.tag in above_dependents
+                ]
+                above_correspondents_below = {
+                    above_correspondent_below.other_tag: above_correspondent_below.other_extents
+                    for above_correspondent_below in element_above_dependent_correspondents
+                }
+                other_extents = above_correspondents_below[element_tag]
+                if element_above.subelements is None:
+                    new_correspondent = Correspondent(
+                        correspondent.overlap_ratio,
+                        correspondent.other_geometry,
+                        correspondent.other_tag,
+                        correspondent.other_rank,
+                        correspondent.other_reaction_type,
+                        other_extents
+                    )
+                    indexed_correspondents_above.append(new_correspondent)
 
+            element.correspondents_above = indexed_correspondents_above
             element.intersections_above = indexed_intersections_above
             self.nodes[node]['element'] = element
 
