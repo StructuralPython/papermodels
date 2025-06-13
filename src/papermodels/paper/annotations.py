@@ -407,7 +407,7 @@ def parse_legend(legend_text: str, legend_identifier: str) -> dict:
     Returns a dict of key/value pairs extracted from teh legened annotation text
     """
     legend_text = strip_html_tags(legend_text)
-    legend_data = legend_text.lower().replace("\r\n", "\n").replace("\r", "\n").replace(f"{legend_identifier.lower()}\n", "").split("\n")
+    legend_data = legend_text.lower().replace(legend_identifier.lower(),"").replace("\r\n", "\n").replace("\r", "\n").replace(f"{legend_identifier.lower()}\n", "").split("\n")
     legend_data = [elem for elem in legend_data if elem]
     annot_attributes = {}
     for legend_attr in legend_data:
