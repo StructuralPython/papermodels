@@ -85,18 +85,7 @@ def parse_annotations(
             prop: getattr(legend_item, prop) for prop in properties_to_match
         }
         matching_annots = filter_annotations(annots, legend_properties)
-        legend_text = strip_html_tags(legend_item.text)
-        legend_data = legend_text.lower().replace("\r\n", "\n").replace("\r", "\n").replace(f"{legend_identifier.lower()}\n", "").split("\n")
-        legend_data = [elem for elem in legend_data if elem]
-        annot_attributes = {}
-        for legend_attr in legend_data:
-            try:
-                key, value = legend_attr.split(":")
-            except ValueError as e:
-                raise LegendError(f"Incorrect legend format on the following annotation: {legend_data}")
-            key = key.strip().lower().replace(" ", "_")
-            value = value.strip()
-            annot_attributes.update({key: value})
+        annot_attributes = parse_legend(legend_item.text, legend_identifier)
         for annot in matching_annots:
             if annot in legend: 
                 continue
@@ -411,6 +400,25 @@ def scale_annotations(
         annot_dict["vertices"] = scaled_vertices
         scaled_annotations.append(Annotation(**annot_dict))
     return scaled_annotations
+
+
+def parse_legend(legend_text: str, legend_identifier: str) -> dict:
+    """
+    Returns a dict of key/value pairs extracted from teh legened annotation text
+    """
+    legend_text = strip_html_tags(legend_text)
+    legend_data = legend_text.lower().replace(legend_identifier.lower(),"").replace("\r\n", "\n").replace("\r", "\n").replace(f"{legend_identifier.lower()}\n", "").split("\n")
+    legend_data = [elem for elem in legend_data if elem]
+    annot_attributes = {}
+    for legend_attr in legend_data:
+        try:
+            key, value = legend_attr.split(":")
+        except ValueError as e:
+            raise LegendError(f"Incorrect legend format on the following annotation: {legend_data}")
+        key = key.strip().lower().replace(" ", "_")
+        value = value.strip()
+        annot_attributes.update({key: value})
+    return annot_attributes
 
 
 def strip_html_tags(s: str) -> str:
