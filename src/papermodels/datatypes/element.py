@@ -18,6 +18,20 @@ import json
 
 Geometry = Union[LineString, Polygon]
 
+ELEMENT_ATTRS = {
+    "tag", 
+    "geometry",
+    "rank",
+    "type",
+    "length",
+    "intersections_above",
+    "intersections_below",
+    "correspondents_above",
+    "correspondents_below",
+    "page_label",
+    "reaction_type",
+}
+
 
 class Intersection(NamedTuple):
     """
@@ -76,8 +90,9 @@ class Element:
     trib_area: Optional[Polygon] or None. # Not sure if adding this here is the right
         thing to do. Currently in use for the creation of collector subelements and for storing
         their trib areas.
+    kwargs: Optional[dict]. Additional kwargs that are defined on the annotation are
+        passed-through to the Element instance and stored here.
     """
-
     geometry: Geometry
     tag: Optional[str | int] = None
     rank: Optional[int] = None
@@ -90,6 +105,7 @@ class Element:
     subelements: list["Element"] = None
     trib_area: Optional[Polygon] = None
     reaction_type: str = "point"
+    kwargs: Optional[dict] = None
 
     def __post_init__(self):
         if self.geometry.geom_type == "LineString" and len(self.geometry.coords) != 2:
@@ -166,7 +182,9 @@ class Element:
             if correspond_with_like_only:
                 corrs_a = prioritize_correspondents(annot_attrs['correspondents_above'], element_family)
                 corrs_b = prioritize_correspondents(annot_attrs['correspondents_below'], element_family)
-
+            
+            available_kwargs = {k: v for k, v in annot_attrs.items() if k not in ELEMENT_ATTRS}
+            available_kwargs = available_kwargs or None
             element = cls(
                 tag=annot_attrs["tag"],
                 geometry=annot_attrs["geometry"],
@@ -177,7 +195,8 @@ class Element:
                 correspondents_below=corrs_b,
                 plane_id=annot_attrs.get("page_label", None),
                 reaction_type=annot_attrs.get('reaction_type', 'point'),
-                trib_area=matching_trib_poly
+                trib_area=matching_trib_poly,
+                kwargs=available_kwargs,
             )
             elements.append(element)
         return elements
@@ -294,7 +313,7 @@ class LoadedElement(Element):
         if self.element_type == "transfer":
             transfer_loads = self._get_transfer_loads(precision)
         distributed_loads = self._get_distributed_loads(precision)
-
+        available_kwargs = self.kwargs or {}
 
         elem_model = {
             "element_attributes":
@@ -305,7 +324,8 @@ class LoadedElement(Element):
                     "vert_correspondent_below": [corr.other_tag for corr in self.correspondents_below],
                     "vert_correspondent_above": [corr.other_tag for corr in self.correspondents_above],
                     "horz_intersects_above": [inter.other_tag for inter in self.intersections_above],
-                    "horz_intersects_below": [inter.other_tag for inter in self.intersections_below]
+                    "horz_intersects_below": [inter.other_tag for inter in self.intersections_below],
+                    "user_defined": available_kwargs,
                 },
             "element_geometry":
                 {
@@ -315,7 +335,7 @@ class LoadedElement(Element):
             "loads": {
                 "point_loads": transfer_loads.get('point', []),
                 "distributed_loads": transfer_loads.get('dist', []) + distributed_loads
-            }
+            },
         }
         return elem_model
 
@@ -636,7 +656,8 @@ class LoadedElement(Element):
             subelements=elem.subelements,
             trib_area=elem.trib_area or trib_area,
             loading_geoms=loading_geoms,
-            reaction_type=elem.reaction_type
+            reaction_type=elem.reaction_type,
+            kwargs=elem.kwargs
         )
 
 
