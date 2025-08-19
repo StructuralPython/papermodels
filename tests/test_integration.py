@@ -51,7 +51,10 @@ def test_sketch_to_scale_creates_array_loaded_elements(sketch_to_scale_to_array_
 def test_kwargs_pass_thru_sketch_to_scale_trib(sketch_to_scale_to_trib_loaded_elements):
     les = sketch_to_scale_to_trib_loaded_elements
     assert les['J4.0'].model()['element_attributes']['user_defined'] == {"slope": "4/12", "slope_down": "right"}
+    assert les['FB2.0'].model()['element_attributes']['user_defined'] == {"user_defined": "data"}
+
 
 def test_kwargs_pass_thru_sketch_to_scale_array(sketch_to_scale_to_array_loaded_elements):
     les = sketch_to_scale_to_array_loaded_elements
     assert les['J4.0-1'].model()['element_attributes']['user_defined'] == {"slope": "4/12", "slope_down": "right"}
+    assert les['FB2.0'].model()['element_attributes']['user_defined'] == {"user_defined": "data"}
