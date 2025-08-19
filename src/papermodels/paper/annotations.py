@@ -89,7 +89,8 @@ def parse_annotations(
         for annot in matching_annots:
             if annot in legend: 
                 continue
-            existing_annot_tag = parse_existing_annot_tag(annot.text)
+            annot_kwargs = parse_annot_kwargs(annot.text)
+            existing_annot_tag = annot_kwargs.get("tag", None)
             annot_geom = annotation_to_shapely(annot)
             annot_attrs = {}
             annot_attrs["geometry"] = annot_geom
@@ -104,7 +105,7 @@ def parse_annotations(
             annot_attrs['reaction_type'] = annot_attrs['reaction_type'].lower()
             if annot_geom.geom_type == "Polygon" and annot_attrs['reaction_type'] == "linear":
                 annot_attrs['length'] = geom_ops.get_rectangle_centerline(annot_geom).length
-            parsed_annotations.update({annot: annot_attrs})
+            parsed_annotations.update({annot: annot_attrs | annot_kwargs})
     return parsed_annotations
 
 
@@ -344,19 +345,28 @@ def get_page_geom_by_page_index(page_annots: list[Annotation]) -> dict[int, list
     return page_geoms
 
 
-def parse_existing_annot_tag(text_contents: str) -> Optional[str]:
+def parse_annot_kwargs(text_contents: str) -> dict[str, str]:
     """
-    Returns a tag if there is a tag field existing within the annotation's
-    text field, 'text_contents'. Returns None, otherwise.
+    Returns a dictionary representing the kwargs that may be
+    encoded into the text field of the annotation
+    """
+    text_contents = remove_windows_crlf(text_contents)
+    acc = {}
+    for line in text_contents.split("\n"):
+        if line:
+            splits = re.split(r":[\s]*", line)
+            if len(splits) == 2:
+                k, v = splits
+                acc.update({k: v})
+    return acc
 
-    A tag field looks like: "tag: <tag name>".
+
+
+def remove_windows_crlf(text_contents: str) -> str:
     """
-    index = text_contents.lower().find("tag:")
-    if index == -1:
-        return None
-    tag_text = text_contents[index:]
-    tag_value = re.search(r"^tag:[\s]*([A-Za-z.0-9\-]+)", tag_text).groups()[0]
-    return tag_value
+    Replaces any \r\n with \n and any \r with \n
+    """
+    return text_contents.replace("\r\n", "\n").replace("\r", "\n")
 
 
 def filter_annotations(annots: list[Annotation], properties: dict) -> list[Annotation]:

@@ -22,6 +22,8 @@ ELEMENT_ATTRS = {
     "tag", 
     "geometry",
     "rank",
+    "type",
+    "length",
     "intersections_above",
     "intersections_below",
     "correspondents_above",
@@ -183,7 +185,6 @@ class Element:
             
             available_kwargs = {k: v for k, v in annot_attrs.items() if k not in ELEMENT_ATTRS}
             available_kwargs = available_kwargs or None
-
             element = cls(
                 tag=annot_attrs["tag"],
                 geometry=annot_attrs["geometry"],
@@ -655,7 +656,8 @@ class LoadedElement(Element):
             subelements=elem.subelements,
             trib_area=elem.trib_area or trib_area,
             loading_geoms=loading_geoms,
-            reaction_type=elem.reaction_type
+            reaction_type=elem.reaction_type,
+            kwargs=elem.kwargs
         )
 
 

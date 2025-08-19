@@ -19,8 +19,6 @@ from papermodels.datatypes.element import Element, Intersection
 from papermodels.geometry import geom_ops
 
 from rich import print
-from IPython.display import display
-
 
 def collector_trib_model(
         element: Element, 
@@ -56,6 +54,7 @@ def collector_trib_model(
         e.subelements,
         trib_area=trib_area,
         reaction_type="linear",
+        kwargs=e.kwargs
     )
     return collector_element
 
@@ -86,6 +85,7 @@ class JoistArrayModel:
         self.joist_support_tags = [ib.other_tag for ib in element.intersections_below]
         self.id = element.tag
         self.plane_id = element.plane_id
+        self.elem_kwargs = element.kwargs
         self.spacing = spacing  # Need to include this in the legend and thus, the Element
         self.initial_offset = float(initial_offset)
         self._joist_prototype = self.joist_prototype
@@ -168,6 +168,7 @@ class JoistArrayModel:
                 element_type="collector",
                 subelements=None,
                 trib_area = trib_area,
+                kwargs=self.elem_kwargs
             )
             subelements.append(element)
         return subelements
