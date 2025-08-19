@@ -148,6 +148,7 @@ class Element:
         types described in the 'legend'. If an annotation is not described in the legend then it will
         not be included in the result list of Elements.
         """
+        print(f"{parsed_annotations=}")
         tagged_annotations = tag_parsed_annotations(parsed_annotations)
         annotations_w_intersect = get_geometry_intersections(tagged_annotations)
         annotations_w_intersect_corrs = get_geometry_correspondents(annotations_w_intersect)
@@ -825,6 +826,7 @@ def get_geometry_correspondents(
     attributes dictionary of each Annotation key.
     """
     annots_by_page = annotations_by_page(tagged_annotations)
+
     descending_pages = sorted(annots_by_page.keys(), reverse=True)
     last_page = descending_pages[-1]
     corresponding_annotations = tagged_annotations.copy()

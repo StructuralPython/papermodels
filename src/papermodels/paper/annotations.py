@@ -397,7 +397,7 @@ def scale_annotations(
     for annot in annots:
         annot_dict = asdict(annot).copy()
         scaled_vertices = geom_ops.scale_vertices(annot.vertices, scale, round_precision=round_precision, paper_origin=paper_origin)
-        annot_dict["vertices"] = scaled_vertices
+        annot_dict["vertices"] = tuple(scaled_vertices)
         scaled_annotations.append(Annotation(**annot_dict))
     return scaled_annotations
 

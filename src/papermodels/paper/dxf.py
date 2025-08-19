@@ -30,7 +30,7 @@ def load_dxf_directory(
     """
     dir_path = pathlib.Path(directory_path)
     annotations = []
-    for page_idx, dxf_path in dir_path.glob("*.dxf"):
+    for page_idx, dxf_path in enumerate(dir_path.glob("*.dxf")):
         if directory_page_idx is not None:
             page_idx = directory_page_idx
         file_annotations = load_dxf_annotations(dxf_path, page_idx)
@@ -64,13 +64,17 @@ def load_dxf_annotations(
     """
     dxf_path = pathlib.Path(dxf_path)
     doc = ezdxf.readfile(dxf_path)
+    layers = doc.layers.entries
     msp = doc.modelspace()
     lines = msp.query("LINE")
     lwpolylines = msp.query("LWPOLYLINE")
-    all_entities = list(lines) + list(lwpolylines)
+    blocks = msp.query("INSERT")
+    all_entities = list(lines) + list(lwpolylines) + list(blocks)
     annotations = []
     for local_idx, entity in enumerate(all_entities):
-        annotations.append(dxf_entity_to_annotation(entity, page_idx, local_idx))
+        annotation = dxf_entity_to_annotation(entity, page_idx, local_idx)
+        if annotation.vertices:
+            annotations.append(annotation)
     return annotations
 
 
@@ -78,7 +82,7 @@ def dxf_entity_to_annotation(entity: ezdxf.entities.DXFGraphic, page_idx: int, l
     """
     Converts the entity into an Annotation
     """
-    dxf_type = entity.dxftype
+    dxf_type = entity.dxftype()
     layer = entity.dxf.layer
     if dxf_type == "LINE":
         object_type = "Line"
@@ -89,15 +93,17 @@ def dxf_entity_to_annotation(entity: ezdxf.entities.DXFGraphic, page_idx: int, l
         coords = parse_polyline_coords(entity)
         text = layer
     elif dxf_type == "INSERT":
+        object_type = "Polygon"
         block_name = entity.get_dxf_attrib('name', default='')
         coords = parse_block_coordinates(entity)
         text = layer
-
-    line_color = entity.dxf.color # convert to RBG tuple
-    line_type = entity.dxf.linetype
-    line_weight = entity.dxf.thickness
-    transparency = entity.dxf.transparency
-    opacity = 1 - transparency
+    else:
+        print(f"{dxf_type=}")
+    line_color = (0, 0, 0)#entity.dxf.color # convert to RBG tuple
+    line_type = None #entity.dxf.linetype
+    line_weight = 1.0#entity.dxf.thickness
+    transparency = 1.0 #entity.dxf.transparency or 1.0
+    opacity = 1.0 - transparency
     vertices = coords_to_vertices_list(coords)
     return Annotation(
         page=page_idx,
@@ -110,7 +116,7 @@ def dxf_entity_to_annotation(entity: ezdxf.entities.DXFGraphic, page_idx: int, l
         line_weight=line_weight,
         line_opacity=opacity,
         fill_opacity=opacity,
-        matrix=[1, 0, 0, 1, 0, 0],
+        matrix=(1, 0, 0, 1, 0, 0),
         local_id=local_idx
 
     )
@@ -131,7 +137,7 @@ def parse_block_coordinates(entity):
             coords = parse_arc_coords(e)
         
         if coords is not None:
-            geoms.append(coords)
+            geoms += coords
     return geoms
 
 
@@ -144,6 +150,7 @@ def parse_line_coords(entity: ezdxf.entities.DXFGraphic):
 
 
 def parse_polyline_coords(entity: ezdxf.entities.DXFGraphic):
+    print(entity.get_points())
     coords = [[(p[0][0], p[0][1]), (p[1][0], p[1][1])] for p in entity.get_points()]
     return coords
 
@@ -171,7 +178,7 @@ def coords_to_vertices_list(coords: list[tuple[float, float]]) -> list:
     """
     vertices = []
     for coord in coords:
-        coord_i, coord_j = coord
+        coord_i, coord_j = coord[0], coord[1]
         vertices.append(coord_i)
         vertices.append(coord_j)
-    return vertices
+    return tuple(vertices)
