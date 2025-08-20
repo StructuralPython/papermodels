@@ -503,6 +503,21 @@ class GeometryGraph(nx.DiGraph):
         self.add_intersection_indexes_above()
 
 
+    def unassigned_collectors(self) -> list[str]:
+        """
+        Returns a list of str that represents collector nodes who do not currently
+        have collector behaviour assigned meaning that they do not have a populated
+        .trib_area attribute.
+        """
+        unassigned_acc = []
+        for collector_node in self.collector_elements:
+            node_element = self.nodes[collector_node]['element']
+            if not node_element.trib_area:
+                unassigned_acc.append(collector_node)
+        return unassigned_acc
+            
+
+
     @classmethod
     def from_pdf_file(
         cls,
