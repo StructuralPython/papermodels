@@ -661,7 +661,6 @@ class LoadedElement(Element):
         )
 
 def create_element_filter(
-    self,
     page_idxs: Optional[list[int]] = None,
     tags: Optional[list[str]] = None,
     element_types: Optional[list[str]] = None,
@@ -690,7 +689,7 @@ def create_element_filter(
         element, it will be included.
     'exclude_tags': A list of tags that will be excluded from the filter
     'exclude_element_types': A list of element types which will be excluded
-    'exclude_user_defined': If ALL of the key/values in this dict match the
+    'exclude_user_defined': If ANY of the key/values in this dict match the
         kwarg values in an element, it will be excluded.
     """
     def filter_function(
@@ -702,13 +701,21 @@ def create_element_filter(
         """
         include_by_page = element.plane_id in page_idxs if page_idxs else True
         include_by_tag = element.tag in tags if tags else True
-        include_by_element_type = any([element.tag.startswith(e_type) for e_type in element_types])
+        include_by_element_type = any([element.tag.startswith(e_type) for e_type in element_types]) if element_types else True
 
-        user_defined_acc = []
-        for k, v in user_defined.items():
-            ev = element.kwargs.get(k)
-            user_defined_acc.append(ev == v)
-        include_by_user_defined = all(user_defined_acc)
+        nonlocal user_defined
+        if user_defined is None:
+            include_by_user_defined = True
+        else:
+            user_defined = user_defined or {}
+            user_defined_acc = []
+            for k, v in user_defined.items():
+                if element.kwargs is None:
+                    user_defined_acc.append(False)
+                    continue
+                ev = element.kwargs.get(k)
+                user_defined_acc.append(ev == v)
+            include_by_user_defined = all(user_defined_acc)
 
         include_element = all([
             include_by_page,
@@ -717,13 +724,23 @@ def create_element_filter(
             include_by_user_defined
         ])
 
-        exclude_by_tag = element.tag not in exclude_tags
-        exclude_by_element_type = not any([element.tag.startswith(e_type) for e_type in exclude_element_types])
-        user_defined_exclude_acc = []
-        for k, v in exclude_user_defined.items():
-            ev = element.kwargs.get(k)
-            user_defined_acc.append(ev == v)
-        exclude_by_user_defined = not all(user_defined_exclude_acc)
+        exclude_by_tag = element.tag not in exclude_tags if exclude_tags else True
+        exclude_by_element_type = not any([element.tag.startswith(e_type) for e_type in exclude_element_types]) if exclude_element_types else True
+        
+        nonlocal exclude_user_defined
+        if exclude_user_defined is None:
+            exclude_by_user_defined = True
+        else:
+            exclude_user_defined = exclude_user_defined or {}
+            exclude_user_defined_acc = []
+            for k, v in exclude_user_defined.items():
+                if element.kwargs is None:
+                    exclude_user_defined_acc.append(False)
+                    continue
+                ev = element.kwargs.get(k)
+                exclude_user_defined_acc.append(ev == v)
+            exclude_by_user_defined = not any(exclude_user_defined_acc)
+
         return all([include_element, exclude_by_tag, exclude_by_element_type, exclude_by_user_defined])
     return filter_function
 

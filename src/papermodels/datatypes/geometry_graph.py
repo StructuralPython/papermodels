@@ -478,10 +478,10 @@ class GeometryGraph(nx.DiGraph):
             node_attrs = self.nodes[node]
             node_element = node_attrs['element']
             if filter_function is not None:
-                try:
-                    filter_passes = filter_function(node_element)
-                except:
-                    raise Exception("There was an exception generated during element filtering.")
+                # try:
+                filter_passes = filter_function(node_element)
+                # except:
+                #     raise Exception("There was an exception generated during element filtering.")
             else:
                 filter_passes = True
             if filter_passes:
