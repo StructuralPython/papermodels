@@ -12,7 +12,7 @@ import pathlib
 import fixtures
 from decimal import Decimal
 
-QUARTER_INCH_SCALE = Decimal(1) / Decimal(72) / Decimal(4)
+QUARTER_INCH_SCALE = Decimal(1) / Decimal(72) * Decimal(4)
 
 TEST_DATA = pathlib.Path(__file__).parent / "test_data"
 

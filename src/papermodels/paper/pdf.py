@@ -24,6 +24,7 @@ def load_pdf_annotations(pdf_path: pathlib.Path | str, show_skipped: bool = Fals
         skipped_annots = []
         for page_num, page_data in enumerate(pdf_obj.pages):
             rotate = page_data.get("/Rotate", None)
+            if not hasattr(page_data.obj, 'Annots'): continue
             for annot_idx, annot in enumerate(page_data.obj.Annots):
                 pm_annot = pike_annotation_to_pm_annotation(annot, annot_idx, page_num, rotate)
                 if pm_annot is not None:
