@@ -660,6 +660,73 @@ class LoadedElement(Element):
             kwargs=elem.kwargs
         )
 
+def create_element_filter(
+    self,
+    page_idxs: Optional[list[int]] = None,
+    tags: Optional[list[str]] = None,
+    element_types: Optional[list[str]] = None,
+    user_defined:  Optional[dict[str, str]] = None,
+    exclude_tags: Optional[list[str]] = None,
+    exclude_element_types: Optional[list[str]] = None,
+    exclude_user_defined: Optional[dict[str, str]] = None,
+) -> callable:
+    """
+    Returns a function with this signature:
+        func(element: Element) -> bool
+    
+    The returned function returns True if the supplied
+    element matches the criteria defined in this function.
+
+    'page_idxs' - A list of ints. Any collector elements on those page
+        indexes will be included.
+    'tags' - A list of joist tags to be included by the filter
+    'element_types' - A list of element types that exist in the graph.
+        In this context, an "element_type" refers to the tag prefix and
+        not the designation of "collector" or "transfer". The element
+        will return True if the element matches ANY of the element_types
+        listed (e.g. ['FB', 'SJ', 'CT'])
+    'user_defined' - A dict of values assigned manually to an element.
+        If ALL the dict of values provided matches the kwarg values in an
+        element, it will be included.
+    'exclude_tags': A list of tags that will be excluded from the filter
+    'exclude_element_types': A list of element types which will be excluded
+    'exclude_user_defined': If ALL of the key/values in this dict match the
+        kwarg values in an element, it will be excluded.
+    """
+    def filter_function(
+        element: Element
+    ) -> bool:
+        """
+        Returns True if the element matches the filter criteria.
+        Returns False otherwise.
+        """
+        include_by_page = element.plane_id in page_idxs if page_idxs else True
+        include_by_tag = element.tag in tags if tags else True
+        include_by_element_type = any([element.tag.startswith(e_type) for e_type in element_types])
+
+        user_defined_acc = []
+        for k, v in user_defined.items():
+            ev = element.kwargs.get(k)
+            user_defined_acc.append(ev == v)
+        include_by_user_defined = all(user_defined_acc)
+
+        include_element = all([
+            include_by_page,
+            include_by_tag,
+            include_by_element_type,
+            include_by_user_defined
+        ])
+
+        exclude_by_tag = element.tag not in exclude_tags
+        exclude_by_element_type = not any([element.tag.startswith(e_type) for e_type in exclude_element_types])
+        user_defined_exclude_acc = []
+        for k, v in exclude_user_defined.items():
+            ev = element.kwargs.get(k)
+            user_defined_acc.append(ev == v)
+        exclude_by_user_defined = not all(user_defined_exclude_acc)
+        return all([include_element, exclude_by_tag, exclude_by_element_type, exclude_by_user_defined])
+    return filter_function
+
 
 def get_collector_extents(
     collector_prototype: Element,

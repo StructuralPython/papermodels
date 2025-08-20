@@ -429,8 +429,9 @@ class GeometryGraph(nx.DiGraph):
 
     def assign_collector_behaviour(
             self, 
-            element_constructor: callable, 
-            as_subelements: bool,
+            element_constructor: callable,
+            filter_function: Optional[callable] = None,
+            as_subelements: bool = False,
             *args,
             **kwargs
     ) -> list[Element]:
@@ -438,33 +439,66 @@ class GeometryGraph(nx.DiGraph):
         Returns a list of Element to be assigned to element.subelements for elements
         that have element_type == "collector".
 
-        'subelement_class': This should be a callable with the following signature:
-            def subelement_constructor(element: Element, [*args, **kwargs]) -> list[Element]
+        'element_constructor': A callable that will create a new Element populated with
+            a trib_area attribute and possibly other modified attributes. The new Element
+            will replace the existing element at that node.
 
-            Where *args, and **kwargs can be any additional parameters that are defined
-            for the callable.
-        '*args' and '**kwargs': These are passed through to 'subelement_constructor'
+            The signature of the callable should be one of either:
+
+            def element_constructor(element: Element, [*args, **kwargs]) -> Element
+            -or
+            def element_constructor(element: Element, [*args, **kwargs]) -> list[Element]
+
+            A constructor function that returns a list[Element] should be used with
+            as_subelements = True so that the returned list of Element will be assigned
+            to the .subelements attribute of the Element
+
+        'filter_function': A callable with the following function signature:
+
+            def filter_function(element: Element) -> bool
+
+            All elements that return True from the filter_function will have the
+            element_constructor function called on them. Any functions that return
+            False will have no collector behaviour assigned.
+
+            You can use the papermodels.datatypes.element.create_element_filter
+            to readily create such a filter function.
+
+            If None, then all elements will be assigned the collector behaviour.
+
+        'as_subelements': If True, then the elements returned from the element_constructor
+            will be assigned to each element's .subelements attribute instead of replacing
+            the element.
+
+        '*args' and '**kwargs': These are passed through to the 'element_constructor'
+            function
         """
-        # TODO: Add the ability to filter collector elements to assign different
-        # behaviours based on rules
         collectors = self.collector_elements
         for node in collectors:
             node_attrs = self.nodes[node]
             node_element = node_attrs['element']
-            # If an incorrect geometry type makes its way into the element_constructor
-            # e.g. a polygon is being entered as a joist in a joist-based element_constructor
-            # then the element_constructor should return None
-            # This prevents an error from being thrown if, for example, unconnected elements
-            # are drawn. Unconnected elements have no precedents therefore they are (currently)
-            # being categorized as collectors. However, I think incompatible geometries
-            # should simply be ignored and not included as part of the processing.
-            new_elem = element_constructor(node_element, *args, **kwargs)
-            if new_elem is not None:
-                if as_subelements:
-                    node_element.subelements = new_elem
-                else:
-                    # assert isinstance(new_elem, Element) # Not an iterable of multiple elements
-                    node_attrs['element'] = new_elem
+            if filter_function is not None:
+                try:
+                    filter_passes = filter_function(node_element)
+                except:
+                    raise Exception("There was an exception generated during element filtering.")
+            else:
+                filter_passes = True
+            if filter_passes:
+                # If an incorrect geometry type makes its way into the element_constructor
+                # e.g. a polygon is being entered as a joist in a joist-based element_constructor
+                # then the element_constructor should return None
+                # This prevents an error from being thrown if, for example, unconnected elements
+                # are drawn. Unconnected elements have no precedents therefore they are (currently)
+                # being categorized as collectors. However, I think incompatible geometries
+                # should simply be ignored and not included as part of the processing.
+                new_elem = element_constructor(node_element, *args, **kwargs)
+                if new_elem is not None:
+                    if as_subelements:
+                        node_element.subelements = new_elem
+                    else:
+                        # assert isinstance(new_elem, Element) # Not an iterable of multiple elements
+                        node_attrs['element'] = new_elem
         self.add_intersection_indexes_below()
         self.add_intersection_indexes_above()
 
