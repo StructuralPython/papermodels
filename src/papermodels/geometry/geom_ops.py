@@ -23,7 +23,7 @@ Geometry = Union[LineString, Polygon]
 IntersectingGeometry = Union[Point, LineString]
 
 def get_intersection(
-    above: Geometry, below: Geometry, j_tag: str
+    above: Geometry, below: Geometry, j_tag: str, above_extent_polygon: Optional[Polygon] = None
 ) -> Optional[tuple[str, IntersectingGeometry, Geometry]]:
     """
     Returns the details of the intersection
@@ -31,7 +31,12 @@ def get_intersection(
     # intersecting_region = above.intersection(below)
     i_type = above.geom_type
     j_type = below.geom_type
-    if i_type == "LineString" and j_type == "Polygon":
+    i_extent = above_extent_polygon
+    if i_extent and j_type=="Polygon":
+        intersecting_region = get_rectangle_centerline(i_extent.intersection(below))
+    elif i_extent and j_type == "LineString":
+        intersecting_region = i_extent.intersection(below)
+    elif i_type == "LineString" and j_type == "Polygon":
         intersecting_region = above.intersection(below.exterior)
     elif i_type == "Polygon" and j_type == "LineString":
         intersecting_region = below.intersection(above.exterior)

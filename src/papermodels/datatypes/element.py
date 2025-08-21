@@ -30,6 +30,7 @@ ELEMENT_ATTRS = {
     "correspondents_below",
     "page_label",
     "reaction_type",
+    "extent_polygon"
 }
 
 
@@ -895,6 +896,8 @@ def get_geometry_intersections(
             j_page = j_annot.page
             i_geom = i_attrs["geometry"]
             j_geom = j_attrs["geometry"]
+            i_tag = i_attrs['tag']
+            j_tag = j_attrs['tag']
 
             if i_page != j_page:
                 continue
@@ -902,14 +905,38 @@ def get_geometry_intersections(
                 if i_geom.geom_type == j_geom.geom_type == "Polygon":
                     if not check_eligible_polygon_intersection(i_attrs['tag'], j_attrs['tag']):
                         continue
-                intersection = geom_ops.get_intersection(i_geom, j_geom, j_attrs['tag'])
+                # Use the extent polygon to find intersections (if it exists)
+                i_extent_poly = i_attrs['extent_polygon']
+                if (
+                    i_extent_poly is not None 
+                    and 
+                    check_eligible_collector_extent_polygon_intersection(
+                        j_geom.geom_type, 
+                        j_attrs['reaction_type']
+                    )
+                ):
+                    intersection = geom_ops.get_intersection(i_geom, j_geom, j_tag, i_extent_poly)
+                else:
+                    intersection = geom_ops.get_intersection(i_geom, j_geom, j_tag)
                 if intersection is None: continue
                 intersections_below.append(Intersection(*intersection))
             elif i_rank > j_rank:
                 if i_geom.geom_type == j_geom.geom_type == "Polygon":
                     if not check_eligible_polygon_intersection(i_attrs['tag'], j_attrs['tag']):
                         continue
-                intersection = geom_ops.get_intersection(j_geom, i_geom, j_attrs['tag'])
+                # Use the extent polygon to find intersections (if it exists)
+                j_extent_poly = j_attrs['extent_polygon']
+                if (
+                    j_extent_poly is not None 
+                    and 
+                    check_eligible_collector_extent_polygon_intersection(
+                        i_geom.geom_type, 
+                        i_attrs['reaction_type']
+                    )
+                ):
+                    intersection = geom_ops.get_intersection(j_geom, i_geom, i_tag, j_extent_poly)
+                else:
+                    intersection = geom_ops.get_intersection(j_geom, i_geom, i_tag)
                 # reaction_type
                 if intersection is None: continue
                 intersections_above.append(Intersection(*intersection))
@@ -926,6 +953,20 @@ def check_eligible_polygon_intersection(i_tag, j_tag) -> bool:
     """
     return i_tag[0] == j_tag[0]
 
+
+def check_eligible_collector_extent_polygon_intersection(j_geomtype: str, j_reaction_type: str) -> bool:
+    """
+    Returns True if the "j" annotation is eligible to receive collector reactions
+    i.e. is not a column/post
+    """
+    if j_geomtype == "Polygon":
+        if j_reaction_type == "linear":
+            return True
+        else:
+            return False
+    else: # LineString
+        return True
+    
 
 def get_geometry_correspondents(
     tagged_annotations: dict[Annotation, dict],
