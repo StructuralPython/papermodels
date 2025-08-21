@@ -100,12 +100,17 @@ def parse_annotations(
                 annot_attrs[annot_key] = str_to_int(
                     annot_attr.split("<")[0]
                 )  # .split() to remove trailing HTML tags
+
+            # Run tests for this first
             # annot_attrs["rank"] = int(annot_attributes["rank"])
-            annot_attrs.setdefault("reaction_type", "point")
-            annot_attrs['reaction_type'] = annot_attrs['reaction_type'].lower()
-            if annot_geom.geom_type == "Polygon" and annot_attrs['reaction_type'] == "linear":
-                annot_attrs['length'] = geom_ops.get_rectangle_centerline(annot_geom).length
-            parsed_annotations.update({annot: annot_attrs | annot_kwargs})
+            if "extent" in annot_attrs['type']:
+                parsed_annotations.update({annot: annot_attrs})
+            else:
+                annot_attrs.setdefault("reaction_type", "point")
+                annot_attrs['reaction_type'] = annot_attrs['reaction_type'].lower()
+                if annot_geom.geom_type == "Polygon" and annot_attrs['reaction_type'] == "linear":
+                    annot_attrs['length'] = geom_ops.get_rectangle_centerline(annot_geom).length
+                parsed_annotations.update({annot: annot_attrs | annot_kwargs})
     return parsed_annotations
 
 

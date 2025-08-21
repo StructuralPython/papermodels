@@ -10,7 +10,10 @@ from shapely import (
     MultiLineString,
     Polygon,
     MultiPolygon,
+    box,
     convex_hull,
+    intersects,
+    union
 )
 import shapely.ops as ops
 import shapely.affinity as aff
@@ -243,6 +246,39 @@ def get_cantilever_segments(
         cantilever_segments = {"A": split_b.length, "B": split_a.length}
     return cantilever_segments
 
+
+def find_extent_intersections(
+        element_geoms: list[LineString], 
+        extent_geoms: list[LineString]
+    ) -> list[Optional[LineString]]:
+    """
+    Returns a list of LineString representing the extent geometries put
+    into the order of the element geometries. If an extent geometry intersects
+    with an element_geometry, the resulting list will have the extent geometry
+    in the same corresponding list position that the element geometry is in.
+    If there is no such intersection, then that list position will be None.
+    """ 
+    extents_array = np.array(extent_geoms)
+    acc = []
+    for element_geom in element_geoms:
+        mask = intersects(element_geom, extents_array)
+        if mask.any():
+            extent = extents_array[mask][0] # Assume the first one until a better idea comes
+            acc.append(extent)
+        else:
+            acc.append(None)
+    return acc
+
+
+def create_extent_polygon(element_geom: LineString, extent_geom: Optional[LineString] = None) -> Polygon:
+    """
+    Returns a Polygon representing the bounding box of the union
+    of 'element_geom' and 'extent_geom'
+    """
+    if extent_geom is None:
+        return None
+    return box(*(union(element_geom, extent_geom).bounds))
+        
 
 def get_system_bounds(
     joist_prototype: LineString, joist_supports: list[LineString]

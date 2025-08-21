@@ -25,6 +25,14 @@ def load_frame_collectors_transfers():
     )
     return graph
 
+@fixture()
+def load_collector_extents():
+    graph = GeometryGraph.from_pdf_file(
+        TEST_DATA / "collector_extents.pdf",
+        scale=EIGHTTH_INCH_SCALE,
+    )
+    return graph
+
 def test_load_frame_collectors_transfers(load_frame_collectors_transfers):
     assert load_frame_collectors_transfers
 
@@ -40,3 +48,7 @@ def test_collector_assignment_frame_collectors_transfers(load_frame_collectors_t
     assert 'SJ0.0-9'in les # Confirms that JoistArray behaviour created for steel joists
     assert 'WJ0.0' in les # Confirms that collector_trib behaviour created for WJ0.0
     assert 'WJ0.1-9' in les # Confirms that JoistArray behaviour created for WJ0.1
+
+
+def test_load_collector_extents(load_collector_extents):
+    assert load_collector_extents

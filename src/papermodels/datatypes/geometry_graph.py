@@ -632,6 +632,7 @@ class GeometryGraph(nx.DiGraph):
             ]
         load_entries = {}
         trib_area_entries = {}
+        extent_entries = {}
         structural_element_entries = {}
         parsed_annotations_acc = {}
         raw_annotations_acc = {}
@@ -647,10 +648,13 @@ class GeometryGraph(nx.DiGraph):
             for annot, annot_attrs in parsed_annotations.items():
                 if "occupancy" in annot_attrs:
                     load_entries.update({annot: annot_attrs})
-                elif "type" in annot_attrs and "trib area" in annot_attrs['type'].lower():
+                elif "trib area" in annot_attrs.get("type", "").lower():
                     trib_area_entries.update({annot: annot_attrs})
+                elif "extent" in annot_attrs.get("type", "").lower():
+                    extent_entries.update({annot: annot_attrs})
                 else:
                     structural_element_entries.update({annot: annot_attrs})
+            structural_element_entries = correlate_extents(structural_element_entries, extent_entries)
 
         elements = Element.from_parsed_annotations(structural_element_entries, trib_area_entries)
         graph = cls.from_elements(elements, do_not_process=do_not_process)
@@ -659,7 +663,7 @@ class GeometryGraph(nx.DiGraph):
         graph.legend_entries = legend_entries
         graph.loading_geometries = parsed_annotations_to_loading_geometry(load_entries)
         return graph
-
+        
 
     def plot_connectivity(self):
         return nx.draw_spectral(self, with_labels=True)
@@ -767,3 +771,26 @@ class GeometryGraph(nx.DiGraph):
             hashes.append(element_hash)
         graph_hash = hashlib.sha256(str(tuple(hashes)).encode()).hexdigest()
         self.node_hash = graph_hash
+
+
+def correlate_extents(
+    element_annots: dict[Annotation, dict], 
+    extent_annots: dict[Annotation, dict]
+) -> dict: 
+    """
+    Returns a copy of 'element_annots' with value dicts that have been updated
+    to include an 'extent_polygon' for any element_annots that have been drawn 
+    with an extent line or polygon.
+    """
+    element_geoms = [annot_attrs['geometry'] for annot_attrs in element_annots.values()]
+    element_annot_keys = [annot for annot in element_annots.keys()]
+    extent_geoms = [annot_attrs['geometry'] for annot_attrs in extent_annots.values()]
+
+    matched_extents = geom.find_extent_intersections(element_geoms, extent_geoms)
+    element_annots_copy = deepcopy(element_annots)
+    for idx, matched_extent in enumerate(matched_extents):
+        annot = element_annot_keys[idx]
+        element_geom = element_geoms[idx]
+        extent_polygon = geom.create_extent_polygon(element_geom, matched_extent)
+        element_annots_copy[annot]['extent_polygon'] = extent_polygon
+    return element_annots_copy

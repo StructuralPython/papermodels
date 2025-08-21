@@ -106,6 +106,7 @@ class Element:
     trib_area: Optional[Polygon] = None
     reaction_type: str = "point"
     kwargs: Optional[dict] = None
+    extent_polygon: Optional[Polygon] = None
 
     def __post_init__(self):
         if self.geometry.geom_type == "LineString" and len(self.geometry.coords) != 2:
@@ -197,6 +198,7 @@ class Element:
                 reaction_type=annot_attrs.get('reaction_type', 'point'),
                 trib_area=matching_trib_poly,
                 kwargs=available_kwargs,
+                extent_polygon=annot_attrs['extent_polygon']
             )
             elements.append(element)
         return elements
@@ -754,22 +756,25 @@ def get_collector_extents(
     prototype would spread over the other_geometry. The (start_x, end_x) locations 
     refer to ordinates on other_geometry, not on the collector_prototype.
     """
-    support_tags_by_geom = {
-        geom_ops.clean_polygon_supports([ib.other_geometry], collector_prototype.geometry)[0]: ib.other_tag 
-        for ib in collector_prototype.intersections_below
-    }
-    poly_support_geoms = list(support_tags_by_geom.keys())
-    support_geoms = geom_ops.clean_polygon_supports(poly_support_geoms, collector_prototype.geometry)
-    
-    cleaned_supports_map = {}
-    for idx, poly_support_geom in enumerate(poly_support_geoms):
-        clean_support_geom = support_geoms[idx]
-        cleaned_supports_map.update({clean_support_geom: poly_support_geom})
-    ordered_support_geoms = geom_ops.sort_supports(collector_prototype.geometry, support_geoms)
-    try:
-        extents = geom_ops.get_joist_extents(collector_prototype.geometry, ordered_support_geoms)
-    except AssertionError as e:
-        raise AssertionError(f"No intersection within joist extents: {collector_prototype.tag=}")
+    if collector_prototype.extent_polygon is None:
+        support_tags_by_geom = {
+            geom_ops.clean_polygon_supports([ib.other_geometry], collector_prototype.geometry)[0]: ib.other_tag 
+            for ib in collector_prototype.intersections_below
+        }
+        poly_support_geoms = list(support_tags_by_geom.keys())
+        support_geoms = geom_ops.clean_polygon_supports(poly_support_geoms, collector_prototype.geometry)
+        
+        cleaned_supports_map = {}
+        for idx, poly_support_geom in enumerate(poly_support_geoms):
+            clean_support_geom = support_geoms[idx]
+            cleaned_supports_map.update({clean_support_geom: poly_support_geom})
+        ordered_support_geoms = geom_ops.sort_supports(collector_prototype.geometry, support_geoms)
+        try:
+            extents = geom_ops.get_joist_extents(collector_prototype.geometry, ordered_support_geoms)
+        except AssertionError as e:
+            raise AssertionError(f"No intersection within joist extents: {collector_prototype.tag=}")
+    else:
+        raise NotImplementedError("Not implemented for support polygons yet")
 
     
     tagged_extents = {}
