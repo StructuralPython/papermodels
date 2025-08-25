@@ -23,7 +23,7 @@ from rich import print
 def collector_trib_model(
         element: Element, 
         trib_width: float = 1.0,
-        reaction_type: str = "linear"
+        reaction_type: str = "linear",
     ):
     """
     Generates a representative trib area for the joist prototype.
@@ -54,7 +54,8 @@ def collector_trib_model(
         e.subelements,
         trib_area=trib_area,
         reaction_type="linear",
-        kwargs=e.kwargs
+        kwargs=e.kwargs,
+        extent_polygon=e.extent_polygon
     )
     return collector_element
 
@@ -86,6 +87,7 @@ class JoistArrayModel:
         self.id = element.tag
         self.plane_id = element.plane_id
         self.elem_kwargs = element.kwargs
+        self.extent_polygon = element.extent_polygon
         self.spacing = spacing  # Need to include this in the legend and thus, the Element
         self.initial_offset = float(initial_offset)
         self._joist_prototype = self.joist_prototype
@@ -168,7 +170,8 @@ class JoistArrayModel:
                 element_type="collector",
                 subelements=None,
                 trib_area = trib_area,
-                kwargs=self.elem_kwargs
+                kwargs=self.elem_kwargs,
+                extent_polygon=self.extent_polygon
             )
             subelements.append(element)
         return subelements

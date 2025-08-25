@@ -431,7 +431,6 @@ class GeometryGraph(nx.DiGraph):
             self, 
             element_constructor: callable,
             filter_function: Optional[callable] = None,
-            as_subelements: bool = False,
             *args,
             **kwargs
     ) -> list[Element]:
@@ -465,10 +464,6 @@ class GeometryGraph(nx.DiGraph):
             to readily create such a filter function.
 
             If None, then all elements will be assigned the collector behaviour.
-
-        'as_subelements': If True, then the elements returned from the element_constructor
-            will be assigned to each element's .subelements attribute instead of replacing
-            the element.
 
         '*args' and '**kwargs': These are passed through to the 'element_constructor'
             function

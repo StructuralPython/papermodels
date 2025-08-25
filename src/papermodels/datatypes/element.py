@@ -774,18 +774,30 @@ def get_collector_extents(
             extents = geom_ops.get_joist_extents(collector_prototype.geometry, ordered_support_geoms)
         except AssertionError as e:
             raise AssertionError(f"No intersection within joist extents: {collector_prototype.tag=}")
+        tagged_extents = {}
+        for idx, extent in enumerate(extents):
+            support_geom = ordered_support_geoms[idx]
+            support_start, _ = geom_ops.get_start_end_nodes(support_geom)
+            support_tag = support_tags_by_geom[support_geom]
+            extent_start = extent[0].distance(support_start)
+            extent_end = extent[1].distance(support_start)
+            tagged_extents.update({support_tag: (extent_start, extent_end)})
     else:
-        raise NotImplementedError("Not implemented for support polygons yet")
+        tagged_extents = {}
+        for ib in collector_prototype.intersections_below:
+            region_start, region_end = geom_ops.get_start_end_nodes(ib.intersecting_region)
+            if ib.other_geometry.geom_type == "Polygon":
+                support_start, support_end = geom_ops.get_start_end_nodes(
+                    geom_ops.get_rectangle_centerline(
+                        ib.other_geometry
+                    )
+                )
+            else: # LineString
+                support_start, support_end = geom_ops.get_start_end_nodes(ib.other_geometry)
+            extent_start = support_start.distance(region_start)
+            extent_end = support_start.distance(region_end)
+            tagged_extents.update({ib.other_tag: (extent_start, extent_end)})
 
-    
-    tagged_extents = {}
-    for idx, extent in enumerate(extents):
-        support_geom = ordered_support_geoms[idx]
-        support_start, _ = geom_ops.get_start_end_nodes(support_geom)
-        support_tag = support_tags_by_geom[support_geom]
-        extent_start = extent[0].distance(support_start)
-        extent_end = extent[1].distance(support_start)
-        tagged_extents.update({support_tag: (extent_start, extent_end)})
     return tagged_extents
 
 
@@ -919,7 +931,7 @@ def get_geometry_intersections(
                 else:
                     intersection = geom_ops.get_intersection(i_geom, j_geom, j_tag)
                 if intersection is None: continue
-                intersections_below.append(Intersection(*intersection))
+                intersections_below.append(Intersection(*intersection, other_reaction_type=j_attrs['reaction_type']))
             elif i_rank > j_rank:
                 if i_geom.geom_type == j_geom.geom_type == "Polygon":
                     if not check_eligible_polygon_intersection(i_attrs['tag'], j_attrs['tag']):
@@ -939,7 +951,8 @@ def get_geometry_intersections(
                     intersection = geom_ops.get_intersection(j_geom, i_geom, i_tag)
                 # reaction_type
                 if intersection is None: continue
-                intersections_above.append(Intersection(*intersection))
+
+                intersections_above.append(Intersection(*intersection, other_reaction_type=i_attrs['reaction_type']))
 
         i_attrs["intersections_above"] = intersections_above
         i_attrs["intersections_below"] = intersections_below
