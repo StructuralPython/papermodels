@@ -14,6 +14,7 @@ dependencies = [
     "numpy >= 2.0.0",
     "pandas >= 2.0.0",
     "scikit-spatial >= 8.1.0",
+    "load_distribution",
     "pikepdf",
     "parse",
     "colour",
@@ -30,3 +31,8 @@ dependencies = [
 
 [project.urls]
 Home = "https://github.com/structuralpython/papermodels"
+
+[dependency-groups]
+dev = [
+    "ipykernel>=6.30.1",
+]

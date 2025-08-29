@@ -294,6 +294,27 @@ def create_extent_polygon(element_geom: LineString, extent_geom: Optional[LineSt
     return box(*(union(element_geom, extent_geom).bounds))
         
 
+def split_polygon(
+        polygon: Polygon, 
+        ls_vector: LineString, 
+        split_points: list[tuple[float, float]]
+    ) -> list[Polygon]:
+                            
+    if ( # Case A: Both start and end points within region - 2 breaks
+        Point(inter_coords[0][0]).within(overlap_poly)
+        and 
+        Point(inter_coords[0][1]).within(overlap_poly)
+    ):
+        split_poly()
+    elif ( # Case B: Start point within region - 1 break
+        Point(inter_coords[0][0]).within(overlap_poly)
+    ):
+        ...
+    elif ( # Case C: End point within region - 1 break
+        Point(inter_coords[0][0]).within(overlap_poly)
+    ):
+        ...
+
 def get_system_bounds(
     joist_prototype: LineString, joist_supports: list[LineString]
 ) -> tuple[float, float, float, float]:
@@ -558,6 +579,15 @@ def rotate_90_coords(v: ArrayLike, precision: int = 6, ccw=True) -> tuple[float,
         ]
     )
     return v @ rot
+
+
+def check_2d_linestring_parallel(ls1: LineString, ls2: LineString, tol=1e-6) -> bool:
+    """
+    Returns True if ls1 and ls2 are parallel within an absolute tolerance
+    """
+    x1, y1 = ls1.coords[0]
+    x2, y2 = ls2.coords[0]
+    return math.isclose(abs(x1 * y2 - x2 * y1), 0.0, abs_tol=tol)
 
 
 def rotate_to_horizontal(line: LineString, geoms: list[Geometry]):

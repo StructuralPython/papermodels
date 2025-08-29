@@ -38,7 +38,7 @@ class Intersection(NamedTuple):
     """
     A class to represent an intersection of geometries
     """
-    intersecting_region: Point
+    intersecting_region: Point | LineString
     other_geometry: Union[LineString, Polygon]
     other_tag: str
     other_index: Optional[int] = None
