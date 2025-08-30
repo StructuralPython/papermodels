@@ -3,7 +3,7 @@ from papermodels.datatypes.annotation import Annotation, A0, A1
 from papermodels.paper.annotations import _annotation_to_wkt
 from papermodels.paper import annotations as an
 from papermodels.paper import pdf
-from papermodels.datatypes.joist_models import JoistArrayModel, collector_trib_model
+from papermodels.datatypes.joist_models import JoistArrayModel, CollectorTribModel
 from papermodels.datatypes.element import create_element_filter
 import numpy as np
 import numpy.testing as npt
@@ -40,9 +40,9 @@ def test_collector_assignment_frame_collectors_transfers(load_frame_collectors_t
     graph = load_frame_collectors_transfers
     steel_joist_arrays = create_element_filter(element_types=['SJ'])
     user_designated_joists = create_element_filter(user_defined={"collector behaviour": "array"})
-    graph.assign_collector_behaviour(collector_trib_model) # Assign all collectors trib model
-    graph.assign_collector_behaviour(JoistArrayModel.create_subelements, steel_joist_arrays, as_subelements=True, spacing=1.0) # Assign steel joists the array
-    graph.assign_collector_behaviour(JoistArrayModel.create_subelements, user_designated_joists, as_subelements=True, spacing=1.0)
+    graph.assign_collector_behaviour(CollectorTribModel) # Assign all collectors trib model
+    graph.assign_collector_behaviour(JoistArrayModel, steel_joist_arrays, spacing=1.0) # Assign steel joists the array
+    graph.assign_collector_behaviour(JoistArrayModel, user_designated_joists, spacing=1.0)
 
     les = graph.create_loaded_elements()
     assert 'SJ0.0-9'in les # Confirms that JoistArray behaviour created for steel joists

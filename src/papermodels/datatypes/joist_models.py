@@ -28,6 +28,7 @@ class CollectorTribModel:
     trib_width: float = 1.0
     reaction_type: str = "linear"
     use_subelements: bool = False
+    support_tolerance: float = 1e-2
 
     def __post_init__(self):
         if self.element.extent_polygon is not None:
@@ -70,7 +71,7 @@ class CollectorTribModel:
             )
         else:
             ext_poly = e.extent_polygon
-            geom = e.geometry
+            joist_prototype = e.geometry
             support_geoms = {
                 ib.intersecting_region: ib.other_tag
                 for ib in e.intersections_below 
@@ -78,10 +79,10 @@ class CollectorTribModel:
             }
 
             # 1. Find polygon edges that intersect with joist prototype
-            poly_edge_points = zip(ext_poly.exterior.coords, ext_poly.exterior.coords[1:])
+            poly_edge_points = list(zip(ext_poly.exterior.coords, ext_poly.exterior.coords[1:]))
             start_edge = None
             end_edge = None
-            start_point, end_point = geom_ops.order_nodes_positive(geom.coords)
+            start_point, end_point = geom_ops.order_nodes_positive([Point(coord) for coord in geom.coords])
             for edge_points in poly_edge_points:
                 edge = LineString(edge_points)
                 if edge.intersects(start_point):
@@ -96,11 +97,44 @@ class CollectorTribModel:
             # FIX TO ACCOMMODATE CANTILEVER EDGES
             start_supports = []
             end_supports = []
-            for geom in support_geoms:
-                if geom.intersects(start_edge):
-                    start_supports.append(geom)
-                elif geom.intersects(end_edge):
-                    end_supports.append(geom)
+            joist_vector = np.abs(geom_ops.get_direction_vector(geom))
+            # This is one of the places where orthogonality is assumed
+            joist_orientation = None
+            if joist_vector[0] > joist_vector[1]:
+                joist_orientation = "horizontal"
+            elif joist_vector[1] > joist_vector[0]:
+                joist_orientation = "vertical"
+            else:
+                print(f"JOIST ORIENTATION VERIANT: {geom=}")
+            support_centroids = [support_geom.centroid for support_geom in support_geoms]
+            
+            if joist_orientation == "horizontal":
+                start_support = min(support_centroids, key=lambda x: x.coords[0][0])
+                end_support = max(support_centroids, key=lambda x: x.coords[0][0])             
+                start_supports = [
+                    support_geom 
+                    for support_geom in support_geoms 
+                    if math.isclose(start_support.coords[0][0], support_geom.coords[0][0], rel_tol=self.support_tolerance)
+                ]
+                end_supports = [
+                    support_geom 
+                    for support_geom in support_geoms 
+                    if math.isclose(end_support.coords[0][0], support_geom.coords[0][0], rel_tol=self.support_tolerance)
+                ]
+            elif joist_orientation == "vertical":
+                start_support = min(support_centroids, key=lambda x: x.coords[0][1])
+                end_support = max(support_centroids, key=lambda x: x.coords[0][1]) 
+                start_supports = [
+                    support_geom 
+                    for support_geom in support_geoms 
+                    if math.isclose(start_support.coords[0][1], support_geom.coords[0][1], rel_tol=self.support_tolerance)
+                ]
+                end_supports = [
+                    support_geom 
+                    for support_geom in support_geoms 
+                    if math.isclose(end_support.coords[0][1], support_geom.coords[0][1], rel_tol=self.support_tolerance)
+                ]
+
             print(f"{start_supports=} | {end_supports=}")
 
             # 2b. Get intermediate supports
@@ -111,56 +145,77 @@ class CollectorTribModel:
             print(f"{intermediate_supports=}")
 
             # 3. Generate overlap regions
-            overlap_regions = []
+            overlap_polys = []
             for start_support in start_supports:
                 for end_support in end_supports:
                     pa0, pa1 = start_support.coords
                     pb0, pb1 = end_support.coords
-                    overlap_region = ld.get_overlap_region(pa0, pa1, pb0, pb1)
-                    if overlap_region is not None:
-                        overlap_regions.append(overlap_region)
-            print(f"{overlap_regions=}")
+                    if joist_orientation == "vertical": 
+                        overlap_region = ld.get_overlap_coords(
+                            pa0[0], pa1[0], pb0[0], pb1[0]
+                        )
+                        if overlap_region is not None:
+                            overlap_poly = box(overlap_region[0], pa0[1], overlap_region[1], pb1[1])
+                    elif joist_orientation == "horizontal":
+                        overlap_region = ld.get_overlap_coords(
+                            pa0[1], pa1[1], pb0[1], pb1[1]
+                        )
+                        if overlap_region is not None:
+                            overlap_poly = box(pa0[0], overlap_region[0], pb1[0], overlap_region[1])
 
-            # 4. Generate overlap region rectangles
-            overlap_polys = []
-            for overlap_region in overlap_regions:
-                overlap_region: ld.Overlap
-                y0, y1 = ld.get_range(overlap_region)
-                x0, x1 = overlap_region.x0, overlap_region.x1
-                overlap_polys.append(box(x0, y0, x1, y1))
-            print(f"{overlap_polys}")
+                    # This does not work, need a substitute
+                    # overlap_region = ld.get_overlap_region(pa0, pa1, pb0, pb1)
+                    overlap_polys.append(overlap_poly)
+            print(f"{overlap_polys=}")
+            print(f"{set(overlap_polys)=}")
 
             # 5. Do overlap polys intersect with intermediate supports?
             #    if so, break the support as required.
-            revised_overlap_polys = []
-            for overlap_poly in overlap_polys:
-                poly_splits = None
+            revised_poly_overlaps = []
+            for overlap_poly in set(overlap_polys):
+                append_overlap_poly = True
+                split_polys = []
                 for intermediate_support in intermediate_supports:
-                    inter_coords = intermediate_support.coords
-                    poly_splits = geom_ops.split_poly(overlap_poly, geom, inter_coords)
-                    revised_overlap_polys += poly_splits
-                if poly_splits is None:
-                    revised_overlap_polys.append(overlap_poly)
-            print(f"{revised_overlap_polys=}")
+                    if intermediate_support.intersects(overlap_poly):
+                        print("Intermediate intersection")
+                        append_overlap_poly = False
+                        inter_coords = intermediate_support.coords
+                        poly_splits = geom_ops.split_polygon(overlap_poly, joist_orientation, inter_coords)
+                        print(f"{len(poly_splits)=}")
+                        print(f"{poly_splits=}")
+                        split_polys += poly_splits
+                if not split_polys:
+                    revised_poly_overlaps.append(overlap_poly)
+                else:
+                    revised_poly_overlaps += split_polys
+            print(f"{revised_poly_overlaps=}")
 
-            # 6. Create a new joist prototype geometry for each overlap poly
             joist_prototype_geometries = []
-            for overlap_poly in revised_overlap_polys:
+            for overlap_poly in revised_poly_overlaps:
                 overlap_poly: Polygon
-                poly_edge_points = zip(overlap_poly.exterior.coords, overlap_poly.exterior.coords[1:])
-                new_joist_points = []
-                for pi, pj in poly_edge_points:
+                overlap_edge_points = list(zip(overlap_poly.exterior.coords, overlap_poly.exterior.coords[1:]))
+                for pi, pj in overlap_edge_points:
                     edge_ls = LineString([pi, pj])
-                    if geom_ops.check_2d_linestring_parallel(edge_ls, start_edge):
-                        new_joist_points.append(edge_ls.centroid())
-                new_joist_prototype = LineString(geom_ops.order_nodes_positive(new_joist_points))
-                joist_prototype_geometries.append(new_joist_prototype)
+                    if geom_ops.check_2d_linestring_parallel(edge_ls, start_edge, tol=0.01):
+                        # Need to translate the original joist prototype to the new position
+                        new_joist = geom_ops.translate_joist_to_point(joist_prototype, joist_orientation, intersection_point=edge_ls.centroid)
+                        # We only need to hit one edge of the overlap so we can break here
+                        break
+                joist_prototype_geometries.append(new_joist)
             print(f"{joist_prototype_geometries=}")
+            from IPython.display import display
+            display(
+                GeometryCollection(
+                    joist_prototype_geometries 
+                    + revised_poly_overlaps 
+                    + [e.extent_polygon]
+                    )
+            )
 
 
             # 7. Create an Element for each new joist prototype geometries
             subelements = []
-            sorted_joist_geoms = sorted(joist_prototype_geometries, key=lambda x: (x.coords[0][0][0], x.coords[0][0][1]))
+            sorted_joist_geoms = sorted(joist_prototype_geometries, key=lambda x: (x.coords[0][0], x.coords[0][1]))
             for idx, joist_geom in enumerate(sorted_joist_geoms):
                 intersections = []
                 total_new_subs = len(joist_prototype_geometries)
@@ -184,10 +239,10 @@ class CollectorTribModel:
                     geometry=joist_geom,
                     tag=subelement_tag,
                     rank=e.rank,
-                    intersections_above=None,
+                    intersections_above=[],
                     intersections_below=intersections,
-                    correspondents_above=None,
-                    correspondents_below=None,
+                    correspondents_above=[],
+                    correspondents_below=[],
                     plane_id=e.plane_id,
                     element_type=e.element_type,
                     subelements=None,

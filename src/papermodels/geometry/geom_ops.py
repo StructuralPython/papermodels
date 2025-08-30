@@ -13,7 +13,8 @@ from shapely import (
     box,
     convex_hull,
     intersects,
-    union
+    union,
+    GeometryCollection
 )
 import shapely.ops as ops
 import shapely.affinity as aff
@@ -296,24 +297,71 @@ def create_extent_polygon(element_geom: LineString, extent_geom: Optional[LineSt
 
 def split_polygon(
         polygon: Polygon, 
-        ls_vector: LineString, 
+        joist_orientation: str,
         split_points: list[tuple[float, float]]
     ) -> list[Polygon]:
-                            
-    if ( # Case A: Both start and end points within region - 2 breaks
-        Point(inter_coords[0][0]).within(overlap_poly)
-        and 
-        Point(inter_coords[0][1]).within(overlap_poly)
-    ):
-        split_poly()
-    elif ( # Case B: Start point within region - 1 break
-        Point(inter_coords[0][0]).within(overlap_poly)
-    ):
-        ...
-    elif ( # Case C: End point within region - 1 break
-        Point(inter_coords[0][0]).within(overlap_poly)
-    ):
-        ...
+    split_locations = []
+    print("Iterating on split poitns")
+    for split_point in split_points:
+        if joist_orientation == "vertical": 
+            split_location = split_point[0]
+        elif joist_orientation == "horizontal":
+            split_location = split_point[1]
+        from IPython.display import display
+        display(GeometryCollection([Point(point) for point in split_points] + [polygon]))
+        if Point(split_point).within(polygon):
+            split_locations.append(split_location)
+    polygons = polygon_splitter(polygon.bounds, split_locations, joist_orientation)
+    return polygons
+
+
+def polygon_splitter(poly_bounds: tuple[float, float, float, float], split_locations: list[float], joist_orientation: str) -> list[tuple[float, float, float, float]]:
+    """
+    Returns a list of box bounds describing the sub-boxes remaining after splitting
+    """
+    xmin, ymin, xmax, ymax = poly_bounds
+    sub_polys = []
+    if joist_orientation == "horizontal":
+        origin = ymin
+        for sl in split_locations:
+            sub_poly = box(xmin, origin, xmax, sl)
+            sub_polys.append(sub_poly)
+            origin = sl
+        else:
+            sub_poly = box(xmin, origin, xmax, ymax)
+            sub_polys.append(sub_poly)
+        if sub_polys:
+            return sub_polys
+        return [box(xmin, ymin, xmax, ymax)]
+    elif joist_orientation == "vertical":
+        origin = xmin
+        for sl in split_locations:
+            sub_poly = box(origin, ymin, sl, ymax)
+            sub_polys.append(sub_poly)
+            origin = sl
+        else:
+            sub_poly = box(origin, ymin, xmax, ymax)
+            sub_polys.append(sub_poly)
+        if sub_polys:
+            return sub_polys
+        return [box(xmin, ymin, xmax, ymax)]
+
+
+def translate_joist_to_point(joist_geom: LineString, joist_orientation: str, intersection_point: Point) -> LineString:
+    """
+    Returns a LineString representing 'joist_geom' translated so that it intersects with 'intersection_point'
+    """
+    point_i, point_j = joist_geom.coords
+    print(f"{point_i=} | {point_j=}")
+    ix, iy = point_i
+    jx, jy = point_j
+    ipx, ipy = intersection_point.coords[0]
+    if joist_orientation == "horizontal":
+        return LineString([(ix, ipy), (jx, ipy)])
+    elif joist_orientation == "vertical": 
+        return LineString([(ipx, iy), (ipx, jy)])
+    
+
 
 def get_system_bounds(
     joist_prototype: LineString, joist_supports: list[LineString]
@@ -585,8 +633,8 @@ def check_2d_linestring_parallel(ls1: LineString, ls2: LineString, tol=1e-6) -> 
     """
     Returns True if ls1 and ls2 are parallel within an absolute tolerance
     """
-    x1, y1 = ls1.coords[0]
-    x2, y2 = ls2.coords[0]
+    x1, y1 = get_direction_vector(ls1)
+    x2, y2 = get_direction_vector(ls2)
     return math.isclose(abs(x1 * y2 - x2 * y1), 0.0, abs_tol=tol)
 
 
