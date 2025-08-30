@@ -243,7 +243,8 @@ class GeometryGraph(nx.DiGraph):
                 for edge in intersection_points_in_polygon_below:
                     self.remove_edge(*edge)
                 
-                    
+    # TODO: Modify add_intersection_indexes_below to work wiht extent_poly subelements
+    # The support models are not receiving loads from teh subelements
     def add_intersection_indexes_below(self):
         sorted_nodes = nx.topological_sort(self)
         for node in sorted_nodes:
