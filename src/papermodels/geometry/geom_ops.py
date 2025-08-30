@@ -223,12 +223,9 @@ def get_joist_extents(
     ])
     ordered_joist_supports = sort_supports(joist_prototype, joist_supports)
     extents = []
-    # from IPython.display import display
-    # from shapely import GeometryCollection
     for support_linestring in ordered_joist_supports:
         left_extent = support_linestring.intersection(joist_left)
         right_extent = support_linestring.intersection(joist_right)
-        # display(GeometryCollection([joist_left, support_linestring]))
 
         # Make sure the intersection geometries are not empty before proceeding
         # If one or more is empty, there is a problem that needs investigating
@@ -301,14 +298,11 @@ def split_polygon(
         split_points: list[tuple[float, float]]
     ) -> list[Polygon]:
     split_locations = []
-    print("Iterating on split poitns")
     for split_point in split_points:
         if joist_orientation == "vertical": 
             split_location = split_point[0]
         elif joist_orientation == "horizontal":
             split_location = split_point[1]
-        from IPython.display import display
-        display(GeometryCollection([Point(point) for point in split_points] + [polygon]))
         if Point(split_point).within(polygon):
             split_locations.append(split_location)
     polygons = polygon_splitter(polygon.bounds, split_locations, joist_orientation)
@@ -352,7 +346,6 @@ def translate_joist_to_point(joist_geom: LineString, joist_orientation: str, int
     Returns a LineString representing 'joist_geom' translated so that it intersects with 'intersection_point'
     """
     point_i, point_j = joist_geom.coords
-    print(f"{point_i=} | {point_j=}")
     ix, iy = point_i
     jx, jy = point_j
     ipx, ipy = intersection_point.coords[0]

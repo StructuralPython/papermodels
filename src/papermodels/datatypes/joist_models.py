@@ -91,7 +91,6 @@ class CollectorTribModel:
                     end_edge = edge
             # Either the start or end edge should work since
             # orthogonality is assumed.
-            print(f"{start_edge=} | {end_edge=}")
 
             # 2. Find support geoms which intersect with start and end edges
             # FIX TO ACCOMMODATE CANTILEVER EDGES
@@ -135,14 +134,11 @@ class CollectorTribModel:
                     if math.isclose(end_support.coords[0][1], support_geom.coords[0][1], rel_tol=self.support_tolerance)
                 ]
 
-            print(f"{start_supports=} | {end_supports=}")
-
             # 2b. Get intermediate supports
             intermediate_supports = []
             for geom in support_geoms:
                 if geom not in start_supports + end_supports:
                     intermediate_supports.append(geom)
-            print(f"{intermediate_supports=}")
 
             # 3. Generate overlap regions
             overlap_polys = []
@@ -166,29 +162,21 @@ class CollectorTribModel:
                     # This does not work, need a substitute
                     # overlap_region = ld.get_overlap_region(pa0, pa1, pb0, pb1)
                     overlap_polys.append(overlap_poly)
-            print(f"{overlap_polys=}")
-            print(f"{set(overlap_polys)=}")
 
             # 5. Do overlap polys intersect with intermediate supports?
             #    if so, break the support as required.
             revised_poly_overlaps = []
             for overlap_poly in set(overlap_polys):
-                append_overlap_poly = True
                 split_polys = []
                 for intermediate_support in intermediate_supports:
                     if intermediate_support.intersects(overlap_poly):
-                        print("Intermediate intersection")
-                        append_overlap_poly = False
                         inter_coords = intermediate_support.coords
                         poly_splits = geom_ops.split_polygon(overlap_poly, joist_orientation, inter_coords)
-                        print(f"{len(poly_splits)=}")
-                        print(f"{poly_splits=}")
                         split_polys += poly_splits
                 if not split_polys:
                     revised_poly_overlaps.append(overlap_poly)
                 else:
                     revised_poly_overlaps += split_polys
-            print(f"{revised_poly_overlaps=}")
 
             joist_prototype_geometries = []
             for overlap_poly in revised_poly_overlaps:
@@ -202,15 +190,6 @@ class CollectorTribModel:
                         # We only need to hit one edge of the overlap so we can break here
                         break
                 joist_prototype_geometries.append(new_joist)
-            print(f"{joist_prototype_geometries=}")
-            from IPython.display import display
-            display(
-                GeometryCollection(
-                    joist_prototype_geometries 
-                    + revised_poly_overlaps 
-                    + [e.extent_polygon]
-                    )
-            )
 
 
             # 7. Create an Element for each new joist prototype geometries
@@ -224,6 +203,8 @@ class CollectorTribModel:
                 subelement_tag = f"{e.tag}-{index}"
                 for support_geom in support_geoms:
                     intersecting_region = joist_geom.intersection(support_geom)
+                    if intersecting_region.is_empty:
+                        continue
                     intersection = Intersection(
                         intersecting_region=intersecting_region,
                         other_geometry=support_geom,
@@ -252,8 +233,6 @@ class CollectorTribModel:
                     extent_polygon=e.extent_polygon
                 )
                 subelements.append(subelement)
-
-                
             
             # 8. Return subelements
             new_element = Element(
@@ -274,21 +253,6 @@ class CollectorTribModel:
             )
             return new_element
 
-
-
-            pass
-            # Double loop over element.intersections_below
-            # if i != j
-            # use ld.get_overlap_region with start and end points of i, j
-            # accumulate overlap regions
-            # for every overlap region:
-            #     duplicate the joist prototype (element geometry) so that it
-            #     is centered on a representative point within a Polygon made
-            #     of the overlap region
-            #         This will require translating x, y and start, end coords all separately, I think
-            #         How will I know if there are more than two supports?
-            # I think I will need to create initial overlaps and pop each geometry that forms a set of overlaps
-            # For all geometries remaining, then loop over the overlaps and see if they fall within the overlap region
         return collector_element
 
 
@@ -483,7 +447,6 @@ class JoistArrayModel:
                 new_centroid, self.vector_parallel, projection_distance # orig +ve
             )
             ray_b = LineString([new_centroid, ray_bj])
-            # display(GeometryCollection([start_centroid, self.get_extent_edge("start"), new_centroid, self._supports[0], self._supports[-1],]))
             support_a_loc = ray_a.intersection(self._supports[0])
             support_b_loc = ray_b.intersection(self._supports[-1])
 
@@ -586,7 +549,8 @@ class JoistArrayModel:
 
         For manual visual review
         """
-        return display(GeometryCollection(self.joist_geoms + self.joist_trib_areas + self.joist_supports))
+        from IPython.display import display
+        display(GeometryCollection(self.joist_geoms + self.joist_trib_areas + self.joist_supports))
         
 
 
