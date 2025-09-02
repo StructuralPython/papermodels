@@ -797,7 +797,6 @@ def get_collector_extents(
             extent_start = support_start.distance(region_start)
             extent_end = support_start.distance(region_end)
             tagged_extents.update({ib.other_tag: (extent_start, extent_end)})
-
     return tagged_extents
 
 
@@ -919,6 +918,7 @@ def get_geometry_intersections(
                         continue
                 # Use the extent polygon to find intersections (if it exists)
                 i_extent_poly = i_attrs['extent_polygon']
+                extent_intersection = False
                 if (
                     i_extent_poly is not None 
                     and 
@@ -928,10 +928,21 @@ def get_geometry_intersections(
                     )
                 ):
                     intersection = geom_ops.get_intersection(i_geom, j_geom, j_tag, i_extent_poly)
+                    extent_intersection = True
                 else:
                     intersection = geom_ops.get_intersection(i_geom, j_geom, j_tag)
+
                 if intersection is None: continue
                 intersections_below.append(Intersection(*intersection, other_reaction_type=j_attrs['reaction_type']))
+                if extent_intersection:
+                    # Need to construct an "intersection_above" when using the polygon extent so that there is a link
+                    # between these two elements (otherwise none exists).
+                    # This means I am adding intersections_above to another element that is not the one currently
+                    # being iterated on. This means, that I have to take care not to over-write that element's
+                    # intersections_above key with a newly created list.
+                    intersection_above = Intersection(intersection[0], i_geom, i_tag, i_attrs['reaction_type'])
+                    j_attrs.setdefault('intersections_above', [])
+                    j_attrs['intersections_above'] += [intersection_above]
             elif i_rank > j_rank:
                 if i_geom.geom_type == j_geom.geom_type == "Polygon":
                     if not check_eligible_polygon_intersection(i_attrs['tag'], j_attrs['tag']):
@@ -954,7 +965,11 @@ def get_geometry_intersections(
 
                 intersections_above.append(Intersection(*intersection, other_reaction_type=i_attrs['reaction_type']))
 
-        i_attrs["intersections_above"] = intersections_above
+        # This now needs to ensure that it merely adds-on to an element's existing intersections_above
+        # because they could be set elsewhere (see note above).
+        i_attrs.setdefault("intersections_above", [])
+        i_attrs['intersections_above'] += intersections_above
+
         i_attrs["intersections_below"] = intersections_below
     return intersected_annotations
 

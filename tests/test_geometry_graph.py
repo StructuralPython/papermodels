@@ -43,7 +43,6 @@ def test_collector_assignment_frame_collectors_transfers(load_frame_collectors_t
     graph.assign_collector_behaviour(CollectorTribModel) # Assign all collectors trib model
     graph.assign_collector_behaviour(JoistArrayModel, steel_joist_arrays, spacing=1.0) # Assign steel joists the array
     graph.assign_collector_behaviour(JoistArrayModel, user_designated_joists, spacing=1.0)
-
     les = graph.create_loaded_elements()
     assert 'SJ0.0-9'in les # Confirms that JoistArray behaviour created for steel joists
     assert 'WJ0.0' in les # Confirms that collector_trib behaviour created for WJ0.0

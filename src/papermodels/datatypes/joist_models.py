@@ -235,7 +235,7 @@ class CollectorTribModel:
                 subelements.append(subelement)
             
             # 8. Return subelements
-            new_element = Element(
+            collector_element = Element(
                 e.geometry,
                 tag=e.tag,
                 rank=e.rank,
@@ -251,8 +251,6 @@ class CollectorTribModel:
                 kwargs=e.kwargs,
                 extent_polygon=e.extent_polygon
             )
-            return new_element
-
         return collector_element
 
 

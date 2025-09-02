@@ -353,7 +353,6 @@ def translate_joist_to_point(joist_geom: LineString, joist_orientation: str, int
         return LineString([(ix, ipy), (jx, ipy)])
     elif joist_orientation == "vertical": 
         return LineString([(ipx, iy), (ipx, jy)])
-    
 
 
 def get_system_bounds(
