@@ -14,7 +14,6 @@ import numpy as np
 from numpy.typing import ArrayLike
 
 
-
 def annotations_to_shapely(
     annots: list[Annotation], as_geometry_collection=False
 ) -> list[Any]:
@@ -56,10 +55,10 @@ def parsed_annotations_to_loading_geometry(
     acc = []
     for annot, annot_attrs in parsed_annots.items():
         lg = LoadingGeometry(
-            geometry=annot_attrs['geometry'],
+            geometry=annot_attrs["geometry"],
             occupancy=annot_attrs.get("occupancy", None),
             load_components=annot_attrs.get("components", None),
-            plane_id=annot_attrs['page_label'],
+            plane_id=annot_attrs["page_label"],
         )
         acc.append(lg)
     return acc
@@ -87,25 +86,35 @@ def parse_annotations(
         matching_annots = filter_annotations(annots, legend_properties)
         annot_attributes = parse_legend(legend_item.text, legend_identifier)
         for annot in matching_annots:
-            if annot in legend: 
+            if annot in legend:
                 continue
             annot_kwargs = parse_annot_kwargs(annot.text)
             existing_annot_tag = annot_kwargs.get("tag", None)
             annot_geom = annotation_to_shapely(annot)
             annot_attrs = {}
             annot_attrs["geometry"] = annot_geom
-            annot_attrs['page_label'] = annot.page
-            annot_attrs['tag'] = existing_annot_tag
+            annot_attrs["page_label"] = annot.page
+            annot_attrs["tag"] = existing_annot_tag
             for annot_key, annot_attr in annot_attributes.items():
                 annot_attrs[annot_key] = str_to_int(
                     annot_attr.split("<")[0]
                 )  # .split() to remove trailing HTML tags
+
+            # Run tests for this first
             # annot_attrs["rank"] = int(annot_attributes["rank"])
-            annot_attrs.setdefault("reaction_type", "point")
-            annot_attrs['reaction_type'] = annot_attrs['reaction_type'].lower()
-            if annot_geom.geom_type == "Polygon" and annot_attrs['reaction_type'] == "linear":
-                annot_attrs['length'] = geom_ops.get_rectangle_centerline(annot_geom).length
-            parsed_annotations.update({annot: annot_attrs | annot_kwargs})
+            if "extent" in annot_attrs["type"]:
+                parsed_annotations.update({annot: annot_attrs})
+            else:
+                annot_attrs.setdefault("reaction_type", "point")
+                annot_attrs["reaction_type"] = annot_attrs["reaction_type"].lower()
+                if (
+                    annot_geom.geom_type == "Polygon"
+                    and annot_attrs["reaction_type"] == "linear"
+                ):
+                    annot_attrs["length"] = geom_ops.get_rectangle_centerline(
+                        annot_geom
+                    ).length
+                parsed_annotations.update({annot: annot_attrs | annot_kwargs})
     return parsed_annotations
 
 
@@ -114,7 +123,7 @@ def tag_parsed_annotations(
 ) -> dict[Annotation, dict]:
     """
     Adds an identifying tag to the annotation based on the page number of the annotation and
-    its identified type. Prioritizes manually named tags according to thsi format: 
+    its identified type. Prioritizes manually named tags according to thsi format:
     "{ABBR}{PAGE_ID}.{INDEX}". If an annotation is not already tagged accordingly then
     it will be auto-assigned an integer index after all tagged annotations have been accounted
     for.
@@ -125,11 +134,13 @@ def tag_parsed_annotations(
     annots_to_tag = parsed_annots.copy()
     annots_to_enumerate = {}
     for annot, annot_attrs in annots_to_tag.items():
-        tag = annot_attrs.get('tag')
+        tag = annot_attrs.get("tag")
         # There is an existing annotation
         if tag is not None:
             parsed = parse_tag_components(tag)
-            if parsed is not None and len(parsed) == 3: # Tag is not in correct format so ignore
+            if (
+                parsed is not None and len(parsed) == 3
+            ):  # Tag is not in correct format so ignore
                 type_initials, page_id, tag_idx = parsed
                 tag_prefix = f"{type_initials}{page_id}"
                 counts.setdefault(tag_prefix, set())
@@ -138,7 +149,6 @@ def tag_parsed_annotations(
                 annots_to_enumerate.update({annot: annot_attrs})
         else:
             annots_to_enumerate.update({annot: annot_attrs})
-
 
     for annot, annot_attrs in annots_to_enumerate.items():
         type_initials = "".join(
@@ -150,7 +160,7 @@ def tag_parsed_annotations(
         while count in counts[tag_prefix]:
             count += 1
         tag = f"{tag_prefix}.{count}"
-        annot_attrs['tag'] = tag
+        annot_attrs["tag"] = tag
         counts[tag_prefix].add(count)
         prev_count = count
 
@@ -178,9 +188,13 @@ def _annotation_to_wkt(annot: Annotation) -> str:
     elif annot.object_type in ("Polygon", "Rectangle", "Square"):
         grouped_vertices = geom_ops._group_vertices_str(annot.vertices, close=True)
         return f"POLYGON(({grouped_vertices}))"
-    
-    
-def assign_page_id_to_annotations(annots: list[Annotation], page_containers: list[Annotation], left_to_right: bool = True) -> list[list[Annotation]]:
+
+
+def assign_page_id_to_annotations(
+    annots: list[Annotation],
+    page_containers: list[Annotation],
+    left_to_right: bool = True,
+) -> list[list[Annotation]]:
     """
     Returns a list of Annotation representing 'annots' after they have been assigned to their page container
     in 'page_containers'.
@@ -204,13 +218,15 @@ def assign_page_id_to_annotations(annots: list[Annotation], page_containers: lis
                 line_opacity=annot.line_opacity,
                 fill_opacity=annot.fill_opacity,
                 matrix=annot.matrix,
-                local_id=annot.local_id
+                local_id=annot.local_id,
             )
             page_indexed_annots[page_id].append(new_annotation)
     return page_indexed_annots
 
 
-def enumerate_page_annotations(page_annots: list[Annotation], left_to_right: bool = True) -> dict[Polygon, int]:
+def enumerate_page_annotations(
+    page_annots: list[Annotation], left_to_right: bool = True
+) -> dict[Polygon, int]:
     """
     Returns the annotations in 'annots' that correspond to page-demarcation
     polygons organized in a seqential fashion.
@@ -219,17 +235,21 @@ def enumerate_page_annotations(page_annots: list[Annotation], left_to_right: boo
     enumerated_page_annotations = {}
     counter = 0
     for page_geoms in page_geoms_by_page.values():
-        reverse=False
+        reverse = False
         if not left_to_right:
-            reverse=True
-        sorted_page_geoms = sorted(page_geoms, key=lambda x: x.centroid.coords[0], reverse=reverse)
+            reverse = True
+        sorted_page_geoms = sorted(
+            page_geoms, key=lambda x: x.centroid.coords[0], reverse=reverse
+        )
         for page_geom in sorted_page_geoms:
             enumerated_page_annotations.update({counter: page_geom})
             counter += 1
     return enumerated_page_annotations
 
 
-def sort_annotations_by_page_polygon(annots: list[Annotation], page_geom_map: dict[int, Polygon]) -> dict[Polygon, list[Annotation]]:
+def sort_annotations_by_page_polygon(
+    annots: list[Annotation], page_geom_map: dict[int, Polygon]
+) -> dict[Polygon, list[Annotation]]:
     """
     Sorts each annotation into its own list[Annotation] coresponding to which page they are contained in.
     """
@@ -256,28 +276,38 @@ def align_annotations_to_pages(
     counter = 0
     for page_poly, page_annots in annotations_by_page.items():
         try:
-            origin_annot = next((page_annot for page_annot in page_annots if page_annot.text == "origin"))
+            origin_annot = next(
+                (
+                    page_annot
+                    for page_annot in page_annots
+                    if page_annot.text == "origin"
+                )
+            )
         except StopIteration:
-            raise AnnotationError(f"The 'page' annotation with index={counter} appears to be missing an 'origin' annotation.")
+            raise AnnotationError(
+                f"The 'page' annotation with index={counter} appears to be missing an 'origin' annotation."
+            )
         if counter == 0:
             global_offset = get_origin_offset(origin_annot, page_poly)
         origin_centroid = get_origin_centroid(origin_annot)
         page_origin = get_page_bottom_left_corner(page_poly)
-        shifted_annots = reset_annotations_to_origin(page_annots, page_origin, origin_centroid, global_offset)
+        shifted_annots = reset_annotations_to_origin(
+            page_annots, page_origin, origin_centroid, global_offset
+        )
         acc.update({page_poly: shifted_annots})
         counter += 1
     return acc
-        
+
 
 def reset_annotations_to_origin(
     annots_on_page: list[Annotation],
     page_origin_xy: ArrayLike,
     origin_centroid_xy: ArrayLike,
-    global_offset: ArrayLike
+    global_offset: ArrayLike,
 ) -> list[Annotation]:
     """
     Translates all of the annotations in 'annots_on_page' so that the origin
-    annotation (contained within 'annots_on_page') is located at 'xy_offset' 
+    annotation (contained within 'annots_on_page') is located at 'xy_offset'
     from the bottom-left corner.
     """
     updated_annots = []
@@ -286,7 +316,9 @@ def reset_annotations_to_origin(
     translation_vector = page_origin_xy - global_offset + local_delta
     for annot in annots_on_page:
         vertices = annot.vertices
-        translated_vertices = geom_ops._translate_vertices(vertices, offset_x=-translation_vector[0], offset_y=-translation_vector[1])
+        translated_vertices = geom_ops._translate_vertices(
+            vertices, offset_x=-translation_vector[0], offset_y=-translation_vector[1]
+        )
         updated_annot = Annotation(
             annot.page,
             annot.object_type,
@@ -299,11 +331,11 @@ def reset_annotations_to_origin(
             line_opacity=annot.line_opacity,
             fill_opacity=annot.fill_opacity,
             matrix=annot.matrix,
-            local_id=annot.local_id
+            local_id=annot.local_id,
         )
         updated_annots.append(updated_annot)
     return updated_annots
-        
+
 
 def get_origin_offset(origin_annot: Annotation, page_poly: Polygon) -> ArrayLike:
     """
@@ -332,7 +364,9 @@ def get_page_bottom_left_corner(page_poly: Polygon) -> ArrayLike:
     return np.array(page_point.coords[0])
 
 
-def get_page_geom_by_page_index(page_annots: list[Annotation]) -> dict[int, list[Polygon]]:
+def get_page_geom_by_page_index(
+    page_annots: list[Annotation],
+) -> dict[int, list[Polygon]]:
     """
     Returns a dictionary that organizes the 'page_annots' by their page id.
     """
@@ -359,7 +393,6 @@ def parse_annot_kwargs(text_contents: str) -> dict[str, str]:
                 k, v = splits
                 acc.update({k: v})
     return acc
-
 
 
 def remove_windows_crlf(text_contents: str) -> str:
@@ -393,7 +426,7 @@ def scale_annotations(
     annots: list[Annotation],
     scale: Decimal,
     paper_origin: Optional[tuple[float, float]] = None,
-    round_precision: int = 4
+    round_precision: int = 4,
 ) -> list[Annotation]:
     """
     Scale the annotations in 'annots'. Each vertex in each annotation in 'annots' will be multiplied
@@ -406,7 +439,12 @@ def scale_annotations(
     scaled_annotations = []
     for annot in annots:
         annot_dict = asdict(annot).copy()
-        scaled_vertices = geom_ops.scale_vertices(annot.vertices, scale, round_precision=round_precision, paper_origin=paper_origin)
+        scaled_vertices = geom_ops.scale_vertices(
+            annot.vertices,
+            scale,
+            round_precision=round_precision,
+            paper_origin=paper_origin,
+        )
         annot_dict["vertices"] = scaled_vertices
         scaled_annotations.append(Annotation(**annot_dict))
     return scaled_annotations
@@ -417,14 +455,23 @@ def parse_legend(legend_text: str, legend_identifier: str) -> dict:
     Returns a dict of key/value pairs extracted from teh legened annotation text
     """
     legend_text = strip_html_tags(legend_text)
-    legend_data = legend_text.lower().replace(legend_identifier.lower(),"").replace("\r\n", "\n").replace("\r", "\n").replace(f"{legend_identifier.lower()}\n", "").split("\n")
+    legend_data = (
+        legend_text.lower()
+        .replace(legend_identifier.lower(), "")
+        .replace("\r\n", "\n")
+        .replace("\r", "\n")
+        .replace(f"{legend_identifier.lower()}\n", "")
+        .split("\n")
+    )
     legend_data = [elem for elem in legend_data if elem]
     annot_attributes = {}
     for legend_attr in legend_data:
         try:
             key, value = legend_attr.split(":")
         except ValueError as e:
-            raise LegendError(f"Incorrect legend format on the following annotation: {legend_data}")
+            raise LegendError(
+                f"Incorrect legend format on the following annotation: {legend_data}"
+            )
         key = key.strip().lower().replace(" ", "_")
         value = value.strip()
         annot_attributes.update({key: value})
@@ -435,7 +482,8 @@ def strip_html_tags(s: str) -> str:
     """
     Removes but does not sanitize HTML tags from strings
     """
-    return re.sub('<[^<]+?>', '\n', s)
+    return re.sub("<[^<]+?>", "\n", s)
+
 
 def str_to_int(s: str) -> int | str:
     try:

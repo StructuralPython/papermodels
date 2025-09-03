@@ -12,6 +12,7 @@ class LoadElement:
     """
     Represents a loading area extracted from a markup
     """
+
     geometry: Polygon
     occupancy: Optional[str] = None
     project_occupancies: Optional[dict] = None
@@ -90,7 +91,6 @@ class LoadElement:
             component: convert_unit_string(magnitude, self.unit_system)
             for component, magnitude in self.load_components.items()
         }
-
 
 
 def parse_load_text(text: str) -> dict:

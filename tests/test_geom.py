@@ -5,6 +5,7 @@ from math import isclose
 
 from papermodels.geometry import geom_ops
 
+
 def test_check_corresponds():
 
     ls1 = LineString([[0, 0], [1, 0]])
@@ -24,13 +25,13 @@ def test_check_corresponds():
 
 
 def test_get_joist_extents():
-    ls1 = LineString([[50, 4], [300,56]])
+    ls1 = LineString([[50, 4], [300, 56]])
     ls2 = LineString([[-23, 300], [350, 335]])
     j1 = LineString([[140.0, -23.4], [100.0, 390.3]])
     extents = geom_ops.get_joist_extents(j1, [ls1, ls2])
     assert (
-        wkt.dumps(MultiPoint(extents[0] + extents[1]), trim=True, rounding_precision=3) 
-        == 'MULTIPOINT ((273.716 327.842), (20.981 304.127), (300 56), (50 4))'
+        wkt.dumps(MultiPoint(extents[0] + extents[1]), trim=True, rounding_precision=3)
+        == "MULTIPOINT ((273.716 327.842), (20.981 304.127), (300 56), (50 4))"
     )
     ls1 = LineString([[0, 0], [0, 100]])
     ls2 = LineString([[50, -20], [50, 80]])
@@ -38,7 +39,7 @@ def test_get_joist_extents():
     extents = geom_ops.get_joist_extents(j1, [ls1, ls2])
     assert (
         wkt.dumps(MultiPoint(extents[0] + extents[1]), trim=True, rounding_precision=3)
-        == 'MULTIPOINT ((0 80), (0 10e-7), (50 80), (50 10e-7))'
+        == "MULTIPOINT ((0 80), (0 10e-7), (50 80), (50 10e-7))"
     )
 
 

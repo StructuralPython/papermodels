@@ -10,6 +10,7 @@ import parse
 from ..datatypes.annotation import Annotation
 from shapely.ops import polylabel
 
+
 def plot_annotations(
     annots: list[Annotation] | dict[Annotation, dict],
     figsize: int | float | tuple[int | float, int | float] = (17, 11),
