@@ -1,0 +1,26 @@
+[element_attributes]
+tag = "FB1.0"
+length = 18.282
+orientation = "horizontal"
+vert_correspondent_below = []
+vert_correspondent_above = []
+horz_intersects_above = []
+horz_intersects_below = [
+    "CT1.0",
+    "CT1.1",
+    "CT1.5",
+]
+
+[element_attributes.user_defined]
+
+[element_geometry]
+geometry = "LINESTRING (33.438 22.409, 15.156 22.409)"
+supports = [
+    { location = 7.767, fixity = "pin" },
+    { location = 17.921, fixity = "roller" },
+    { location = 0.414, fixity = "roller" },
+]
+
+[loads]
+point_loads = []
+distributed_loads = []

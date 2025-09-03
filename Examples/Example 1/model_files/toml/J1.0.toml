@@ -1,0 +1,100 @@
+[element_attributes]
+tag = "J1.0"
+length = 11.104
+orientation = "horizontal"
+vert_correspondent_below = []
+vert_correspondent_above = []
+horz_intersects_above = []
+horz_intersects_below = [
+    "FB1.0",
+    "FB1.1",
+]
+
+[element_attributes.user_defined]
+
+[element_geometry]
+geometry = "LINESTRING (24.446 33.514, 24.446 22.409)"
+supports = [
+    { location = 0.0, fixity = "pin" },
+    { location = 11.062, fixity = "roller" },
+]
+
+[loads]
+point_loads = []
+
+[[loads.distributed_loads]]
+transfer_source = ""
+transfer_reaction_index = ""
+occupancy = "residential"
+load_components = []
+applied_area = 11.105
+start_loc = 0
+start_magnitude = 0.09
+end_loc = 11.104
+end_magnitude = 0.09
+
+[[loads.distributed_loads]]
+transfer_source = ""
+transfer_reaction_index = ""
+occupancy = "big stuff"
+load_components = []
+applied_area = 1.722
+start_loc = 2.391
+start_magnitude = 0.26
+end_loc = 4.113
+end_magnitude = 0.26
+
+[[loads.distributed_loads]]
+transfer_source = ""
+transfer_reaction_index = ""
+occupancy = "big stuff"
+load_components = []
+applied_area = 0.016
+start_loc = 4.113
+start_magnitude = 0.26
+end_loc = 4.144
+end_magnitude = 0.0
+
+[[loads.distributed_loads]]
+transfer_source = ""
+transfer_reaction_index = ""
+occupancy = "big stuff"
+load_components = []
+applied_area = 0.0
+start_loc = 4.144
+start_magnitude = 0.0
+end_loc = 7.514
+end_magnitude = 0.0
+
+[[loads.distributed_loads]]
+transfer_source = ""
+transfer_reaction_index = ""
+occupancy = "big stuff"
+load_components = []
+applied_area = 0.022
+start_loc = 7.514
+start_magnitude = 0.0
+end_loc = 7.558
+end_magnitude = 0.26
+
+[[loads.distributed_loads]]
+transfer_source = ""
+transfer_reaction_index = ""
+occupancy = "big stuff"
+load_components = []
+applied_area = 2.083
+start_loc = 7.558
+start_magnitude = 0.26
+end_loc = 9.641
+end_magnitude = 0.26
+
+[[loads.distributed_loads]]
+transfer_source = ""
+transfer_reaction_index = ""
+occupancy = "big stuff"
+load_components = []
+applied_area = 0.002
+start_loc = 9.641
+start_magnitude = 0.26
+end_loc = 9.646
+end_magnitude = 0.0

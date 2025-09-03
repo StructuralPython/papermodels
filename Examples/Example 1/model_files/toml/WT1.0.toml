@@ -1,0 +1,29 @@
+[element_attributes]
+tag = "WT1.0"
+orientation = "vertical"
+vert_correspondent_below = [
+    "WB0.0",
+]
+vert_correspondent_above = [
+    "WT2.0",
+]
+horz_intersects_above = []
+horz_intersects_below = []
+
+[element_attributes.length]
+
+[element_attributes.user_defined]
+
+[element_geometry]
+geometry = "POLYGON ((33.273 22.711, 33.273 33.291, 33.638 33.291, 33.638 22.711, 33.273 22.711))"
+supports = []
+
+[loads]
+distributed_loads = []
+
+[[loads.point_loads]]
+location = []
+magnitude = 0.0
+transfer_source = "WT2.0"
+transfer_reaction_index = 0
+direction = "gravity"

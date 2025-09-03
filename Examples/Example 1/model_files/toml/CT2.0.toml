@@ -1,0 +1,21 @@
+[element_attributes]
+tag = "CT2.0"
+orientation = "vertical"
+vert_correspondent_below = [
+    "CB1.0",
+]
+vert_correspondent_above = []
+horz_intersects_above = []
+horz_intersects_below = []
+
+[element_attributes.length]
+
+[element_attributes.user_defined]
+
+[element_geometry]
+geometry = "POLYGON ((19.754 33.141, 19.754 33.821, 20.434 33.821, 20.434 33.141, 19.754 33.141))"
+supports = []
+
+[loads]
+point_loads = []
+distributed_loads = []

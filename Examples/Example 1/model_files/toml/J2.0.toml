@@ -1,0 +1,34 @@
+[element_attributes]
+tag = "J2.0"
+length = 16.961
+orientation = "horizontal"
+vert_correspondent_below = []
+vert_correspondent_above = []
+horz_intersects_above = []
+horz_intersects_below = [
+    "FB2.0",
+    "WT2.0",
+]
+
+[element_attributes.user_defined]
+
+[element_geometry]
+geometry = "LINESTRING (16.477 27.966, 33.438 27.966)"
+supports = [
+    { location = 3.659, fixity = "pin" },
+    { location = 16.717, fixity = "roller" },
+]
+
+[loads]
+point_loads = []
+
+[[loads.distributed_loads]]
+transfer_source = ""
+transfer_reaction_index = ""
+occupancy = "roof"
+load_components = []
+applied_area = 16.961
+start_loc = 0
+start_magnitude = 0.059
+end_loc = 16.961
+end_magnitude = 0.059
