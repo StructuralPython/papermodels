@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import Optional, Union, NamedTuple
 import numpy as np
 import numpy.typing as npt
-from shapely import Point, LineString, Polygon
+from shapely import Point, LineString, Polygon, GeometryCollection
 from shapely import wkt
 from .annotation import Annotation
 from ..paper.annotations import (
@@ -757,7 +757,24 @@ def get_collector_extents(
     prototype would spread over the other_geometry. The (start_x, end_x) locations 
     refer to ordinates on other_geometry, not on the collector_prototype.
     """
-    if collector_prototype.extent_polygon is None:
+    # When we have collector extents and an extent_polygon
+    if collector_prototype.trib_area is None and collector_prototype.extent_polygon is not None:
+        tagged_extents = {}
+        for ib in collector_prototype.intersections_below:
+            region_start, region_end = geom_ops.get_start_end_nodes(ib.intersecting_region)
+            if ib.other_geometry.geom_type == "Polygon":
+                support_start, support_end = geom_ops.get_start_end_nodes(
+                    geom_ops.get_rectangle_centerline(
+                        ib.other_geometry
+                    )
+                )
+            else: # LineString
+                support_start, support_end = geom_ops.get_start_end_nodes(ib.other_geometry)
+            extent_start = support_start.distance(region_start)
+            extent_end = support_start.distance(region_end)
+            tagged_extents.update({ib.other_tag: (extent_start, extent_end)})
+    # When we have joist prototypes that have been drawn for all locations
+    elif collector_prototype.trib_area is None:
         support_tags_by_geom = {
             geom_ops.clean_polygon_supports([ib.other_geometry], collector_prototype.geometry)[0]: ib.other_tag 
             for ib in collector_prototype.intersections_below
@@ -782,21 +799,36 @@ def get_collector_extents(
             extent_start = extent[0].distance(support_start)
             extent_end = extent[1].distance(support_start)
             tagged_extents.update({support_tag: (extent_start, extent_end)})
-    else:
+
+    # When we have collectors with their own trib areas (manually created or 
+    # otherwise)
+    elif collector_prototype.trib_area is not None:
         tagged_extents = {}
         for ib in collector_prototype.intersections_below:
-            region_start, region_end = geom_ops.get_start_end_nodes(ib.intersecting_region)
+            intersection = geom_ops.get_intersection(
+                collector_prototype.geometry, 
+                ib.other_geometry, 
+                ib.other_tag,
+                above_extent_polygon=collector_prototype.trib_area
+            )
+            try:
+                intersecting_region, support_geom, support_tag = intersection
+            except:
+                raise ValueError("There seems to be an internal error with your markup that causes this intermittent error. Please report to connor@structuralpython.com with this message and your drawing file.")
+            print(f"{collector_prototype.tag=} {support_tag=} | {intersecting_region=} | {support_geom=}")
+            region_start, region_end = geom_ops.get_start_end_nodes(intersecting_region)
             if ib.other_geometry.geom_type == "Polygon":
                 support_start, support_end = geom_ops.get_start_end_nodes(
                     geom_ops.get_rectangle_centerline(
-                        ib.other_geometry
+                        support_geom
                     )
                 )
             else: # LineString
-                support_start, support_end = geom_ops.get_start_end_nodes(ib.other_geometry)
+                support_start, support_end = geom_ops.get_start_end_nodes(support_geom)
             extent_start = support_start.distance(region_start)
             extent_end = support_start.distance(region_end)
             tagged_extents.update({ib.other_tag: (extent_start, extent_end)})
+
     return tagged_extents
 
 
@@ -912,7 +944,7 @@ def get_geometry_intersections(
 
             if i_page != j_page:
                 continue
-            if j_rank > i_rank:
+            if j_rank > i_rank: # When i transfers to j
                 if i_geom.geom_type == j_geom.geom_type == "Polygon":
                     if not check_eligible_polygon_intersection(i_attrs['tag'], j_attrs['tag']):
                         continue
@@ -935,6 +967,7 @@ def get_geometry_intersections(
                 if intersection is None: continue
                 intersections_below.append(Intersection(*intersection, other_reaction_type=j_attrs['reaction_type']))
                 if extent_intersection:
+                    # MUTATION ALERT:
                     # Need to construct an "intersection_above" when using the polygon extent so that there is a link
                     # between these two elements (otherwise none exists).
                     # This means I am adding intersections_above to another element that is not the one currently
@@ -943,7 +976,7 @@ def get_geometry_intersections(
                     intersection_above = Intersection(intersection[0], i_geom, i_tag, i_attrs['reaction_type'])
                     j_attrs.setdefault('intersections_above', [])
                     j_attrs['intersections_above'] += [intersection_above]
-            elif i_rank > j_rank:
+            elif i_rank > j_rank: # When j transfers to i
                 if i_geom.geom_type == j_geom.geom_type == "Polygon":
                     if not check_eligible_polygon_intersection(i_attrs['tag'], j_attrs['tag']):
                         continue

@@ -291,13 +291,12 @@ class GeometryGraph(nx.DiGraph):
                 updated_intersections_below = []
                 extents = {}
                 if node in self.collector_elements:
-                    if element.reaction_type == "linear":
-                        extents = get_collector_extents(element)
                     if element.subelements is not None:
                         for subelem in element.subelements:
                             start_coord, _ = geom.order_nodes_positive(subelem.geometry.boundary.geoms)
                             sub_dependent_intersections = get_dependent_intersections(subelem, dependents)
                             sub_local_coords = get_local_coords(start_coord, sub_dependent_intersections)
+                            subextents = get_collector_extents(subelem)
                             sub_sorted_below_ints = sorted(sub_local_coords, key=lambda x: x[0])
                             if len(sub_sorted_below_ints) < 2:
                                 raise ValueError(f"It seems that this element only has one support: {node}")
@@ -308,16 +307,18 @@ class GeometryGraph(nx.DiGraph):
                                 sub_local_index = sub_other_tags_below.index(sub_other_tag)
                                 new_sub_intersection = Intersection(
                                     sub_intersection.intersecting_region,
-                                    sub_intersection.other_geometry,
+                                    self.nodes[sub_other_tag]['element'].geometry,
                                     sub_intersection.other_tag,
                                     sub_local_index,
                                     other_reaction_type=element.reaction_type,
-                                    other_extents=extents
+                                    other_extents=subextents[sub_intersection.other_tag]
                                 )
                                 sub_updated_intersections_below.append(new_sub_intersection)
                             subelem.intersections_below = sub_updated_intersections_below
                         updated_intersections_below = element.intersections_below
                     else:
+                        if element.reaction_type == "linear":
+                            extents = get_collector_extents(element)
                         for intersection in dependent_intersections:
                             other_tag = intersection.other_tag
                             local_index = other_tags_below.index(other_tag)
@@ -398,34 +399,23 @@ class GeometryGraph(nx.DiGraph):
                     )
                     indexed_intersections_above.append(new_intersection)
                 else:
-                    parent_element_tag = element_above.tag
                     for subelem_above in element_above.subelements:
                         # 1. Find subelements above that actually intersect with this (below) element
                         intersections_this_element = []
                         for above_inter_below in subelem_above.intersections_below:
                             if above_inter_below.other_tag == element_tag:
-                                other_extents = above_inter_below.other_extents[element_tag]
+                                other_extents = above_inter_below.other_extents
                                 intersections_this_element.append(
                                     Intersection(
                                         above_inter_below.intersecting_region,
-                                        subelem_above.geometry,
+                                        element.geometry,
                                         subelem_above.tag,
                                         above_inter_below.other_index,
                                         subelem_above.reaction_type,
                                         other_extents=other_extents
                                     )
                                 )
-
-                    parent_element_index = [
-                        index 
-                        for index, inter_above 
-                        in enumerate(element.intersections_above) 
-                        if parent_element_tag in inter_above.other_tag
-                    ]
-                    # There should be exactly one reference to the parent element in this element's intersections_above
-                    assert len(parent_element_index) == 1
-                    element.intersections_above.pop(parent_element_index[0])
-                    indexed_intersections_above += intersections_this_element
+                        indexed_intersections_above += intersections_this_element
 
             element.intersections_above = indexed_intersections_above
 

@@ -25,7 +25,7 @@ IntersectingGeometry = Union[Point, LineString]
 
 def get_intersection(
     above: Geometry, below: Geometry, j_tag: str, above_extent_polygon: Optional[Polygon] = None
-) -> Optional[tuple[str, IntersectingGeometry, Geometry]]:
+) -> Optional[tuple[IntersectingGeometry, Geometry, str]]:
     """
     Returns the details of the intersection
     """

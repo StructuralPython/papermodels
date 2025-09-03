@@ -72,13 +72,22 @@ class CollectorTribModel:
         else:
             ext_poly = e.extent_polygon
             joist_prototype = e.geometry
-            support_geoms = {
-                ib.intersecting_region: ib.other_tag
-                for ib in e.intersections_below 
-                if ib.intersecting_region.geom_type == "LineString"
-            }
+            support_lines = {}
+            for ib in e.intersections_below:
+                if ib.other_geometry.geom_type == "Polygon":
+                    support_line = geom_ops.get_rectangle_centerline(ib.other_geometry)
+                    support_lines.update({
+                       support_line : ib.other_tag
+                    }
+                    )
+                elif ib.other_geometry.geom_type == "LineString":
+                    support_lines.update({
+                        ib.other_geometry: ib.other_tag
+                    })
+            support_geoms = [ib.other_geometry for ib in e.intersections_below]
 
-            # 1. Find polygon edges that intersect with joist prototype
+            # 1. Find polygon extent edges that intersect with joist prototype
+            # These will be our extent boundaries for the length of the prototype
             poly_edge_points = list(zip(ext_poly.exterior.coords, ext_poly.exterior.coords[1:]))
             start_edge = None
             end_edge = None
@@ -93,7 +102,6 @@ class CollectorTribModel:
             # orthogonality is assumed.
 
             # 2. Find support geoms which intersect with start and end edges
-            # FIX TO ACCOMMODATE CANTILEVER EDGES
             start_supports = []
             end_supports = []
             joist_vector = np.abs(geom_ops.get_direction_vector(geom))
@@ -111,34 +119,34 @@ class CollectorTribModel:
                 start_support = min(support_centroids, key=lambda x: x.coords[0][0])
                 end_support = max(support_centroids, key=lambda x: x.coords[0][0])             
                 start_supports = [
-                    support_geom 
-                    for support_geom in support_geoms 
-                    if math.isclose(start_support.coords[0][0], support_geom.coords[0][0], rel_tol=self.support_tolerance)
+                    support_line 
+                    for support_line in support_lines 
+                    if math.isclose(start_support.coords[0][0], support_line.coords[0][0], rel_tol=self.support_tolerance)
                 ]
                 end_supports = [
-                    support_geom 
-                    for support_geom in support_geoms 
-                    if math.isclose(end_support.coords[0][0], support_geom.coords[0][0], rel_tol=self.support_tolerance)
+                    support_line 
+                    for support_line in support_lines 
+                    if math.isclose(end_support.coords[0][0], support_line.coords[0][0], rel_tol=self.support_tolerance)
                 ]
             elif joist_orientation == "vertical":
                 start_support = min(support_centroids, key=lambda x: x.coords[0][1])
                 end_support = max(support_centroids, key=lambda x: x.coords[0][1]) 
                 start_supports = [
-                    support_geom 
-                    for support_geom in support_geoms 
-                    if math.isclose(start_support.coords[0][1], support_geom.coords[0][1], rel_tol=self.support_tolerance)
+                    support_line 
+                    for support_line in support_lines 
+                    if math.isclose(start_support.coords[0][1], support_line.coords[0][1], rel_tol=self.support_tolerance)
                 ]
                 end_supports = [
-                    support_geom 
-                    for support_geom in support_geoms 
-                    if math.isclose(end_support.coords[0][1], support_geom.coords[0][1], rel_tol=self.support_tolerance)
+                    support_line 
+                    for support_line in support_lines 
+                    if math.isclose(end_support.coords[0][1], support_line.coords[0][1], rel_tol=self.support_tolerance)
                 ]
 
             # 2b. Get intermediate supports
-            intermediate_supports = []
-            for geom in support_geoms:
-                if geom not in start_supports + end_supports:
-                    intermediate_supports.append(geom)
+            intermediate_support_lines = []
+            for support_line in support_lines:
+                if support_line not in start_supports + end_supports:
+                    intermediate_support_lines.append(support_line)
 
             # 3. Generate overlap regions
             overlap_polys = []
@@ -159,16 +167,15 @@ class CollectorTribModel:
                         if overlap_region is not None:
                             overlap_poly = box(pa0[0], overlap_region[0], pb1[0], overlap_region[1])
 
-                    # This does not work, need a substitute
-                    # overlap_region = ld.get_overlap_region(pa0, pa1, pb0, pb1)
-                    overlap_polys.append(overlap_poly)
+                    overlap_within_extent = ext_poly.intersection(overlap_poly)
+                    overlap_polys.append(overlap_within_extent)
 
             # 5. Do overlap polys intersect with intermediate supports?
             #    if so, break the support as required.
             revised_poly_overlaps = []
             for overlap_poly in set(overlap_polys):
                 split_polys = []
-                for intermediate_support in intermediate_supports:
+                for intermediate_support in intermediate_support_lines:
                     if intermediate_support.intersects(overlap_poly):
                         inter_coords = intermediate_support.coords
                         poly_splits = geom_ops.split_polygon(overlap_poly, joist_orientation, inter_coords)
@@ -195,25 +202,28 @@ class CollectorTribModel:
             # 7. Create an Element for each new joist prototype geometries
             subelements = []
             sorted_joist_geoms = sorted(joist_prototype_geometries, key=lambda x: (x.coords[0][0], x.coords[0][1]))
+            sorted_poly_overlaps = sorted(revised_poly_overlaps, key=lambda x: (x.centroid.coords[0][0], x.centroid.coords[0][1]))
             for idx, joist_geom in enumerate(sorted_joist_geoms):
                 intersections = []
                 total_new_subs = len(joist_prototype_geometries)
                 z_fill_qty = math.floor(math.log10(total_new_subs))
                 index = f"{idx}".zfill(z_fill_qty)                
                 subelement_tag = f"{e.tag}-{index}"
+                trib_area = sorted_poly_overlaps[idx]
                 for support_geom in support_geoms:
-                    intersecting_region = joist_geom.intersection(support_geom)
+                    if support_geom.geom_type == "Polygon":
+                        support_line = geom_ops.get_rectangle_centerline(support_geom)
+                    elif support_geom.geom_type == "LineString":
+                        support_line = support_geom
+
+                    intersecting_region = trib_area.intersection(support_line)
                     if intersecting_region.is_empty:
                         continue
                     intersection = Intersection(
                         intersecting_region=intersecting_region,
                         other_geometry=support_geom,
-                        other_tag=support_geoms[support_geom],
-                        other_reaction_type=(
-                            "point" 
-                            if intersecting_region.geom_type == "Point" 
-                            else "linear"
-                        )
+                        other_tag=support_lines[support_line],
+                        other_reaction_type="linear" if support_geom.geom_type == "Polygon" else "point"
                     )
                     intersections.append(intersection)
                 subelement = Element(
@@ -227,7 +237,7 @@ class CollectorTribModel:
                     plane_id=e.plane_id,
                     element_type=e.element_type,
                     subelements=None,
-                    trib_area=e.trib_area,
+                    trib_area=trib_area,
                     reaction_type="linear",
                     kwargs=e.kwargs,
                     extent_polygon=e.extent_polygon

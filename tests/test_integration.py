@@ -81,4 +81,4 @@ def test_collector_extent_loads(load_collector_extents):
 def test_collector_extent_creates_loaded_elements(collector_extents_to_trib_loaded_elements):
     les = collector_extents_to_trib_loaded_elements
     assert list(les.keys()) == ['CT0.1', 'SJ0.0-0', 'SJ0.0-1', 'SJ0.0-2', 'SJ0.0-3', 'SJ0.0-4', 'SJ0.0-5', 'SJ0.0-6', 'SJ0.1', 'WT0.3', 'FB0.0', 'FB0.2', 'FB0.1', 'FB0.3', 'WT0.1', 'CT0.4', 'CT0.5', 'CT0.3', 'CT0.8', 'WT0.0', 'CT0.0', 'CT0.6', 'WT0.2', 'CT0.2', 'CT0.7']
-    assert les['FB0.3'].model()['distributed_loads']
+    assert les['WT0.3'].model()['loads']['distributed_loads']
