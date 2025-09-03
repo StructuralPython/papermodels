@@ -3,7 +3,6 @@ from decimal import Decimal
 from typing import Any
 
 
-
 @dataclass(frozen=True)
 class Annotation:
     page: int
@@ -20,21 +19,22 @@ class Annotation:
     local_id: int
 
     def __eq__(self, other):
-        return all([
-            self.page==other.page,
-            self.object_type==other.object_type,
-            self.text==other.text,
-            self.vertices==other.vertices,
-            self.matrix==other.matrix,
-            self.line_color==other.line_color,
-            self.fill_color==other.fill_color,
-            self.line_type==other.line_type,
-            self.line_weight==other.line_weight,
-            self.line_opacity==other.line_opacity,
-            self.fill_opacity==other.fill_opacity,
-            self.matrix==other.matrix,
-        ])
-
+        return all(
+            [
+                self.page == other.page,
+                self.object_type == other.object_type,
+                self.text == other.text,
+                self.vertices == other.vertices,
+                self.matrix == other.matrix,
+                self.line_color == other.line_color,
+                self.fill_color == other.fill_color,
+                self.line_type == other.line_type,
+                self.line_weight == other.line_weight,
+                self.line_opacity == other.line_opacity,
+                self.fill_opacity == other.fill_opacity,
+                self.matrix == other.matrix,
+            ]
+        )
 
 
 A0 = Annotation(
@@ -58,7 +58,7 @@ A0 = Annotation(
     line_opacity=None,
     fill_opacity=None,
     matrix=[1.0, 0.0, 0.0, 1.0, -1992.727, -537.1696],
-    local_id=3
+    local_id=3,
 )
 
 A1 = Annotation(
@@ -82,5 +82,5 @@ A1 = Annotation(
     line_opacity=None,
     fill_opacity=None,
     matrix=[1.0, 0.0, 0.0, 1.0, -1992.727, -537.1696],
-    local_id=0
+    local_id=0,
 )

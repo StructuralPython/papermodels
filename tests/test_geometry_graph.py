@@ -17,6 +17,7 @@ EIGHTTH_INCH_SCALE = Decimal(1) / Decimal(72) * Decimal(8)
 
 TEST_DATA = pathlib.Path(__file__).parent / "test_data"
 
+
 @fixture()
 def load_frame_collectors_transfers():
     graph = GeometryGraph.from_pdf_file(
@@ -24,6 +25,7 @@ def load_frame_collectors_transfers():
         scale=EIGHTTH_INCH_SCALE,
     )
     return graph
+
 
 @fixture()
 def load_collector_extents():
@@ -33,20 +35,34 @@ def load_collector_extents():
     )
     return graph
 
+
 def test_load_frame_collectors_transfers(load_frame_collectors_transfers):
     assert load_frame_collectors_transfers
 
-def test_collector_assignment_frame_collectors_transfers(load_frame_collectors_transfers):
+
+def test_collector_assignment_frame_collectors_transfers(
+    load_frame_collectors_transfers,
+):
     graph = load_frame_collectors_transfers
-    steel_joist_arrays = create_element_filter(element_types=['SJ'])
-    user_designated_joists = create_element_filter(user_defined={"collector behaviour": "array"})
-    graph.assign_collector_behaviour(CollectorTribModel) # Assign all collectors trib model
-    graph.assign_collector_behaviour(JoistArrayModel, steel_joist_arrays, spacing=1.0) # Assign steel joists the array
-    graph.assign_collector_behaviour(JoistArrayModel, user_designated_joists, spacing=1.0)
+    steel_joist_arrays = create_element_filter(element_types=["SJ"])
+    user_designated_joists = create_element_filter(
+        user_defined={"collector behaviour": "array"}
+    )
+    graph.assign_collector_behaviour(
+        CollectorTribModel
+    )  # Assign all collectors trib model
+    graph.assign_collector_behaviour(
+        JoistArrayModel, steel_joist_arrays, spacing=1.0
+    )  # Assign steel joists the array
+    graph.assign_collector_behaviour(
+        JoistArrayModel, user_designated_joists, spacing=1.0
+    )
     les = graph.create_loaded_elements()
-    assert 'SJ0.0-9'in les # Confirms that JoistArray behaviour created for steel joists
-    assert 'WJ0.0' in les # Confirms that collector_trib behaviour created for WJ0.0
-    assert 'WJ0.1-9' in les # Confirms that JoistArray behaviour created for WJ0.1
+    assert (
+        "SJ0.0-9" in les
+    )  # Confirms that JoistArray behaviour created for steel joists
+    assert "WJ0.0" in les  # Confirms that collector_trib behaviour created for WJ0.0
+    assert "WJ0.1-9" in les  # Confirms that JoistArray behaviour created for WJ0.1
 
 
 def test_load_collector_extents(load_collector_extents):

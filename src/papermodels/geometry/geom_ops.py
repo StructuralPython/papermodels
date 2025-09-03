@@ -14,7 +14,7 @@ from shapely import (
     convex_hull,
     intersects,
     union,
-    GeometryCollection
+    GeometryCollection,
 )
 import shapely.ops as ops
 import shapely.affinity as aff
@@ -23,8 +23,12 @@ from papermodels.datatypes.exceptions import GeometryError
 Geometry = Union[LineString, Polygon]
 IntersectingGeometry = Union[Point, LineString]
 
+
 def get_intersection(
-    above: Geometry, below: Geometry, j_tag: str, above_extent_polygon: Optional[Polygon] = None
+    above: Geometry,
+    below: Geometry,
+    j_tag: str,
+    above_extent_polygon: Optional[Polygon] = None,
 ) -> Optional[tuple[IntersectingGeometry, Geometry, str]]:
     """
     Returns the details of the intersection
@@ -33,7 +37,7 @@ def get_intersection(
     i_type = above.geom_type
     j_type = below.geom_type
     i_extent = above_extent_polygon
-    if i_extent and j_type=="Polygon":
+    if i_extent and j_type == "Polygon":
         # Goal: calculate the intersecting region as being along the centerline
         # of the linear polygon support so that, down the line, it becomes easy
         # to calculate the extents from the intersecting region
@@ -41,8 +45,12 @@ def get_intersection(
         inter_centerline = get_rectangle_centerline(intersecting_region)
         support_centerline = get_rectangle_centerline(below)
         # Project the intersecting region centerline onto the support centerline
-        _, projected_a = ops.nearest_points(Point(inter_centerline.coords[0]), support_centerline)
-        _, projected_b = ops.nearest_points(Point(inter_centerline.coords[1]), support_centerline)
+        _, projected_a = ops.nearest_points(
+            Point(inter_centerline.coords[0]), support_centerline
+        )
+        _, projected_b = ops.nearest_points(
+            Point(inter_centerline.coords[1]), support_centerline
+        )
         intersecting_region = LineString([projected_a, projected_b])
     elif i_extent and j_type == "LineString":
         intersecting_region = i_extent.intersection(below)
@@ -59,11 +67,11 @@ def get_intersection(
     all_linestrings = i_type == j_type == "LineString"
     if intersecting_region.geom_type == "Point" and all_linestrings:
         return (intersecting_region, below, j_tag)
-    elif intersecting_region.geom_type == "MultiPoint": # Line enters and exits a polygon boundary
-        if (
-            (i_type == "Polygon" and j_type == "LineString")
-            or
-            (i_type == "LineString" and j_type == "Polygon")
+    elif (
+        intersecting_region.geom_type == "MultiPoint"
+    ):  # Line enters and exits a polygon boundary
+        if (i_type == "Polygon" and j_type == "LineString") or (
+            i_type == "LineString" and j_type == "Polygon"
         ):
             point = intersecting_region.centroid
             return (point, below, j_tag)
@@ -74,15 +82,21 @@ def get_intersection(
             )
     elif intersecting_region.geom_type == "LineString":
         return (intersecting_region, below, j_tag)
-    elif intersecting_region.geom_type == "Point": # LineString and Polygon intersection @ boundary
+    elif (
+        intersecting_region.geom_type == "Point"
+    ):  # LineString and Polygon intersection @ boundary
         return (intersecting_region, below, j_tag)
-    elif intersecting_region.geom_type == "Polygon": # Polygon point/line load intersecting with another polygon
+    elif (
+        intersecting_region.geom_type == "Polygon"
+    ):  # Polygon point/line load intersecting with another polygon
         return (intersecting_region, below, j_tag)
     else:
         return None
 
 
-def check_corresponds(above: Union[LineString, Polygon], below: Union[LineString, Polygon]) -> float:
+def check_corresponds(
+    above: Union[LineString, Polygon], below: Union[LineString, Polygon]
+) -> float:
     """
     Returns the ratio of overlap between geometry above and the geometry below.
 
@@ -99,7 +113,7 @@ def check_corresponds(above: Union[LineString, Polygon], below: Union[LineString
     of the alignment of the sketch from plane to plane and does not necessarily represent the
     bearing area at a connection. For example, a ratio of 1.0 between two polygons representing
     columns may indicate that there is no "slope" in the column and that the bottom of the column has
-    been sketched so that it is directly under the top of the column. 
+    been sketched so that it is directly under the top of the column.
     """
     intersecting_region = above.intersection(below)
     a_type = above.geom_type
@@ -107,21 +121,21 @@ def check_corresponds(above: Union[LineString, Polygon], below: Union[LineString
     c_type = intersecting_region.geom_type
     if intersecting_region is None:
         return 0.0
-    elif a_type == b_type == c_type == 'LineString':
+    elif a_type == b_type == c_type == "LineString":
         return intersecting_region.length / below.length
-    elif a_type == b_type == c_type == "Polygon" :
+    elif a_type == b_type == c_type == "Polygon":
         return intersecting_region.area / below.area
     else:
         return 0.0
-    
 
-def get_local_intersection_ordinates(start_node: Point, intersections: list[Point]) -> list[float]:
+
+def get_local_intersection_ordinates(
+    start_node: Point, intersections: list[Point]
+) -> list[float]:
     """
     Returns the relative distances of the Points in 'intersections' relative to the 'start_node'.
     """
-    return [
-        start_node.distance(intersection) for intersection in intersections
-    ]
+    return [start_node.distance(intersection) for intersection in intersections]
 
 
 def get_linestring_start_node(ls: LineString) -> Point:
@@ -135,13 +149,14 @@ def get_linestring_start_node(ls: LineString) -> Point:
     return start_coord
 
 
-
-def clean_polygon_supports(support_geoms: list[LineString | Polygon], joist_prototype: LineString):
+def clean_polygon_supports(
+    support_geoms: list[LineString | Polygon], joist_prototype: LineString
+):
     """
     Converts any Polygon in support_geoms into LineStrings. The LineStrings
     are created depending on where the joist prototype lands within the polygon.
 
-    Assumption: the Polygon represents a single rectangle which represents a 
+    Assumption: the Polygon represents a single rectangle which represents a
     wall or something similar.
 
     The resulting LineString will either be located on the inside face of the
@@ -155,7 +170,7 @@ def clean_polygon_supports(support_geoms: list[LineString | Polygon], joist_prot
         if support_geom.geom_type == "Polygon":
             support_lines = explode_polygon(support_geom)
             support_intersections = joist_prototype.intersects(np.array(support_lines))
-            if sum(support_intersections) == 1: # Intersects on one edge only
+            if sum(support_intersections) == 1:  # Intersects on one edge only
                 intersecting_line_index = int(support_intersections.nonzero()[0][0])
                 support_line = support_lines[intersecting_line_index]
                 # Ensure there are no missing intersections on the support line
@@ -163,7 +178,9 @@ def clean_polygon_supports(support_geoms: list[LineString | Polygon], joist_prot
             # elif sum(support_intersections) == 2:
             elif sum(support_intersections) == 0:
                 assert support_geom.intersects(support_lines)
-                raise GeometryError(f"The geometry {support_geom.wkt} does not intersect {joist_prototype.wkt}")
+                raise GeometryError(
+                    f"The geometry {support_geom.wkt} does not intersect {joist_prototype.wkt}"
+                )
             elif sum(support_intersections) == 2:
                 # Ensure there are no missing intersections on the support line
                 # Can sometimes be caused by a joist intersecting with a column
@@ -198,8 +215,12 @@ def get_joist_extents(
     right_coords = []
     for joist_support in joist_supports:
         start_coord, end_coord = joist_support.coords
-        start_coord_rotation = cross_product_2d(joist_vector, np.array(start_coord) - joist_origin)
-        end_coord_rotation = cross_product_2d(joist_vector, np.array(end_coord) - joist_origin)
+        start_coord_rotation = cross_product_2d(
+            joist_vector, np.array(start_coord) - joist_origin
+        )
+        end_coord_rotation = cross_product_2d(
+            joist_vector, np.array(end_coord) - joist_origin
+        )
         if 0.0 < start_coord_rotation:
             left_coords.append(start_coord)
         elif start_coord_rotation < 0.0:
@@ -208,19 +229,43 @@ def get_joist_extents(
             left_coords.append(end_coord)
         elif end_coord_rotation < 0.0:
             right_coords.append(end_coord)
-    closest_left_coord = min(left_coords, key=lambda x: Point(x).distance(joist_prototype))
-    closest_right_coord = min(right_coords, key=lambda x: Point(x).distance(joist_prototype))
+    closest_left_coord = min(
+        left_coords, key=lambda x: Point(x).distance(joist_prototype)
+    )
+    closest_right_coord = min(
+        right_coords, key=lambda x: Point(x).distance(joist_prototype)
+    )
     closest_left_distance = Point(closest_left_coord).distance(joist_prototype)
     closest_right_distance = Point(closest_right_coord).distance(joist_prototype)
     joist_vector_normal = rotate_90_vector(joist_vector, ccw=True)
-    joist_left = LineString([
-        project_node(Point(joist_origin), joist_vector_normal, magnitude=closest_left_distance - eps),
-        project_node(Point(joist_end), joist_vector_normal, magnitude=closest_left_distance - eps)
-    ])
-    joist_right = LineString([
-        project_node(Point(joist_origin), -joist_vector_normal, magnitude=closest_right_distance - eps),
-        project_node(Point(joist_end), -joist_vector_normal, magnitude=closest_right_distance - eps)
-    ])
+    joist_left = LineString(
+        [
+            project_node(
+                Point(joist_origin),
+                joist_vector_normal,
+                magnitude=closest_left_distance - eps,
+            ),
+            project_node(
+                Point(joist_end),
+                joist_vector_normal,
+                magnitude=closest_left_distance - eps,
+            ),
+        ]
+    )
+    joist_right = LineString(
+        [
+            project_node(
+                Point(joist_origin),
+                -joist_vector_normal,
+                magnitude=closest_right_distance - eps,
+            ),
+            project_node(
+                Point(joist_end),
+                -joist_vector_normal,
+                magnitude=closest_right_distance - eps,
+            ),
+        ]
+    )
     ordered_joist_supports = sort_supports(joist_prototype, joist_supports)
     extents = []
     for support_linestring in ordered_joist_supports:
@@ -249,7 +294,7 @@ def get_cantilever_segments(
     cantilever_segments = {"A": 0.0, "B": 0.0}
     if isinstance(cantilevers, LineString):
         split_a = cantilevers
-        split_b = Point() # A geometry of length 0
+        split_b = Point()  # A geometry of length 0
     elif hasattr(cantilevers, "geoms"):
         split_a, split_b = cantilevers.geoms
     if split_a.distance(ordered_supports[0]) < split_a.distance(ordered_supports[-1]):
@@ -260,29 +305,32 @@ def get_cantilever_segments(
 
 
 def find_extent_intersections(
-        element_geoms: list[LineString], 
-        extent_geoms: list[LineString]
-    ) -> list[Optional[LineString]]:
+    element_geoms: list[LineString], extent_geoms: list[LineString]
+) -> list[Optional[LineString]]:
     """
     Returns a list of LineString representing the extent geometries put
     into the order of the element geometries. If an extent geometry intersects
     with an element_geometry, the resulting list will have the extent geometry
     in the same corresponding list position that the element geometry is in.
     If there is no such intersection, then that list position will be None.
-    """ 
+    """
     extents_array = np.array(extent_geoms)
     acc = []
     for element_geom in element_geoms:
         mask = intersects(element_geom, extents_array)
         if mask.any():
-            extent = extents_array[mask][0] # Assume the first one until a better idea comes
+            extent = extents_array[mask][
+                0
+            ]  # Assume the first one until a better idea comes
             acc.append(extent)
         else:
             acc.append(None)
     return acc
 
 
-def create_extent_polygon(element_geom: LineString, extent_geom: Optional[LineString] = None) -> Polygon:
+def create_extent_polygon(
+    element_geom: LineString, extent_geom: Optional[LineString] = None
+) -> Polygon:
     """
     Returns a Polygon representing the bounding box of the union
     of 'element_geom' and 'extent_geom'
@@ -290,16 +338,14 @@ def create_extent_polygon(element_geom: LineString, extent_geom: Optional[LineSt
     if extent_geom is None:
         return None
     return box(*(union(element_geom, extent_geom).bounds))
-        
+
 
 def split_polygon(
-        polygon: Polygon, 
-        joist_orientation: str,
-        split_points: list[tuple[float, float]]
-    ) -> list[Polygon]:
+    polygon: Polygon, joist_orientation: str, split_points: list[tuple[float, float]]
+) -> list[Polygon]:
     split_locations = []
     for split_point in split_points:
-        if joist_orientation == "vertical": 
+        if joist_orientation == "vertical":
             split_location = split_point[0]
         elif joist_orientation == "horizontal":
             split_location = split_point[1]
@@ -309,7 +355,11 @@ def split_polygon(
     return polygons
 
 
-def polygon_splitter(poly_bounds: tuple[float, float, float, float], split_locations: list[float], joist_orientation: str) -> list[tuple[float, float, float, float]]:
+def polygon_splitter(
+    poly_bounds: tuple[float, float, float, float],
+    split_locations: list[float],
+    joist_orientation: str,
+) -> list[tuple[float, float, float, float]]:
     """
     Returns a list of box bounds describing the sub-boxes remaining after splitting
     """
@@ -341,7 +391,9 @@ def polygon_splitter(poly_bounds: tuple[float, float, float, float], split_locat
         return [box(xmin, ymin, xmax, ymax)]
 
 
-def translate_joist_to_point(joist_geom: LineString, joist_orientation: str, intersection_point: Point) -> LineString:
+def translate_joist_to_point(
+    joist_geom: LineString, joist_orientation: str, intersection_point: Point
+) -> LineString:
     """
     Returns a LineString representing 'joist_geom' translated so that it intersects with 'intersection_point'
     """
@@ -351,7 +403,7 @@ def translate_joist_to_point(joist_geom: LineString, joist_orientation: str, int
     ipx, ipy = intersection_point.coords[0]
     if joist_orientation == "horizontal":
         return LineString([(ix, ipy), (jx, ipy)])
-    elif joist_orientation == "vertical": 
+    elif joist_orientation == "vertical":
         return LineString([(ipx, iy), (ipx, jy)])
 
 
@@ -420,7 +472,7 @@ def get_direction_vector(ls: LineString) -> np.ndarray:
     i_node, j_node = get_start_end_nodes(ls)
     column_vector = np.array(j_node.coords[0]) - np.array(i_node.coords[0])
     column_vector_norm = np.linalg.norm(column_vector)
-    parallel_vector =  column_vector / column_vector_norm
+    parallel_vector = column_vector / column_vector_norm
     return parallel_vector
     # return column_vector.T[0] # Return a flat, 1D vector
 
@@ -434,9 +486,7 @@ def sort_supports(
     docstring for get_start_end_nodes for more explanation of the +ve vector direction.
     """
     all_supports = MultiLineString(supports)
-    ordered_intersections = order_nodes_positive(
-        (joist_prototype & all_supports).geoms
-    )
+    ordered_intersections = order_nodes_positive((joist_prototype & all_supports).geoms)
     ordered_supports = []
     for point in ordered_intersections:
         for linestring in supports:
@@ -488,7 +538,7 @@ def scale_vertices(
     vertices: list[Decimal],
     scale: Decimal,
     paper_origin: Optional[tuple[Decimal, Decimal]] = None,
-    round_precision: int = 4
+    round_precision: int = 4,
 ) -> tuple[Decimal | float]:
     """
     Scale the vertices in relation to the origin or in relation to 'paper_origin'.
@@ -519,8 +569,9 @@ def _translate_vertices(
     return flattened_array
 
 
-
-def _group_vertices(vertices: list[Decimal | float], close=False) -> list[tuple[Decimal, Decimal]]:
+def _group_vertices(
+    vertices: list[Decimal | float], close=False
+) -> list[tuple[Decimal, Decimal]]:
     """
     Returns a list of (x, y) tuples from a list of vertices in the format of:
     'x1 y1 x2 y2 x3 y3 ... xn yn'
@@ -549,7 +600,7 @@ def vertices_to_array(vertices: list[Decimal]) -> ArrayLike:
 
 def flatten_vertex_array(v: ArrayLike, precision=6) -> tuple[Decimal]:
     """
-    Returns a flattened version of 'v' in the format of 
+    Returns a flattened version of 'v' in the format of
     (x1, y1, x2, y2, x3, y3, ..., xn, yn) where 'v' is either
     a row or column-based vector of shape (2, n) or (n, 2) rounded to
     'precision'.
@@ -558,7 +609,6 @@ def flatten_vertex_array(v: ArrayLike, precision=6) -> tuple[Decimal]:
     for use in pdf annotations
     """
     return tuple([round(Decimal(x), precision) for x in v.flatten()])
-
 
 
 def _group_vertices_str(vertices: str, close=False) -> str:
@@ -579,6 +629,7 @@ def _group_vertices_str(vertices: str, close=False) -> str:
         acc.append(acc[0])
     return ", ".join(acc)
 
+
 def rotate_90_vector(v: ArrayLike, precision: int = 6, ccw=True) -> tuple[float, float]:
     """
     Rotate the vector components, 'x1' and 'y1' by 90 degrees.
@@ -588,9 +639,9 @@ def rotate_90_vector(v: ArrayLike, precision: int = 6, ccw=True) -> tuple[float,
     """
     # v_angle = np.arctan2(v[1], v[0])
     if ccw:
-            angle = math.pi/2
+        angle = math.pi / 2
     else:
-            angle = -math.pi / 2
+        angle = -math.pi / 2
     rot = np.array(
         [
             [round(math.cos(angle), precision), -round(math.sin(angle), precision)],
@@ -609,9 +660,9 @@ def rotate_90_coords(v: ArrayLike, precision: int = 6, ccw=True) -> tuple[float,
     """
     # v_angle = np.arctan2(v[1], v[0])
     if ccw:
-            angle = math.pi/2
+        angle = math.pi / 2
     else:
-            angle = -math.pi / 2
+        angle = -math.pi / 2
     rot = np.array(
         [
             [round(math.cos(angle), precision), -round(math.sin(angle), precision)],
@@ -643,10 +694,18 @@ def rotate_to_horizontal(line: LineString, geoms: list[Geometry]):
 
     angle = math.atan2(delta_y, delta_x)
 
-    rotated_line = aff.translate(aff.rotate(line, -angle, origin=i_end, use_radians=True), xoff=-ix)
-    rotated_geoms = [aff.translate(aff.rotate(geom, -angle, origin=i_end, use_radians=True), xoff=-ix) for geom in geoms]
+    rotated_line = aff.translate(
+        aff.rotate(line, -angle, origin=i_end, use_radians=True), xoff=-ix
+    )
+    rotated_geoms = [
+        aff.translate(
+            aff.rotate(geom, -angle, origin=i_end, use_radians=True), xoff=-ix
+        )
+        for geom in geoms
+    ]
 
     return rotated_line, rotated_geoms
+
 
 def explode_polygon(p: Polygon) -> list[LineString]:
     """
@@ -655,6 +714,7 @@ def explode_polygon(p: Polygon) -> list[LineString]:
     ext_ls = LineString(p.exterior)
     exploded = [LineString(tup) for tup in zip(ext_ls.coords, ext_ls.coords[1:])]
     return exploded
+
 
 def get_rectangle_centerline(p: Polygon) -> LineString:
     """
@@ -669,11 +729,9 @@ def get_rectangle_centerline(p: Polygon) -> LineString:
     start, end = order_nodes_positive([edge1.centroid, edge2.centroid])
     center_line = LineString([start, end])
     return center_line
-    
 
-def calculate_trapezoid_area_sums(
-    member_loads: list[list[list[tuple]]]
-) -> list[float]:
+
+def calculate_trapezoid_area_sums(member_loads: list[list[list[tuple]]]) -> list[float]:
     """
     Returns a list of the sums of the areas of the trapezoids
     in 'traps'
@@ -692,7 +750,6 @@ def calculate_trapezoid_area_sums(
             polygon_loads.append(trap_area)
         member_polys.append(sum(polygon_loads))
     return member_polys
-        
 
 
 def trapezoid_area(h: float, b2: float, b1: float) -> float:
@@ -712,8 +769,10 @@ def get_vector_angle(v1, v2) -> float:
     angle = np.arccos(num / denom)
     return angle
 
+
 def cross_product_2d(v1, v2):
     return v1[0] * v2[1] - v2[0] * v1[1]
+
 
 def create_linestring(points: list[tuple]) -> LineString:
     return LineString(points)

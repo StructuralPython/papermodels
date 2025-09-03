@@ -12,7 +12,9 @@ import parse
 import numpy as np
 
 
-def load_pdf_annotations(pdf_path: pathlib.Path | str, show_skipped: bool = False) -> list[Annotation]:
+def load_pdf_annotations(
+    pdf_path: pathlib.Path | str, show_skipped: bool = False
+) -> list[Annotation]:
     """
     Returns a lists of pdf annotations keyed by page index.
 
@@ -24,9 +26,12 @@ def load_pdf_annotations(pdf_path: pathlib.Path | str, show_skipped: bool = Fals
         skipped_annots = []
         for page_num, page_data in enumerate(pdf_obj.pages):
             rotate = page_data.get("/Rotate", None)
-            if not hasattr(page_data.obj, 'Annots'): continue
+            if not hasattr(page_data.obj, "Annots"):
+                continue
             for annot_idx, annot in enumerate(page_data.obj.Annots):
-                pm_annot = pike_annotation_to_pm_annotation(annot, annot_idx, page_num, rotate)
+                pm_annot = pike_annotation_to_pm_annotation(
+                    annot, annot_idx, page_num, rotate
+                )
                 if pm_annot is not None:
                     annots_in_pdf.append(pm_annot)
                 else:
@@ -37,59 +42,75 @@ def load_pdf_annotations(pdf_path: pathlib.Path | str, show_skipped: bool = Fals
 
 
 def update_pdf_annotations(
-        pdf_path: pathlib.Path, 
-        parsed_annotations: dict[Annotation, dict],
-        export_path: pathlib.Path,
-        append_text: bool = False,
-        ) -> None:
+    pdf_path: pathlib.Path,
+    parsed_annotations: dict[Annotation, dict],
+    export_path: pathlib.Path,
+    append_text: bool = False,
+) -> None:
     """
-    Returns None. Creates a copy of the file at 'pdf_path' with all of annotations representing 
+    Returns None. Creates a copy of the file at 'pdf_path' with all of annotations representing
     structural elements (collector and transfer elements, not loads or legend entries) having
     their text field updated with the assigned tag of the structural element.
     """
     pdf_path = pathlib.Path(pdf_path).resolve()
-    with pike.open(pdf_path,) as pdf_obj:
+    with pike.open(
+        pdf_path,
+    ) as pdf_obj:
         for page_idx, page_data in enumerate(pdf_obj.pages):
             for annot_idx, annot in enumerate(page_data.obj.Annots):
                 for parsed_annotation, annot_attrs in parsed_annotations.items():
-                    annotations_equal = compare_annotations(parsed_annotation, annot, page_idx)
+                    annotations_equal = compare_annotations(
+                        parsed_annotation, annot, page_idx
+                    )
                     if annotations_equal:
                         text_to_add = f"tag: {annot_attrs['tag']}"
                         replace_text = not append_text
-                        updated_pike_annot = update_annotation_text_field(annot, text_to_add, replace_text)
+                        updated_pike_annot = update_annotation_text_field(
+                            annot, text_to_add, replace_text
+                        )
                         page_data.obj.Annots[annot_idx] = updated_pike_annot
         pdf_obj.save(export_path)
 
 
-def update_annotation_text_field(pike_annot: pike.Annotation, text: str, replace: bool = False):
+def update_annotation_text_field(
+    pike_annot: pike.Annotation, text: str, replace: bool = False
+):
     """
     Returns a copy of the 'pike_annot' with the text field updated with 'text'. If 'replace'
     is True then the text field is completely replaced with 'text'. If not, then 'text'
     is appended on a new line to the existing 'text'.
     """
     orig_text = pike_annot.get("/Contents")
-    if "tag:" in str(orig_text) and not replace: # Don't append a tag if there is one there
+    if (
+        "tag:" in str(orig_text) and not replace
+    ):  # Don't append a tag if there is one there
         return pike_annot
     elif replace or orig_text is None:
-       pike_annot['/Contents'] = pike.String(text)
+        pike_annot["/Contents"] = pike.String(text)
     else:
-       pike_annot['/Contents'] = pike.String(f"{str(orig_text)}\r\n{text}")
+        pike_annot["/Contents"] = pike.String(f"{str(orig_text)}\r\n{text}")
     return pike_annot
 
 
-def compare_annotations(pm_annot: Annotation, pike_annot: pike.Annotation, page_num: int) -> bool:
+def compare_annotations(
+    pm_annot: Annotation, pike_annot: pike.Annotation, page_num: int
+) -> bool:
     """
     Returns True if the `pm_annot` is nominally equal to the 'pike_annot' by converting
     the 'pike_annot' to the 'pm_annot' and seeing if they are equal. Will return True
     for duplicate annotations.
     """
-    converted = pike_annotation_to_pm_annotation(pike_annot, pm_annot.local_id, page_num)
+    converted = pike_annotation_to_pm_annotation(
+        pike_annot, pm_annot.local_id, page_num
+    )
     if converted is None:
         return False
     return pm_annot == converted
 
 
-def pike_annotation_to_pm_annotation(annot, annot_idx: int, page_idx: int, rotate: Optional[int] = None) -> Optional[Annotation]:
+def pike_annotation_to_pm_annotation(
+    annot, annot_idx: int, page_idx: int, rotate: Optional[int] = None
+) -> Optional[Annotation]:
     """
     Returns either an Annotation object or None. None is returned if:
         - The annotation has a "parent" key
@@ -181,9 +202,10 @@ def pike_annotation_to_pm_annotation(annot, annot_idx: int, page_idx: int, rotat
         line_type=line_type,
         line_opacity=line_opacity,
         matrix=matrix,
-        local_id=annot_idx
+        local_id=annot_idx,
     )
     return annotation
+
 
 def parse_content_stream(stream: str) -> dict[str, list]:
     """
