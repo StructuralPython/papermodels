@@ -815,7 +815,6 @@ def get_collector_extents(
                 intersecting_region, support_geom, support_tag = intersection
             except:
                 raise ValueError("There seems to be an internal error with your markup that causes this intermittent error. Please report to connor@structuralpython.com with this message and your drawing file.")
-            print(f"{collector_prototype.tag=} {support_tag=} | {intersecting_region=} | {support_geom=}")
             region_start, region_end = geom_ops.get_start_end_nodes(intersecting_region)
             if ib.other_geometry.geom_type == "Polygon":
                 support_start, support_end = geom_ops.get_start_end_nodes(
