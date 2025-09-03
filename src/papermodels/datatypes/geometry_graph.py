@@ -273,8 +273,9 @@ class GeometryGraph(nx.DiGraph):
             dependents = list(self.successors(node))
             dependent_intersections = get_dependent_intersections(element, dependents)
             dependent_correspondents = get_dependent_correspondents(element, dependents)
+            updated_intersections_below = []
+            updated_correspondents_below = []
             if element.geometry.geom_type == "Polygon":  # node geometry is polygon
-                updated_intersections_below = []
                 all_extents = {}
                 if element.reaction_type == "linear":
                     all_extents = get_transfer_extents(element)
@@ -285,13 +286,13 @@ class GeometryGraph(nx.DiGraph):
                         intersection.intersecting_region,
                         intersection.other_geometry,
                         intersection.other_tag,
-                        0,
-                        intersection.other_reaction_type,
+                        other_index=0,
+                        other_reaction_type=intersection.other_reaction_type,
                         other_extents=extents,
                     )
                     updated_intersections_below.append(new_intersection)
+                element.intersections_below = updated_intersections_below
 
-                updated_correspondents_below = []
                 for correspondent in dependent_correspondents:
                     extents = all_extents.get(correspondent.other_tag)
                     new_correspondent = Correspondent(
@@ -303,7 +304,7 @@ class GeometryGraph(nx.DiGraph):
                         extents,
                     )
                     updated_correspondents_below.append(new_correspondent)
-                    element.correspondents_below = updated_correspondents_below
+                element.correspondents_below = updated_correspondents_below
             else:  # For LineStrings
                 intersection_below_local_coords = get_local_coords(
                     node_attrs["start_coord"], dependent_intersections

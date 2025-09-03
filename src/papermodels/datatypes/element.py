@@ -120,48 +120,6 @@ class Element:
             )
 
     @classmethod
-    def from_geometries(
-        cls,
-        elem_geom: Geometry,
-        elem_tag: str | int,
-        intersections_above: Optional[dict[str | int, Geometry]] = None,
-        intersections_below: Optional[dict[str | int, Geometry]] = None,
-        correspondents_above: Optional[dict[str | int, Geometry]] = None,
-        correspondents_below: Optional[dict[str | int, Geometry]] = None,
-        plane_id: Optional[str | int] = None,
-    ):
-        """
-        Generates an Element from provided geometries
-        """
-        inters_above = []
-        inters_below = []
-        if intersections_above is not None:
-            inters_above = [
-                Intersection(
-                    *geom_ops.get_intersection(elem_geom, above_geom, above_tag)
-                )
-                for above_tag, above_geom in intersections_above.items()
-            ]
-
-        if intersections_below is not None:
-            inters_below = [
-                Intersection(
-                    *geom_ops.get_intersection(elem_geom, below_geom, below_tag)
-                )
-                for below_tag, below_geom in intersections_below.items()
-                if intersections_below is not None
-            ]
-
-        return cls(
-            tag=elem_tag,
-            geometry=elem_geom,
-            intersections_above=inters_above,
-            intersections_below=inters_below,
-            correspondents_above=correspondents_above or [],
-            correspondents_below=correspondents_below or [],
-        )
-
-    @classmethod
     def from_parsed_annotations(
         cls,
         parsed_annotations: dict[Annotation, dict],
@@ -898,6 +856,7 @@ def get_collector_extents(
                 collector_prototype.geometry,
                 ib.other_geometry,
                 ib.other_tag,
+                collector_prototype.reaction_type,
                 above_extent_polygon=collector_prototype.trib_area,
             )
             try:
@@ -1066,11 +1025,11 @@ def get_geometry_intersections(
                     )
                 ):
                     intersection = geom_ops.get_intersection(
-                        i_geom, j_geom, j_tag, i_extent_poly
+                        i_geom, j_geom, j_tag, i_attrs['reaction_type'], i_extent_poly
                     )
                     extent_intersection = True
                 else:
-                    intersection = geom_ops.get_intersection(i_geom, j_geom, j_tag)
+                    intersection = geom_ops.get_intersection(i_geom, j_geom, j_tag, i_attrs['reaction_type'])
 
                 if intersection is None:
                     continue
@@ -1106,10 +1065,10 @@ def get_geometry_intersections(
                     )
                 ):
                     intersection = geom_ops.get_intersection(
-                        j_geom, i_geom, i_tag, j_extent_poly
+                        j_geom, i_geom, i_tag, j_attrs['reaction_type'], j_extent_poly
                     )
                 else:
-                    intersection = geom_ops.get_intersection(j_geom, i_geom, i_tag)
+                    intersection = geom_ops.get_intersection(j_geom, i_geom, j_tag, j_attrs['reaction_type'])
                 # reaction_type
                 if intersection is None:
                     continue

@@ -1,5 +1,6 @@
 [element_attributes]
 tag = "WB0.0"
+length = 10.605
 orientation = "vertical"
 vert_correspondent_below = []
 vert_correspondent_above = [
@@ -8,10 +9,10 @@ vert_correspondent_above = [
 horz_intersects_above = []
 horz_intersects_below = []
 
-[element_attributes.length]
+[element_attributes.user_defined]
 
 [element_geometry]
-geometry = "POLYGON ((33.1515 22.6864, 33.1515 33.2909, 33.7444 33.2909, 33.7444 22.6864, 33.1515 22.6864))"
+geometry = "POLYGON ((33.152 22.686, 33.152 33.291, 33.744 33.291, 33.744 22.686, 33.152 22.686))"
 supports = []
 
 [loads]
@@ -20,11 +21,13 @@ point_loads = []
 [[loads.distributed_loads]]
 transfer_source = "WT1.0"
 transfer_reaction_index = 0
+transfer_source_start_extent = 0.041
+transfer_source_end_extent = 10.473
 occupancy = ""
 applied_area = 0.0
-start_loc = 0.0
+start_loc = 0.03
 start_magnitude = 1.0
-end_loc = 10.604500000000002
+end_loc = 10.432
 end_magnitude = 1.0
 direction = "gravity"
 

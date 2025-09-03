@@ -440,7 +440,7 @@ class JoistArrayModel:
             for sup_idx, support_geom in enumerate(self.joist_supports):
                 other_tag = self.joist_support_tags[sup_idx]
                 intersection_attrs = geom_ops.get_intersection(
-                    joist_geom, support_geom, other_tag
+                    joist_geom, support_geom, other_tag, e.reaction_type
                 )
                 intersection_below = Intersection(*intersection_attrs)
                 intersections_below.append(intersection_below)

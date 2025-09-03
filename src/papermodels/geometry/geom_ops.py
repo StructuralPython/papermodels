@@ -28,6 +28,7 @@ def get_intersection(
     above: Geometry,
     below: Geometry,
     j_tag: str,
+    above_reaction_type: str,
     above_extent_polygon: Optional[Polygon] = None,
 ) -> Optional[tuple[IntersectingGeometry, Geometry, str]]:
     """
@@ -62,6 +63,7 @@ def get_intersection(
             intersecting_region = below.intersection(above)
     else:
         intersecting_region = above.intersection(below)
+
     if intersecting_region.is_empty:
         return None
     all_linestrings = i_type == j_type == "LineString"
@@ -70,11 +72,24 @@ def get_intersection(
     elif (
         intersecting_region.geom_type == "MultiPoint"
     ):  # Line enters and exits a polygon boundary
-        if (i_type == "Polygon" and j_type == "LineString") or (
-            i_type == "LineString" and j_type == "Polygon"
+        if (
+            (
+                (i_type == "Polygon" and j_type == "LineString") 
+                or (i_type == "LineString" and j_type == "Polygon")
+            ) 
+            and above_reaction_type.lower() == "point"
         ):
             point = intersecting_region.centroid
             return (point, below, j_tag)
+        elif (
+            (
+                (i_type == "Polygon" and j_type == "LineString") 
+                or (i_type == "LineString" and j_type == "Polygon")
+            ) 
+            and above_reaction_type.lower() == "linear"
+        ):
+            linestring = LineString(intersecting_region.geoms)
+            return (linestring, below, j_tag)
         else:
             raise ValueError(
                 "Could not get intersecting region for MultiPoint. Should not see this error.\n"

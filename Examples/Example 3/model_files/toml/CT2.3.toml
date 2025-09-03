@@ -14,23 +14,27 @@ horz_intersects_below = []
 
 [element_attributes.length]
 
+[element_attributes.user_defined]
+
 [element_geometry]
-geometry = "POLYGON ((14.7742 33.1365, 14.7742 33.8159, 15.4535 33.8159, 15.4535 33.1365, 14.7742 33.1365))"
+geometry = "POLYGON ((14.774 33.136, 14.774 33.816, 15.454 33.816, 15.454 33.136, 14.774 33.136))"
 supports = []
 
 [loads]
 distributed_loads = []
 
 [[loads.point_loads]]
-location = []
+location = 0.0
 magnitude = 0.0
-transfer_source = "CT3.3"
+transfer_source = "FB2.1"
 transfer_reaction_index = 0
 direction = "gravity"
 
 [[loads.point_loads]]
-location = []
-magnitude = 0
-transfer_source = "FB2.1"
-transfer_reaction_idx = 0
+location = [
+    0.0,
+]
+magnitude = 0.0
+transfer_source = "CT3.3"
+transfer_reaction_index = 0
 direction = "gravity"

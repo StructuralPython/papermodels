@@ -27,6 +27,15 @@ def load_sketch_to_scale():
 
 
 @fixture()
+def load_sketch_to_scale_vertical_loads():
+    graph = GeometryGraph.from_pdf_file(
+        TEST_DATA / "sketch_to_scale-vertical-loads.pdf",
+        scale=QUARTER_INCH_SCALE,
+    )
+    return graph
+
+
+@fixture()
 def load_collector_extents():
     graph = GeometryGraph.from_pdf_file(
         TEST_DATA / "collector_extents.pdf",
@@ -38,6 +47,14 @@ def load_collector_extents():
 @fixture()
 def sketch_to_scale_to_trib_loaded_elements(load_sketch_to_scale):
     graph = load_sketch_to_scale
+    graph.assign_collector_behaviour(CollectorTribModel)
+    les = graph.create_loaded_elements()
+    return les
+
+
+@fixture()
+def sketch_to_scale_vertical_loads_to_trib_loaded_elements(load_sketch_to_scale_vertical_loads):
+    graph = load_sketch_to_scale_vertical_loads
     graph.assign_collector_behaviour(CollectorTribModel)
     les = graph.create_loaded_elements()
     return les
@@ -73,6 +90,12 @@ def test_sketch_to_scale_creates_array_loaded_elements(
     sketch_to_scale_to_array_loaded_elements,
 ):
     les = sketch_to_scale_to_array_loaded_elements
+    assert les
+
+def test_sketch_to_scale_vertical_loads_creates_trib_loaded_elements(
+    sketch_to_scale_vertical_loads_to_trib_loaded_elements,
+):
+    les = sketch_to_scale_vertical_loads_to_trib_loaded_elements
     assert les
 
 
@@ -166,3 +189,8 @@ def test_collector_extent_creates_loaded_elements(
     )
     assert les["FB0.0"].model()["loads"]["distributed_loads"][1]["start_loc"] == 3.01
     assert les["FB0.0"].model()["loads"]["distributed_loads"][1]["end_loc"] == 3.912
+
+
+def test_wall_bottom_transfers_to_beam(sketch_to_scale_vertical_loads_to_trib_loaded_elements):
+    les = sketch_to_scale_vertical_loads_to_trib_loaded_elements
+    assert les['FB2.2'].model()['loads']['distributed_loads'][0]['transfer_source'] == "WB2.0"
