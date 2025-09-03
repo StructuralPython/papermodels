@@ -1,0 +1,24 @@
+[element_attributes]
+tag = "SJ0.0-3"
+length = 11.2766
+orientation = "horizontal"
+vert_correspondent_below = []
+vert_correspondent_above = []
+horz_intersects_above = []
+horz_intersects_below = [
+    "WT0.2",
+    "FB0.0",
+]
+
+[element_attributes.user_defined]
+
+[element_geometry]
+geometry = "LINESTRING (14.1975 18.5681, 14.1975 29.8447)"
+supports = [
+    { location = 10.7872, fixity = "pin" },
+    { location = 0.2176, fixity = "roller" },
+]
+
+[loads]
+point_loads = []
+distributed_loads = []

@@ -10,8 +10,10 @@ horz_intersects_below = []
 
 [element_attributes.length]
 
+[element_attributes.user_defined]
+
 [element_geometry]
-geometry = "POLYGON ((15.246 35.268, 14.621 35.268, 14.621 35.847, 15.246 35.847, 15.246 35.268))"
+geometry = "POLYGON ((15.2456 35.2678, 14.6212 35.2678, 14.6212 35.8466, 15.2456 35.8466, 15.2456 35.2678))"
 supports = []
 
 [loads]

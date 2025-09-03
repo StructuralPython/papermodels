@@ -1,0 +1,66 @@
+[element_attributes]
+tag = "WT0.2"
+length = 4.4991
+orientation = "vertical"
+vert_correspondent_below = []
+vert_correspondent_above = []
+horz_intersects_above = [
+    "SJ0.0-2",
+    "SJ0.0-3",
+    "SJ0.0-4",
+]
+horz_intersects_below = []
+
+[element_attributes.user_defined]
+
+[element_geometry]
+geometry = "POLYGON ((11.0626 29.0245, 11.0626 29.6861, 15.5617 29.6861, 15.5617 29.0245, 11.0626 29.0245))"
+supports = []
+
+[loads]
+point_loads = []
+
+[[loads.distributed_loads]]
+transfer_source = "SJ0.0-2"
+transfer_reaction_index = 2
+transfer_source_start_extent = []
+transfer_source_end_extent = []
+occupancy = ""
+applied_area = 0.0
+start_loc = 0.0
+start_magnitude = 1.0
+end_loc = 2.6843
+end_magnitude = 1.0
+direction = "gravity"
+
+[loads.distributed_loads.load_components]
+
+[[loads.distributed_loads]]
+transfer_source = "SJ0.0-3"
+transfer_reaction_index = 1
+transfer_source_start_extent = []
+transfer_source_end_extent = []
+occupancy = ""
+applied_area = 0.0
+start_loc = 2.6843
+start_magnitude = 1.0
+end_loc = 3.5855
+end_magnitude = 1.0
+direction = "gravity"
+
+[loads.distributed_loads.load_components]
+
+[[loads.distributed_loads]]
+transfer_source = "SJ0.0-4"
+transfer_reaction_index = 1
+transfer_source_start_extent = []
+transfer_source_end_extent = []
+occupancy = ""
+applied_area = 0.0
+start_loc = 4.3882
+start_magnitude = 1.0
+end_loc = 4.3882
+end_magnitude = 1.0
+direction = "gravity"
+
+[loads.distributed_loads.load_components]

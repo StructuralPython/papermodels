@@ -1,6 +1,6 @@
 [element_attributes]
 tag = "FB2.3"
-length = 11.12720347976076
+length = 11.127
 orientation = "horizontal"
 vert_correspondent_below = []
 vert_correspondent_above = []
@@ -13,16 +13,18 @@ horz_intersects_below = [
     "CT2.2",
 ]
 
+[element_attributes.user_defined]
+
 [element_geometry]
-geometry = "LINESTRING (33.5651 22.5138, 33.5739 33.641)"
+geometry = "LINESTRING (33.565 22.514, 33.574 33.641)"
 supports = [
-    { location = 0.1434000448448568, fixity = "pin" },
-    { location = 10.525903291718837, fixity = "roller" },
+    { location = 0.143, fixity = "pin" },
+    { location = 10.526, fixity = "roller" },
 ]
 
 [[loads.point_loads]]
-location = 5.348801672706913
-magnitude = 0
+location = 5.349
+magnitude = 0.0
 transfer_source = "FB2.2"
 transfer_reaction_index = 1
 direction = "gravity"
@@ -30,11 +32,13 @@ direction = "gravity"
 [[loads.distributed_loads]]
 transfer_source = "WB2.0"
 transfer_reaction_index = 0
+transfer_source_start_extent = 0.107
+transfer_source_end_extent = 10.358
 occupancy = ""
 applied_area = 0.0
-start_loc = 0.2498000781188658
+start_loc = 0.25
 start_magnitude = 1.0
-end_loc = 10.606703316987065
+end_loc = 10.607
 end_magnitude = 1.0
 direction = "gravity"
 

@@ -1,6 +1,6 @@
 [element_attributes]
 tag = "J1.2"
-length = 13.682
+length = 13.6819
 orientation = "horizontal"
 vert_correspondent_below = []
 vert_correspondent_above = []
@@ -10,11 +10,13 @@ horz_intersects_below = [
     "W1.0",
 ]
 
+[element_attributes.user_defined]
+
 [element_geometry]
-geometry = "LINESTRING (40.039 24.983, 40.039 38.665)"
+geometry = "LINESTRING (40.0386 24.9831, 40.0386 38.665)"
 supports = [
     { location = 13.618, fixity = "pin" },
-    { location = 1.632, fixity = "roller" },
+    { location = 1.6324, fixity = "roller" },
 ]
 
 [loads]
@@ -26,7 +28,7 @@ transfer_reaction_index = ""
 occupancy = "f"
 load_components = []
 applied_area = 0.001
-start_loc = 0.17
+start_loc = 0.1701
 start_magnitude = 0.0
 end_loc = 0.172
 end_magnitude = 0.074
@@ -36,8 +38,8 @@ transfer_source = ""
 transfer_reaction_index = ""
 occupancy = "f"
 load_components = []
-applied_area = 13.51
+applied_area = 13.5099
 start_loc = 0.172
 start_magnitude = 0.074
-end_loc = 13.682
+end_loc = 13.6819
 end_magnitude = 0.074

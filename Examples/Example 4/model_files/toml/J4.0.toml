@@ -1,6 +1,6 @@
 [element_attributes]
 tag = "J4.0"
-length = 16.960700000000003
+length = 16.961
 orientation = "horizontal"
 vert_correspondent_below = []
 vert_correspondent_above = []
@@ -10,11 +10,13 @@ horz_intersects_below = [
     "FB4.0",
 ]
 
+[element_attributes.user_defined]
+
 [element_geometry]
-geometry = "LINESTRING (16.4769 27.9658, 33.4376 27.9658)"
+geometry = "LINESTRING (16.477 27.966, 33.438 27.966)"
 supports = [
     { location = 16.717, fixity = "pin" },
-    { location = 3.658899999999999, fixity = "roller" },
+    { location = 3.659, fixity = "roller" },
 ]
 
 [loads]
@@ -25,8 +27,8 @@ transfer_source = ""
 transfer_reaction_index = ""
 occupancy = "roof"
 load_components = []
-applied_area = 16.960700000001
+applied_area = 16.961
 start_loc = 0
-start_magnitude = 0.05896
-end_loc = 16.960699999999004
-end_magnitude = 0.05896
+start_magnitude = 0.059
+end_loc = 16.961
+end_magnitude = 0.059

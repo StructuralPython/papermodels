@@ -11,6 +11,8 @@ horz_intersects_below = [
     "CT0.2",
 ]
 
+[element_attributes.user_defined]
+
 [element_geometry]
 geometry = "LINESTRING (11.3188 20.6399, 25.1068 20.6399)"
 supports = [

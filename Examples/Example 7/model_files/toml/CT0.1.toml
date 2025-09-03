@@ -1,0 +1,27 @@
+[element_attributes]
+tag = "CT0.1"
+orientation = "vertical"
+vert_correspondent_below = []
+vert_correspondent_above = []
+horz_intersects_above = [
+    "FB0.4",
+]
+horz_intersects_below = []
+
+[element_attributes.length]
+
+[element_attributes.user_defined]
+
+[element_geometry]
+geometry = "POLYGON ((4.9672 18.2914, 4.9672 19.0541, 5.7298 19.0541, 5.7298 18.2914, 4.9672 18.2914))"
+supports = []
+
+[loads]
+distributed_loads = []
+
+[[loads.point_loads]]
+location = 0.0
+magnitude = 0.0
+transfer_source = "FB0.4"
+transfer_reaction_index = 0
+direction = "gravity"

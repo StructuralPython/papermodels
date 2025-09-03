@@ -164,9 +164,8 @@ def test_collector_extent_creates_loaded_elements(
             "CT0.3",
         ]
     )
-    assert les["WT0.3"].model()["loads"][
-        "distributed_loads"
-    ]  # There are loads present on the intermediate support
+    assert les['SJ0.0-0'].model()['element_attributes']['horz_intersects_below'] == ["WT0.1", "FB0.2"]
+    assert les['SJ0.0-6'].model()['element_attributes']['horz_intersects_below'] == ["FB0.1", "FB0.3"]
 
     assert (
         les["WT0.1"].model()["loads"]["distributed_loads"][0]["transfer_source"]

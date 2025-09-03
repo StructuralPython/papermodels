@@ -10,6 +10,8 @@ horz_intersects_below = []
 
 [element_attributes.length]
 
+[element_attributes.user_defined]
+
 [element_geometry]
 geometry = "POLYGON ((11.0297 20.3889, 11.0297 21.0246, 11.6085 21.0246, 11.6085 20.3889, 11.0297 20.3889))"
 supports = []
@@ -18,8 +20,8 @@ supports = []
 distributed_loads = []
 
 [[loads.point_loads]]
-location = []
-magnitude = 0
+location = 0.0
+magnitude = 0.0
 transfer_source = "FB0.0"
-transfer_reaction_idx = 0
+transfer_reaction_index = 0
 direction = "gravity"

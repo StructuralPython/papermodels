@@ -187,7 +187,7 @@ class CollectorTribModel:
                             overlap_poly = box(
                                 pa0[0], overlap_region[0], pb1[0], overlap_region[1]
                             )
-
+                    # The overlap polygon should be clipped by the extent region
                     overlap_within_extent = ext_poly.intersection(overlap_poly)
                     overlap_polys.append(overlap_within_extent)
 
@@ -239,10 +239,10 @@ class CollectorTribModel:
                 revised_poly_overlaps,
                 key=lambda x: (x.centroid.coords[0][0], x.centroid.coords[0][1]),
             )
+            total_new_subs = len(joist_prototype_geometries)
+            z_fill_qty = math.floor(math.log10(total_new_subs))
             for idx, joist_geom in enumerate(sorted_joist_geoms):
                 intersections = []
-                total_new_subs = len(joist_prototype_geometries)
-                z_fill_qty = math.floor(math.log10(total_new_subs))
                 index = f"{idx}".zfill(z_fill_qty)
                 subelement_tag = f"{e.tag}-{index}"
                 trib_area = sorted_poly_overlaps[idx]
@@ -252,8 +252,12 @@ class CollectorTribModel:
                     elif support_geom.geom_type == "LineString":
                         support_line = support_geom
 
+                    # intersecting_region = trib_area.intersection(support_line)
                     intersecting_region = trib_area.intersection(support_line)
-                    if intersecting_region.is_empty:
+                    intersection = joist_geom.intersection(support_line)
+                    # Use the joist intersection to determine if the support is required
+                    # but use the trib_area to get the overlapping intersection region
+                    if intersection.is_empty:
                         continue
                     intersection = Intersection(
                         intersecting_region=intersecting_region,

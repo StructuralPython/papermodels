@@ -13,11 +13,13 @@ horz_intersects_below = [
     "CT0.3",
 ]
 
+[element_attributes.user_defined]
+
 [element_geometry]
-geometry = "LINESTRING (33.295 26.906, 37.698 26.906)"
+geometry = "LINESTRING (33.2948 26.9055, 37.6978 26.9055)"
 supports = [
-    { location = 0.227, fixity = "pin" },
-    { location = 4.215, fixity = "roller" },
+    { location = 0.2273, fixity = "pin" },
+    { location = 4.2151, fixity = "roller" },
 ]
 
 [loads]
@@ -26,11 +28,13 @@ point_loads = []
 [[loads.distributed_loads]]
 transfer_source = "J0.2"
 transfer_reaction_index = 0
+transfer_source_start_extent = []
+transfer_source_end_extent = []
 occupancy = ""
 applied_area = 0.0
-start_loc = 0.204
+start_loc = 1.6469
 start_magnitude = 1.0
-end_loc = 4.403
+end_loc = 2.6469
 end_magnitude = 1.0
 direction = "gravity"
 
@@ -39,6 +43,8 @@ direction = "gravity"
 [[loads.distributed_loads]]
 transfer_source = "WLL0.0"
 transfer_reaction_index = 0
+transfer_source_start_extent = 18.6324
+transfer_source_end_extent = 23.0354
 occupancy = ""
 applied_area = 0.0
 start_loc = 0.0

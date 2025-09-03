@@ -12,8 +12,10 @@ horz_intersects_above = [
 ]
 horz_intersects_below = []
 
+[element_attributes.user_defined]
+
 [element_geometry]
-geometry = "POLYGON ((44.634 26.394, 14.623 26.394, 14.623 26.837, 44.634 26.837, 44.634 26.394))"
+geometry = "POLYGON ((44.6343 26.394, 14.6233 26.394, 14.6233 26.837, 44.6343 26.837, 44.6343 26.394))"
 supports = []
 
 [loads]
@@ -22,11 +24,13 @@ point_loads = []
 [[loads.distributed_loads]]
 transfer_source = "J1.1"
 transfer_reaction_index = 0
+transfer_source_start_extent = []
+transfer_source_end_extent = []
 occupancy = ""
 applied_area = 0.0
-start_loc = 0.188
+start_loc = 6.8952
 start_magnitude = 1.0
-end_loc = 18.443
+end_loc = 7.8952
 end_magnitude = 1.0
 direction = "gravity"
 
@@ -35,11 +39,13 @@ direction = "gravity"
 [[loads.distributed_loads]]
 transfer_source = "J1.2"
 transfer_reaction_index = 0
+transfer_source_start_extent = []
+transfer_source_end_extent = []
 occupancy = ""
 applied_area = 0.0
-start_loc = 18.97
+start_loc = 24.9153
 start_magnitude = 1.0
-end_loc = 30.011
+end_loc = 25.9153
 end_magnitude = 1.0
 direction = "gravity"
 
