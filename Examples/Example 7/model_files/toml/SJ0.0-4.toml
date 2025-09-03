@@ -21,4 +21,14 @@ supports = [
 
 [loads]
 point_loads = []
-distributed_loads = []
+
+[[loads.distributed_loads]]
+transfer_source = ""
+transfer_reaction_index = ""
+occupancy = "residential"
+load_components = []
+applied_area = 2.3621
+start_loc = 0.1377
+start_magnitude = 0.0939
+end_loc = 10.7872
+end_magnitude = 0.0939

@@ -21,4 +21,14 @@ supports = [
 
 [loads]
 point_loads = []
-distributed_loads = []
+
+[[loads.distributed_loads]]
+transfer_source = ""
+transfer_reaction_index = ""
+occupancy = "roof"
+load_components = []
+applied_area = 10.6904
+start_loc = 0.3896
+start_magnitude = 0.0935
+end_loc = 11.08
+end_magnitude = 0.0935
