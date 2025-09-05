@@ -853,7 +853,7 @@ def get_collector_extents(
             extent_end = support_start.distance(region_end)
             tagged_extents.update({ib.other_tag: (extent_start, extent_end)})
     # When we have joist prototypes that have been drawn for all locations
-    elif collector_prototype.trib_area is None:
+    else:
         support_tags_by_geom = {
             geom_ops.clean_polygon_supports(
                 [ib.other_geometry], collector_prototype.geometry
@@ -887,35 +887,35 @@ def get_collector_extents(
             support_tag = support_tags_by_geom[support_geom]
             extent_start = extent[0].distance(support_start)
             extent_end = extent[1].distance(support_start)
-            tagged_extents.update({support_tag: (extent_start, extent_end)})
+            tagged_extents.update({support_tag: tuple(sorted((extent_start, extent_end)))})
 
-    # When we have collectors with their own trib areas (manually created or
-    # otherwise)
-    elif collector_prototype.trib_area is not None:
-        tagged_extents = {}
-        for ib in collector_prototype.intersections_below:
-            intersection = geom_ops.get_intersection(
-                collector_prototype.geometry,
-                ib.other_geometry,
-                ib.other_tag,
-                above_extent_polygon=collector_prototype.trib_area,
-            )
-            try:
-                intersecting_region, support_geom, support_tag = intersection
-            except:
-                raise ValueError(
-                    "There seems to be an internal error with your markup that causes this intermittent error. Please report to connor@structuralpython.com with this message and your drawing file."
-                )
-            region_start, region_end = geom_ops.get_start_end_nodes(intersecting_region)
-            if ib.other_geometry.geom_type == "Polygon":
-                support_start, support_end = geom_ops.get_start_end_nodes(
-                    geom_ops.get_rectangle_centerline(support_geom)
-                )
-            else:  # LineString
-                support_start, support_end = geom_ops.get_start_end_nodes(support_geom)
-            extent_start = support_start.distance(region_start)
-            extent_end = support_start.distance(region_end)
-            tagged_extents.update({ib.other_tag: (extent_start, extent_end)})
+    # # When we have collectors with their own trib areas (manually created or
+    # # otherwise)
+    # elif collector_prototype.trib_area is not None:
+    #     tagged_extents = {}
+    #     for ib in collector_prototype.intersections_below:
+    #         intersection = geom_ops.get_intersection(
+    #             collector_prototype.geometry,
+    #             ib.other_geometry,
+    #             ib.other_tag,
+    #             above_extent_polygon=collector_prototype.trib_area,
+    #         )
+    #         try:
+    #             intersecting_region, support_geom, support_tag = intersection
+    #         except:
+    #             raise ValueError(
+    #                 "There seems to be an internal error with your markup that causes this intermittent error. Please report to connor@structuralpython.com with this message and your drawing file."
+    #             )
+    #         region_start, region_end = geom_ops.get_start_end_nodes(intersecting_region)
+    #         if ib.other_geometry.geom_type == "Polygon":
+    #             support_start, support_end = geom_ops.get_start_end_nodes(
+    #                 geom_ops.get_rectangle_centerline(support_geom)
+    #             )
+    #         else:  # LineString
+    #             support_start, support_end = geom_ops.get_start_end_nodes(support_geom)
+    #         extent_start = support_start.distance(region_start)
+    #         extent_end = support_start.distance(region_end)
+    #         tagged_extents.update({ib.other_tag: (extent_start, extent_end)})
 
     return tagged_extents
 
