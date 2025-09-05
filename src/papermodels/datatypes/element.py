@@ -1037,6 +1037,7 @@ def get_geometry_intersections(
         i_attrs = intersected_annotations[i_annot]
         i_rank = i_attrs["rank"]
         i_page = i_annot.page
+        i_extent_poly = i_attrs["extent_polygon"]
         intersections_above = []
         intersections_below = []
         for j_annot in annots:
@@ -1047,7 +1048,8 @@ def get_geometry_intersections(
             j_geom = j_attrs["geometry"]
             i_tag = i_attrs["tag"]
             j_tag = j_attrs["tag"]
-
+            j_extent_poly = j_attrs["extent_polygon"]
+            # print(f"{i_tag=} | {j_tag=}")
             if i_page != j_page:
                 continue
             if j_rank > i_rank:  # When i transfers to j
@@ -1057,7 +1059,6 @@ def get_geometry_intersections(
                     ):
                         continue
                 # Use the extent polygon to find intersections (if it exists)
-                i_extent_poly = i_attrs["extent_polygon"]
                 extent_intersection = False
                 if (
                     i_extent_poly is not None
@@ -1098,7 +1099,6 @@ def get_geometry_intersections(
                     ):
                         continue
                 # Use the extent polygon to find intersections (if it exists)
-                j_extent_poly = j_attrs["extent_polygon"]
                 if (
                     j_extent_poly is not None
                     and check_eligible_collector_extent_polygon_intersection(
@@ -1109,7 +1109,7 @@ def get_geometry_intersections(
                         j_geom, i_geom, i_tag, j_extent_poly
                     )
                 else:
-                    intersection = geom_ops.get_intersection(j_geom, i_geom, i_tag)
+                    intersection = geom_ops.get_intersection(i_geom, j_geom, j_tag)
                 # reaction_type
                 if intersection is None:
                     continue
@@ -1120,12 +1120,17 @@ def get_geometry_intersections(
                     )
                 )
 
-        # This now needs to ensure that it merely adds-on to an element's existing intersections_above
-        # because they could be set elsewhere (see note above).
-        i_attrs.setdefault("intersections_above", [])
-        i_attrs["intersections_above"] += intersections_above
+            # This now needs to ensure that it merely adds-on to an element's existing intersections_above
+            # because they could be set elsewhere (see note above).
+            if j_extent_poly:
+                i_attrs.setdefault("intersections_above", [])
+                i_attrs["intersections_above"] += intersections_above
+            else:
+                i_attrs["intersections_above"] = intersections_above
 
-        i_attrs["intersections_below"] = intersections_below
+            i_attrs["intersections_below"] = intersections_below
+            if i_tag == "FB4.0":
+                print(f"{i_attrs=}")
     return intersected_annotations
 
 
