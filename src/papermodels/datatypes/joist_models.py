@@ -48,10 +48,10 @@ class CollectorTribModel:
         """
         e = self.element
         geom = e.geometry
-        # trib_area = geom.buffer(
-        #     distance=self.trib_width / 2.0,
-        #     cap_style="flat",
-        # )
+        trib_area = geom.buffer(
+            distance=self.trib_width / 2.0,
+            cap_style="flat",
+        )
         if not self.use_subelements:
             collector_element = Element(
                 e.geometry,

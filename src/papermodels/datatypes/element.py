@@ -832,6 +832,7 @@ def get_collector_extents(
     refer to ordinates on other_geometry, not on the collector_prototype.
     """
     # When we have collector extents and an extent_polygon
+    print(f"{collector_prototype=}")
     if (
         collector_prototype.trib_area is None
         and collector_prototype.extent_polygon is not None
@@ -1049,7 +1050,6 @@ def get_geometry_intersections(
             i_tag = i_attrs["tag"]
             j_tag = j_attrs["tag"]
             j_extent_poly = j_attrs["extent_polygon"]
-            # print(f"{i_tag=} | {j_tag=}")
             if i_page != j_page:
                 continue
             if j_rank > i_rank:  # When i transfers to j
@@ -1129,8 +1129,6 @@ def get_geometry_intersections(
                 i_attrs["intersections_above"] = intersections_above
 
             i_attrs["intersections_below"] = intersections_below
-            if i_tag == "FB4.0":
-                print(f"{i_attrs=}")
     return intersected_annotations
 
 
