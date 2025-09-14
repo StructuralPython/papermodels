@@ -252,8 +252,9 @@ class CollectorTribModel:
                     elif support_geom.geom_type == "LineString":
                         support_line = support_geom
 
+                    support_intersection = joist_geom.intersection(support_line)
                     intersecting_region = trib_area.intersection(support_line)
-                    if intersecting_region.is_empty:
+                    if support_intersection.is_empty:
                         continue
                     intersection = Intersection(
                         intersecting_region=intersecting_region,
