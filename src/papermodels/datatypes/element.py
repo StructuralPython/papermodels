@@ -832,7 +832,6 @@ def get_collector_extents(
     refer to ordinates on other_geometry, not on the collector_prototype.
     """
     # When we have collector extents and an extent_polygon
-    print(f"{collector_prototype=}")
     if (
         collector_prototype.trib_area is None
         and collector_prototype.extent_polygon is not None
@@ -875,7 +874,7 @@ def get_collector_extents(
         )
         try:
             extents = geom_ops.get_joist_extents(
-                collector_prototype.geometry, ordered_support_geoms
+                collector_prototype.geometry, ordered_support_geoms, collector_prototype.trib_area
             )
         except AssertionError as e:
             raise AssertionError(
