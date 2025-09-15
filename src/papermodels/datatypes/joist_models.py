@@ -64,7 +64,7 @@ class CollectorTribModel:
                 e.plane_id,
                 e.element_type,
                 e.subelements,
-                # trib_area=trib_area,
+                trib_area=trib_area,
                 reaction_type="linear",
                 kwargs=e.kwargs,
                 extent_polygon=e.extent_polygon,

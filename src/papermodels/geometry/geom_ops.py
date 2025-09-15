@@ -177,7 +177,6 @@ def clean_polygon_supports(
                 assert support_line.intersects(joist_prototype)
             # elif sum(support_intersections) == 2:
             elif sum(support_intersections) == 0:
-                print(support_geom.intersects(support_lines))
                 assert support_geom.intersects(support_lines)
                 raise GeometryError(
                     f"The geometry {support_geom.wkt} does not intersect {joist_prototype.wkt}"

@@ -100,6 +100,11 @@ def test_kwargs_pass_thru_sketch_to_scale_array(
     }
 
 
+def test_joists_loaded_sketch_to_scale(sketch_to_scale_to_trib_loaded_elements):
+    les = sketch_to_scale_to_trib_loaded_elements
+    assert les["J4.0"].model()["loads"]["distributed_loads"]
+
+
 def test_collector_extent_loads(load_collector_extents):
     assert load_collector_extents
 
