@@ -177,6 +177,7 @@ def clean_polygon_supports(
                 assert support_line.intersects(joist_prototype)
             # elif sum(support_intersections) == 2:
             elif sum(support_intersections) == 0:
+                print(support_geom.intersects(support_lines))
                 assert support_geom.intersects(support_lines)
                 raise GeometryError(
                     f"The geometry {support_geom.wkt} does not intersect {joist_prototype.wkt}"
@@ -194,7 +195,7 @@ def clean_polygon_supports(
 
 
 def get_joist_extents(
-    joist_prototype: LineString, joist_supports: list[LineString], eps: float = 1e-6
+    joist_prototype: LineString, joist_supports: list[LineString], trib_area: Optional[Polygon] = None, eps: float = 1e-6
 ) -> dict[str, tuple[Point, Point]]:
     """
     Returns the extents for the supports "A" and "B". Each extent is represented by a tuple of
@@ -203,80 +204,92 @@ def get_joist_extents(
 
     'joist_supports' is a list of LineString where each LineString only has one line segment
         (the relevant line segment which provides the support to 'joist_prototype')
+    'trib_area' if passed, the intersection of the trib area and the support geoms
+        will be used to determine the extent locations.
     'eps' is a small tolerance amount to deal with floating point error in the extent
         calcualtion.
     """
-    supports_bbox = get_system_bounds(joist_prototype, joist_supports)
-    magnitude_max = get_magnitude(supports_bbox)
-    joist_vector = get_direction_vector(joist_prototype).flatten()
-    joist_origin, joist_end = get_start_end_nodes(joist_prototype)
-    joist_origin = np.array(joist_origin.coords[0])
-    left_coords = []
-    right_coords = []
-    for joist_support in joist_supports:
-        start_coord, end_coord = joist_support.coords
-        start_coord_rotation = cross_product_2d(
-            joist_vector, np.array(start_coord) - joist_origin
-        )
-        end_coord_rotation = cross_product_2d(
-            joist_vector, np.array(end_coord) - joist_origin
-        )
-        if 0.0 < start_coord_rotation:
-            left_coords.append(start_coord)
-        elif start_coord_rotation < 0.0:
-            right_coords.append(start_coord)
-        if 0.0 < end_coord_rotation:
-            left_coords.append(end_coord)
-        elif end_coord_rotation < 0.0:
-            right_coords.append(end_coord)
-    closest_left_coord = min(
-        left_coords, key=lambda x: Point(x).distance(joist_prototype)
-    )
-    closest_right_coord = min(
-        right_coords, key=lambda x: Point(x).distance(joist_prototype)
-    )
-    closest_left_distance = Point(closest_left_coord).distance(joist_prototype)
-    closest_right_distance = Point(closest_right_coord).distance(joist_prototype)
-    joist_vector_normal = rotate_90_vector(joist_vector, ccw=True)
-    joist_left = LineString(
-        [
-            project_node(
-                Point(joist_origin),
-                joist_vector_normal,
-                magnitude=closest_left_distance - eps,
-            ),
-            project_node(
-                Point(joist_end),
-                joist_vector_normal,
-                magnitude=closest_left_distance - eps,
-            ),
-        ]
-    )
-    joist_right = LineString(
-        [
-            project_node(
-                Point(joist_origin),
-                -joist_vector_normal,
-                magnitude=closest_right_distance - eps,
-            ),
-            project_node(
-                Point(joist_end),
-                -joist_vector_normal,
-                magnitude=closest_right_distance - eps,
-            ),
-        ]
-    )
-    ordered_joist_supports = sort_supports(joist_prototype, joist_supports)
-    extents = []
-    for support_linestring in ordered_joist_supports:
-        left_extent = support_linestring.intersection(joist_left)
-        right_extent = support_linestring.intersection(joist_right)
+    if trib_area is not None:
+        sorted_support_geoms = sort_supports(joist_prototype, joist_supports)
+        extents = []
+        for support_geom in sorted_support_geoms:
+            intersecting_region: LineString = trib_area.intersection(support_geom)
+            extent_start, extent_end = get_start_end_nodes(intersecting_region)
+            extents.append((extent_start, extent_end))
 
-        # Make sure the intersection geometries are not empty before proceeding
-        # If one or more is empty, there is a problem that needs investigating
-        assert not left_extent.is_empty
-        assert not right_extent.is_empty
-        extents.append((left_extent, right_extent))
+    else:
+        supports_bbox = get_system_bounds(joist_prototype, joist_supports)
+        magnitude_max = get_magnitude(supports_bbox)
+        joist_vector = get_direction_vector(joist_prototype).flatten()
+        joist_origin, joist_end = get_start_end_nodes(joist_prototype)
+        joist_origin = np.array(joist_origin.coords[0])
+
+        left_coords = []
+        right_coords = []
+        for joist_support in joist_supports:
+            start_coord, end_coord = joist_support.coords
+            start_coord_rotation = cross_product_2d(
+                joist_vector, np.array(start_coord) - joist_origin
+            )
+            end_coord_rotation = cross_product_2d(
+                joist_vector, np.array(end_coord) - joist_origin
+            )
+            if 0.0 < start_coord_rotation:
+                left_coords.append(start_coord)
+            elif start_coord_rotation < 0.0:
+                right_coords.append(start_coord)
+            if 0.0 < end_coord_rotation:
+                left_coords.append(end_coord)
+            elif end_coord_rotation < 0.0:
+                right_coords.append(end_coord)
+        closest_left_coord = min(
+            left_coords, key=lambda x: Point(x).distance(joist_prototype)
+        )
+        closest_right_coord = min(
+            right_coords, key=lambda x: Point(x).distance(joist_prototype)
+        )
+        closest_left_distance = Point(closest_left_coord).distance(joist_prototype)
+        closest_right_distance = Point(closest_right_coord).distance(joist_prototype)
+        joist_vector_normal = rotate_90_vector(joist_vector, ccw=True)
+        joist_left = LineString(
+            [
+                project_node(
+                    Point(joist_origin),
+                    joist_vector_normal,
+                    magnitude=closest_left_distance - eps,
+                ),
+                project_node(
+                    Point(joist_end),
+                    joist_vector_normal,
+                    magnitude=closest_left_distance - eps,
+                ),
+            ]
+        )
+        joist_right = LineString(
+            [
+                project_node(
+                    Point(joist_origin),
+                    -joist_vector_normal,
+                    magnitude=closest_right_distance - eps,
+                ),
+                project_node(
+                    Point(joist_end),
+                    -joist_vector_normal,
+                    magnitude=closest_right_distance - eps,
+                ),
+            ]
+        )
+        ordered_joist_supports = sort_supports(joist_prototype, joist_supports)
+        extents = []
+        for support_linestring in ordered_joist_supports:
+            left_extent = support_linestring.intersection(joist_left)
+            right_extent = support_linestring.intersection(joist_right)
+
+            # Make sure the intersection geometries are not empty before proceeding
+            # If one or more is empty, there is a problem that needs investigating
+            assert not left_extent.is_empty
+            assert not right_extent.is_empty
+            extents.append((left_extent, right_extent))
     return extents
 
 

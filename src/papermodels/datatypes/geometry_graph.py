@@ -278,7 +278,6 @@ class GeometryGraph(nx.DiGraph):
                 all_extents = {}
                 if element.reaction_type == "linear":
                     all_extents = get_transfer_extents(element)
-
                 for intersection in dependent_intersections:
                     extents = all_extents.get(intersection.other_tag)
                     new_intersection = Intersection(
@@ -392,6 +391,7 @@ class GeometryGraph(nx.DiGraph):
                         )
                         updated_intersections_below.append(new_intersection)
                 element.intersections_below = updated_intersections_below
+            element.intersections_below = updated_intersections_below
             self.nodes[node]["element"] = element
 
     def add_intersection_indexes_above(self):

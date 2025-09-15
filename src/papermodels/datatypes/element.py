@@ -874,7 +874,7 @@ def get_collector_extents(
         )
         try:
             extents = geom_ops.get_joist_extents(
-                collector_prototype.geometry, ordered_support_geoms
+                collector_prototype.geometry, ordered_support_geoms, collector_prototype.trib_area
             )
         except AssertionError as e:
             raise AssertionError(
@@ -1049,7 +1049,6 @@ def get_geometry_intersections(
             i_tag = i_attrs["tag"]
             j_tag = j_attrs["tag"]
             j_extent_poly = j_attrs["extent_polygon"]
-            # print(f"{i_tag=} | {j_tag=}")
             if i_page != j_page:
                 continue
             if j_rank > i_rank:  # When i transfers to j
@@ -1129,8 +1128,6 @@ def get_geometry_intersections(
                 i_attrs["intersections_above"] = intersections_above
 
             i_attrs["intersections_below"] = intersections_below
-            if i_tag == "FB4.0":
-                print(f"{i_attrs=}")
     return intersected_annotations
 
 

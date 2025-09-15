@@ -48,10 +48,10 @@ class CollectorTribModel:
         """
         e = self.element
         geom = e.geometry
-        # trib_area = geom.buffer(
-        #     distance=self.trib_width / 2.0,
-        #     cap_style="flat",
-        # )
+        trib_area = geom.buffer(
+            distance=self.trib_width / 2.0,
+            cap_style="flat",
+        )
         if not self.use_subelements:
             collector_element = Element(
                 e.geometry,
@@ -246,15 +246,20 @@ class CollectorTribModel:
                 index = f"{idx}".zfill(z_fill_qty)
                 subelement_tag = f"{e.tag}-{index}"
                 trib_area = sorted_poly_overlaps[idx]
+                assert joist_geom.intersects(trib_area)
                 for support_geom in support_geoms:
                     if support_geom.geom_type == "Polygon":
                         support_line = geom_ops.get_rectangle_centerline(support_geom)
                     elif support_geom.geom_type == "LineString":
                         support_line = support_geom
 
-                    intersecting_region = trib_area.intersection(support_line)
-                    if intersecting_region.is_empty:
+                    support_intersection = joist_geom.intersection(support_line)
+                    # intersecting_region = trib_area.intersection(support_line)
+                    intersecting_region = support_line.intersection(joist_geom)
+                    if support_intersection.is_empty:
                         continue
+                    # if intersecting_region.is_empty:
+                    #     continue
                     intersection = Intersection(
                         intersecting_region=intersecting_region,
                         other_geometry=support_geom,
