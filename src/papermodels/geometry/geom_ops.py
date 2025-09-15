@@ -195,7 +195,10 @@ def clean_polygon_supports(
 
 
 def get_joist_extents(
-    joist_prototype: LineString, joist_supports: list[LineString], trib_area: Optional[Polygon] = None, eps: float = 1e-6
+    joist_prototype: LineString,
+    joist_supports: list[LineString],
+    trib_area: Optional[Polygon] = None,
+    eps: float = 1e-6,
 ) -> dict[str, tuple[Point, Point]]:
     """
     Returns the extents for the supports "A" and "B". Each extent is represented by a tuple of

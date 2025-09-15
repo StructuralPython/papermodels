@@ -874,7 +874,9 @@ def get_collector_extents(
         )
         try:
             extents = geom_ops.get_joist_extents(
-                collector_prototype.geometry, ordered_support_geoms, collector_prototype.trib_area
+                collector_prototype.geometry,
+                ordered_support_geoms,
+                collector_prototype.trib_area,
             )
         except AssertionError as e:
             raise AssertionError(
@@ -887,7 +889,9 @@ def get_collector_extents(
             support_tag = support_tags_by_geom[support_geom]
             extent_start = extent[0].distance(support_start)
             extent_end = extent[1].distance(support_start)
-            tagged_extents.update({support_tag: tuple(sorted((extent_start, extent_end)))})
+            tagged_extents.update(
+                {support_tag: tuple(sorted((extent_start, extent_end)))}
+            )
 
     # # When we have collectors with their own trib areas (manually created or
     # # otherwise)
