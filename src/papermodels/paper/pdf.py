@@ -57,10 +57,11 @@ def update_pdf_annotations(
         pdf_path,
     ) as pdf_obj:
         for page_idx, page_data in enumerate(pdf_obj.pages):
+            rotate = page_data.get("/Rotate", None)
             for annot_idx, annot in enumerate(page_data.obj.Annots):
                 for parsed_annotation, annot_attrs in parsed_annotations.items():
                     annotations_equal = compare_annotations(
-                        parsed_annotation, annot, page_idx
+                        parsed_annotation, annot, page_idx, rotate
                     )
                     if annotations_equal:
                         text_to_add = f"tag: {annot_attrs['tag']}"
@@ -93,7 +94,7 @@ def update_annotation_text_field(
 
 
 def compare_annotations(
-    pm_annot: Annotation, pike_annot: pike.Annotation, page_num: int
+    pm_annot: Annotation, pike_annot: pike.Annotation, page_num: int, rotate: int
 ) -> bool:
     """
     Returns True if the `pm_annot` is nominally equal to the 'pike_annot' by converting
@@ -101,11 +102,12 @@ def compare_annotations(
     for duplicate annotations.
     """
     converted = pike_annotation_to_pm_annotation(
-        pike_annot, pm_annot.local_id, page_num
+        pike_annot, pm_annot.local_id, page_num, rotate
     )
     if converted is None:
         return False
-    return pm_annot == converted
+    else:
+        return pm_annot == converted
 
 
 def pike_annotation_to_pm_annotation(
