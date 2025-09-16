@@ -535,14 +535,21 @@ class JoistArrayModel:
                 self._joist_prototype, list(self._supports)
             )
             projection_distance = geom_ops.get_magnitude(system_bounds)
+            ray_ai = geom_ops.project_node(
+                new_centroid, self.vector_parallel, projection_distance  # orig +ve
+            )
             ray_aj = geom_ops.project_node(
                 new_centroid, -self.vector_parallel, projection_distance  # orig -ve
             )
-            ray_a = LineString([new_centroid, ray_aj])
+            ray_a = LineString([ray_ai, ray_aj])
+
             ray_bj = geom_ops.project_node(
                 new_centroid, self.vector_parallel, projection_distance  # orig +ve
             )
-            ray_b = LineString([new_centroid, ray_bj])
+            ray_bi = geom_ops.project_node(
+                new_centroid, -self.vector_parallel, projection_distance  # orig +ve
+            )
+            ray_b = LineString([ray_bi, ray_bj])
             support_a_loc = ray_a.intersection(self._supports[0])
             support_b_loc = ray_b.intersection(self._supports[-1])
 
