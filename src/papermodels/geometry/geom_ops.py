@@ -20,8 +20,6 @@ import shapely.ops as ops
 import shapely.affinity as aff
 from papermodels.datatypes.exceptions import GeometryError
 
-from IPython.display import display
-
 Geometry = Union[LineString, Polygon]
 IntersectingGeometry = Union[Point, LineString]
 
