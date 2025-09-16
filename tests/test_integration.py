@@ -102,7 +102,13 @@ def test_kwargs_pass_thru_sketch_to_scale_array(
 
 def test_joists_loaded_sketch_to_scale(sketch_to_scale_to_trib_loaded_elements):
     les = sketch_to_scale_to_trib_loaded_elements
-    assert les["J4.0"].model()["loads"]["distributed_loads"]
+    j40_joist = les["J4.0"].model()
+    assert j40_joist["loads"]["distributed_loads"][0]["occupancy"] == "roof"
+    assert j40_joist["loads"]["distributed_loads"][0]["applied_area"] == 188.493
+    j40_load = les["WT4.0"].model()["loads"]["distributed_loads"][0]
+    assert j40_load["transfer_source"] == "J4.0"
+    assert j40_load["start_loc"] == 0.573
+    assert j40_load["end_loc"] == 11.686
 
 
 def test_collector_extent_loads(load_collector_extents):
