@@ -230,6 +230,188 @@ class Element:
             acc.append(intersection_tuple[1])
         return acc
 
+    def get_collector_extents(self, relative: bool = True) -> dict[str, tuple]:
+        """
+        Returns a dict keyed by .tag attributes in self.intersections_below
+        and with values representing the (start_x, end_x) locations where the collector
+        prototype would spread over the other_geometry. The (start_x, end_x) locations
+        refer to ordinates on other_geometry, not on the self.
+
+        If 'relative' == False, then the values returned are absolute Point objects.
+        """
+        # When we have collector extents and an extent_polygon
+        if self.trib_area is None and self.extent_polygon is not None:
+            tagged_extents = {}
+            for ib in self.intersections_below:
+                region_start, region_end = geom_ops.get_start_end_nodes(
+                    ib.intersecting_region
+                )
+                if ib.other_geometry.geom_type == "Polygon":
+                    support_start, support_end = geom_ops.get_start_end_nodes(
+                        geom_ops.get_rectangle_centerline(ib.other_geometry)
+                    )
+                else:  # LineString
+                    support_start, support_end = geom_ops.get_start_end_nodes(
+                        ib.other_geometry
+                    )
+                if relative:
+                    extent_start = support_start.distance(region_start)
+                    extent_end = support_start.distance(region_end)
+                    tagged_extents.update({ib.other_tag: (extent_start, extent_end)})
+                else:
+                    tagged_extents.update({ib.other_tag: (support_start, support_end)})
+        # When we have joist prototypes that have been drawn for all locations
+        else:
+            support_tags_by_geom = {
+                geom_ops.clean_polygon_supports([ib.other_geometry], self.geometry)[
+                    0
+                ]: ib.other_tag
+                for ib in self.intersections_below
+            }
+            poly_support_geoms = list(support_tags_by_geom.keys())
+            support_geoms = geom_ops.clean_polygon_supports(
+                poly_support_geoms, self.geometry
+            )
+
+            cleaned_supports_map = {}
+            for idx, poly_support_geom in enumerate(poly_support_geoms):
+                clean_support_geom = support_geoms[idx]
+                cleaned_supports_map.update({clean_support_geom: poly_support_geom})
+            ordered_support_geoms = geom_ops.sort_supports(self.geometry, support_geoms)
+            try:
+                extents = geom_ops.get_joist_extents(
+                    self.geometry,
+                    ordered_support_geoms,
+                    self.trib_area,
+                )
+            except AssertionError as e:
+                raise AssertionError(
+                    f"No intersection within joist extents: {self.tag=}"
+                )
+            tagged_extents = {}
+            for idx, extent in enumerate(extents):
+                support_geom = ordered_support_geoms[idx]
+                support_start, support_end = geom_ops.get_start_end_nodes(support_geom)
+                support_tag = support_tags_by_geom[support_geom]
+                extent_start = extent[0].distance(support_start)
+                extent_end = extent[1].distance(support_start)
+                if relative:
+                    tagged_extents.update(
+                        {support_tag: tuple(sorted((extent_start, extent_end)))}
+                    )
+                else:
+                    tagged_extents.update({support_tag: (support_start, support_end)})
+
+        return tagged_extents
+
+    def get_transfer_extents(self) -> tuple[str, dict]:
+        """
+        Returns a tuple of str, extents_dict
+
+        e.g.
+        {"FB0.1": (2.5, 6.5, 0.3, 4.3)}
+
+        Where the first two values describe the extents of the _transferred_ elemnt
+        and the last two values describe the extents of the _transferring_ element.
+
+        For the polygon element that has a linear reaction type.
+        This element could have more than one intersection below
+        if it overlaps multiple beams, for example. It can also
+        have correspondents that need to have a portion of teh
+        linear load applied to it.
+        """
+        intersection_extents = {}
+        for intersection_below in self.intersections_below:
+            intersection_below: Intersection
+            tag = intersection_below.other_tag
+            other_geom = intersection_below.other_geometry
+            if isinstance(other_geom, LineString):
+                below_start_coord, _ = geom_ops.get_start_end_nodes(
+                    other_geom
+                )  # extents are in reference to "below" geometry
+                above_start_coord, _ = geom_ops.get_rectangle_centerline(
+                    self.geometry
+                ).coords
+                above_start_coord = Point(above_start_coord)
+                overlapping_linestring = self.geometry.intersection(other_geom)
+                overlap_start, overlap_end = geom_ops.get_start_end_nodes(
+                    overlapping_linestring
+                )
+                intersection_extents.update(
+                    {
+                        tag: (
+                            below_start_coord.distance(overlap_start),
+                            below_start_coord.distance(overlap_end),
+                            above_start_coord.distance(
+                                overlap_start
+                            ),  # Extents in relation to transferring element
+                            above_start_coord.distance(
+                                overlap_end
+                            ),  # Extents in relation to transferring element
+                        )
+                    }
+                )
+            elif isinstance(other_geom, Polygon) and isinstance(self.geometry, Polygon):
+                # The element will be a rank 0 element which means it is a load source
+                # and the other_geom of the intersection below will be the physical
+                # element of which the extents should be measured by.
+                intersecting_region = intersection_below.intersecting_region
+                other_geom = intersection_below.other_geometry
+                other_geom_centerline = geom_ops.get_rectangle_centerline(other_geom)
+                below_start_coord, _ = geom_ops.get_start_end_nodes(
+                    other_geom_centerline
+                )
+                above_start_coord, _ = geom_ops.get_rectangle_centerline(
+                    self.geometry
+                ).coords
+                above_start_coord = Point(above_start_coord)
+                intersecting_centerline = geom_ops.get_rectangle_centerline(
+                    intersecting_region
+                )
+                inter_start_coord, inter_end_coord = geom_ops.get_start_end_nodes(
+                    intersecting_centerline
+                )
+                intersection_extents.update(
+                    {
+                        tag: (
+                            below_start_coord.distance(inter_start_coord),
+                            below_start_coord.distance(inter_end_coord),
+                            above_start_coord.distance(inter_start_coord),
+                            above_start_coord.distance(inter_end_coord),
+                        )
+                    }
+                )
+
+        correspondent_extents = {}
+        for correspondent_below in self.correspondents_below:
+            tag = correspondent_below.other_tag
+            other_geom = correspondent_below.other_geometry
+            intersecting_region = self.geometry.intersection(other_geom)
+            other_geom_centerline = geom_ops.get_rectangle_centerline(other_geom)
+            below_start_coord, _ = geom_ops.get_start_end_nodes(other_geom_centerline)
+            above_start_coord, _ = geom_ops.get_rectangle_centerline(
+                self.geometry
+            ).coords
+            above_start_coord = Point(above_start_coord)
+            intersecting_centerline = geom_ops.get_rectangle_centerline(
+                intersecting_region
+            )
+            inter_start_coord, inter_end_coord = geom_ops.get_start_end_nodes(
+                intersecting_centerline
+            )
+            correspondent_extents.update(
+                {
+                    tag: (
+                        below_start_coord.distance(inter_start_coord),
+                        below_start_coord.distance(inter_end_coord),
+                        above_start_coord.distance(inter_start_coord),
+                        above_start_coord.distance(inter_end_coord),
+                    )
+                }
+            )
+
+        return intersection_extents | correspondent_extents
+
 
 def prioritize_correspondents(
     correspondents: list[Correspondent], family: str
@@ -820,213 +1002,6 @@ def create_element_filter(
         )
 
     return filter_function
-
-
-def get_collector_extents(
-    collector_prototype: Element,
-) -> dict[str, tuple]:
-    """
-    Returns a dict keyed by .tag attributes in collector_prototype.intersections_below
-    and with values representing the (start_x, end_x) locations where the collector
-    prototype would spread over the other_geometry. The (start_x, end_x) locations
-    refer to ordinates on other_geometry, not on the collector_prototype.
-    """
-    # When we have collector extents and an extent_polygon
-    if (
-        collector_prototype.trib_area is None
-        and collector_prototype.extent_polygon is not None
-    ):
-        tagged_extents = {}
-        for ib in collector_prototype.intersections_below:
-            region_start, region_end = geom_ops.get_start_end_nodes(
-                ib.intersecting_region
-            )
-            if ib.other_geometry.geom_type == "Polygon":
-                support_start, support_end = geom_ops.get_start_end_nodes(
-                    geom_ops.get_rectangle_centerline(ib.other_geometry)
-                )
-            else:  # LineString
-                support_start, support_end = geom_ops.get_start_end_nodes(
-                    ib.other_geometry
-                )
-            extent_start = support_start.distance(region_start)
-            extent_end = support_start.distance(region_end)
-            tagged_extents.update({ib.other_tag: (extent_start, extent_end)})
-    # When we have joist prototypes that have been drawn for all locations
-    else:
-        support_tags_by_geom = {
-            geom_ops.clean_polygon_supports(
-                [ib.other_geometry], collector_prototype.geometry
-            )[0]: ib.other_tag
-            for ib in collector_prototype.intersections_below
-        }
-        poly_support_geoms = list(support_tags_by_geom.keys())
-        support_geoms = geom_ops.clean_polygon_supports(
-            poly_support_geoms, collector_prototype.geometry
-        )
-
-        cleaned_supports_map = {}
-        for idx, poly_support_geom in enumerate(poly_support_geoms):
-            clean_support_geom = support_geoms[idx]
-            cleaned_supports_map.update({clean_support_geom: poly_support_geom})
-        ordered_support_geoms = geom_ops.sort_supports(
-            collector_prototype.geometry, support_geoms
-        )
-        try:
-            extents = geom_ops.get_joist_extents(
-                collector_prototype.geometry,
-                ordered_support_geoms,
-                collector_prototype.trib_area,
-            )
-        except AssertionError as e:
-            raise AssertionError(
-                f"No intersection within joist extents: {collector_prototype.tag=}"
-            )
-        tagged_extents = {}
-        for idx, extent in enumerate(extents):
-            support_geom = ordered_support_geoms[idx]
-            support_start, _ = geom_ops.get_start_end_nodes(support_geom)
-            support_tag = support_tags_by_geom[support_geom]
-            extent_start = extent[0].distance(support_start)
-            extent_end = extent[1].distance(support_start)
-            tagged_extents.update(
-                {support_tag: tuple(sorted((extent_start, extent_end)))}
-            )
-
-    # # When we have collectors with their own trib areas (manually created or
-    # # otherwise)
-    # elif collector_prototype.trib_area is not None:
-    #     tagged_extents = {}
-    #     for ib in collector_prototype.intersections_below:
-    #         intersection = geom_ops.get_intersection(
-    #             collector_prototype.geometry,
-    #             ib.other_geometry,
-    #             ib.other_tag,
-    #             above_extent_polygon=collector_prototype.trib_area,
-    #         )
-    #         try:
-    #             intersecting_region, support_geom, support_tag = intersection
-    #         except:
-    #             raise ValueError(
-    #                 "There seems to be an internal error with your markup that causes this intermittent error. Please report to connor@structuralpython.com with this message and your drawing file."
-    #             )
-    #         region_start, region_end = geom_ops.get_start_end_nodes(intersecting_region)
-    #         if ib.other_geometry.geom_type == "Polygon":
-    #             support_start, support_end = geom_ops.get_start_end_nodes(
-    #                 geom_ops.get_rectangle_centerline(support_geom)
-    #             )
-    #         else:  # LineString
-    #             support_start, support_end = geom_ops.get_start_end_nodes(support_geom)
-    #         extent_start = support_start.distance(region_start)
-    #         extent_end = support_start.distance(region_end)
-    #         tagged_extents.update({ib.other_tag: (extent_start, extent_end)})
-
-    return tagged_extents
-
-
-def get_transfer_extents(element: Element) -> tuple[str, dict]:
-    """
-    Returns a tuple of str, extents_dict
-
-    e.g.
-    {"FB0.1": (2.5, 6.5, 0.3, 4.3)}
-
-    Where the first two values describe the extents of the _transferred_ elemnt
-    and the last two values describe the extents of the _transferring_ element.
-
-    For the polygon element that has a linear reaction type.
-    This element could have more than one intersection below
-    if it overlaps multiple beams, for example. It can also
-    have correspondents that need to have a portion of teh
-    linear load applied to it.
-    """
-    intersection_extents = {}
-    for intersection_below in element.intersections_below:
-        intersection_below: Intersection
-        tag = intersection_below.other_tag
-        other_geom = intersection_below.other_geometry
-        if isinstance(other_geom, LineString):
-            below_start_coord, _ = geom_ops.get_start_end_nodes(
-                other_geom
-            )  # extents are in reference to "below" geometry
-            above_start_coord, _ = geom_ops.get_rectangle_centerline(
-                element.geometry
-            ).coords
-            above_start_coord = Point(above_start_coord)
-            overlapping_linestring = element.geometry.intersection(other_geom)
-            overlap_start, overlap_end = geom_ops.get_start_end_nodes(
-                overlapping_linestring
-            )
-            intersection_extents.update(
-                {
-                    tag: (
-                        below_start_coord.distance(overlap_start),
-                        below_start_coord.distance(overlap_end),
-                        above_start_coord.distance(
-                            overlap_start
-                        ),  # Extents in relation to transferring element
-                        above_start_coord.distance(
-                            overlap_end
-                        ),  # Extents in relation to transferring element
-                    )
-                }
-            )
-        elif isinstance(other_geom, Polygon) and isinstance(element.geometry, Polygon):
-            # The element will be a rank 0 element which means it is a load source
-            # and the other_geom of the intersection below will be the physical
-            # element of which the extents should be measured by.
-            intersecting_region = intersection_below.intersecting_region
-            other_geom = intersection_below.other_geometry
-            other_geom_centerline = geom_ops.get_rectangle_centerline(other_geom)
-            below_start_coord, _ = geom_ops.get_start_end_nodes(other_geom_centerline)
-            above_start_coord, _ = geom_ops.get_rectangle_centerline(
-                element.geometry
-            ).coords
-            above_start_coord = Point(above_start_coord)
-            intersecting_centerline = geom_ops.get_rectangle_centerline(
-                intersecting_region
-            )
-            inter_start_coord, inter_end_coord = geom_ops.get_start_end_nodes(
-                intersecting_centerline
-            )
-            intersection_extents.update(
-                {
-                    tag: (
-                        below_start_coord.distance(inter_start_coord),
-                        below_start_coord.distance(inter_end_coord),
-                        above_start_coord.distance(inter_start_coord),
-                        above_start_coord.distance(inter_end_coord),
-                    )
-                }
-            )
-
-    correspondent_extents = {}
-    for correspondent_below in element.correspondents_below:
-        tag = correspondent_below.other_tag
-        other_geom = correspondent_below.other_geometry
-        intersecting_region = element.geometry.intersection(other_geom)
-        other_geom_centerline = geom_ops.get_rectangle_centerline(other_geom)
-        below_start_coord, _ = geom_ops.get_start_end_nodes(other_geom_centerline)
-        above_start_coord, _ = geom_ops.get_rectangle_centerline(
-            element.geometry
-        ).coords
-        above_start_coord = Point(above_start_coord)
-        intersecting_centerline = geom_ops.get_rectangle_centerline(intersecting_region)
-        inter_start_coord, inter_end_coord = geom_ops.get_start_end_nodes(
-            intersecting_centerline
-        )
-        correspondent_extents.update(
-            {
-                tag: (
-                    below_start_coord.distance(inter_start_coord),
-                    below_start_coord.distance(inter_end_coord),
-                    above_start_coord.distance(inter_start_coord),
-                    above_start_coord.distance(inter_end_coord),
-                )
-            }
-        )
-
-    return intersection_extents | correspondent_extents
 
 
 def get_geometry_intersections(

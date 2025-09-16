@@ -48,10 +48,36 @@ class CollectorTribModel:
         """
         e = self.element
         geom = e.geometry
-        trib_area = geom.buffer(
-            distance=self.trib_width / 2.0,
-            cap_style="flat",
-        )
+        collector_extents = e.get_collector_extents(relative=False)
+        left = [extent[0] for extent in collector_extents.values()]
+        right = [extent[1] for extent in collector_extents.values()]
+        left_dist = [geom.distance(extent) for extent in left]
+        right_dist = [geom.distance(extent) for extent in right]
+        left_minimum_idx = left_dist.index(min(left_dist))
+        right_minimum_idx = right_dist.index(min(right_dist))
+
+        joist_vector = np.abs(geom_ops.get_direction_vector(geom))
+        # This is one of the places where orthogonality is assumed
+        joist_orientation = None
+        if joist_vector[0] > joist_vector[1]:
+            joist_orientation = "horizontal"
+        elif joist_vector[1] > joist_vector[0]:
+            joist_orientation = "vertical"
+        else:
+            print(f"JOIST ORIENTATION VERIANT: {geom=}")
+
+        if joist_orientation == "vertical":
+            minx = left[left_minimum_idx].coords[0][0]
+            miny = geom.coords[0][1]
+            maxx = right[right_minimum_idx].coords[0][0]
+            maxy = geom.coords[1][1]
+        elif joist_orientation == "horizontal":
+            minx = geom.coords[0][0]
+            miny = left[left_minimum_idx].coords[0][1]
+            maxx = geom.coords[1][0]
+            maxy = right[right_minimum_idx].coords[0][1]
+        trib_area = box(minx, miny, maxx, maxy)
+        # trib_area = e.geometry.buffer(self.trib_width/2)
         if not self.use_subelements:
             collector_element = Element(
                 e.geometry,

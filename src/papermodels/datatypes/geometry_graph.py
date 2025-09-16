@@ -12,8 +12,6 @@ from ..geometry import geom_ops as geom
 from ..datatypes.element import (
     Correspondent,
     Intersection,
-    get_collector_extents,
-    get_transfer_extents,
 )
 from ..paper.annotations import (
     Annotation,
@@ -277,7 +275,7 @@ class GeometryGraph(nx.DiGraph):
                 updated_intersections_below = []
                 all_extents = {}
                 if element.reaction_type == "linear":
-                    all_extents = get_transfer_extents(element)
+                    all_extents = element.get_transfer_extents()
                 for intersection in dependent_intersections:
                     extents = all_extents.get(intersection.other_tag)
                     new_intersection = Intersection(
@@ -325,7 +323,7 @@ class GeometryGraph(nx.DiGraph):
                             sub_local_coords = get_local_coords(
                                 start_coord, sub_dependent_intersections
                             )
-                            subextents = get_collector_extents(subelem)
+                            subextents = subelem.get_collector_extents()
                             sub_sorted_below_ints = sorted(
                                 sub_local_coords, key=lambda x: x[0]
                             )
@@ -359,7 +357,7 @@ class GeometryGraph(nx.DiGraph):
                         updated_intersections_below = element.intersections_below
                     else:
                         if element.reaction_type == "linear":
-                            extents = get_collector_extents(element)
+                            extents = element.get_collector_extents()
                         for intersection in dependent_intersections:
                             other_tag = intersection.other_tag
                             local_index = other_tags_below.index(other_tag)
