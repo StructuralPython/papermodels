@@ -20,6 +20,8 @@ import shapely.ops as ops
 import shapely.affinity as aff
 from papermodels.datatypes.exceptions import GeometryError
 
+from IPython.display import display
+
 Geometry = Union[LineString, Polygon]
 IntersectingGeometry = Union[Point, LineString]
 
@@ -223,18 +225,23 @@ def get_joist_extents(
         supports_bbox = get_system_bounds(joist_prototype, joist_supports)
         magnitude_max = get_magnitude(supports_bbox)
         joist_vector = get_direction_vector(joist_prototype).flatten()
-        joist_origin, joist_end = get_start_end_nodes(joist_prototype)
+        orig_joist_origin, orig_joist_end = get_start_end_nodes(joist_prototype)
+        joist_origin = project_node(orig_joist_origin, -joist_vector, magnitude_max/2)
+        joist_end = project_node(orig_joist_end, joist_vector, magnitude_max/2)
+        extended_joist_prototype = LineString([joist_origin, joist_end])
         joist_origin = np.array(joist_origin.coords[0])
+        orig_joist_origin = np.array(orig_joist_origin.coords[0])
 
         left_coords = []
         right_coords = []
         for joist_support in joist_supports:
             start_coord, end_coord = joist_support.coords
+            start_coord, end_coord = Point(start_coord), Point(end_coord)
             start_coord_rotation = cross_product_2d(
-                joist_vector, np.array(start_coord) - joist_origin
+                joist_vector, np.array(start_coord.coords[0]) - orig_joist_origin
             )
             end_coord_rotation = cross_product_2d(
-                joist_vector, np.array(end_coord) - joist_origin
+                joist_vector, np.array(end_coord.coords[0]) - orig_joist_origin
             )
             if 0.0 < start_coord_rotation:
                 left_coords.append(start_coord)
@@ -244,14 +251,15 @@ def get_joist_extents(
                 left_coords.append(end_coord)
             elif end_coord_rotation < 0.0:
                 right_coords.append(end_coord)
+
         closest_left_coord = min(
-            left_coords, key=lambda x: Point(x).distance(joist_prototype)
+            left_coords, key=lambda x: x.distance(extended_joist_prototype)
         )
         closest_right_coord = min(
-            right_coords, key=lambda x: Point(x).distance(joist_prototype)
+            right_coords, key=lambda x: x.distance(extended_joist_prototype)
         )
-        closest_left_distance = Point(closest_left_coord).distance(joist_prototype)
-        closest_right_distance = Point(closest_right_coord).distance(joist_prototype)
+        closest_left_distance = closest_left_coord.distance(extended_joist_prototype)
+        closest_right_distance = closest_right_coord.distance(extended_joist_prototype)
         joist_vector_normal = rotate_90_vector(joist_vector, ccw=True)
         joist_left = LineString(
             [
@@ -281,12 +289,12 @@ def get_joist_extents(
                 ),
             ]
         )
+
         ordered_joist_supports = sort_supports(joist_prototype, joist_supports)
         extents = []
         for support_linestring in ordered_joist_supports:
             left_extent = support_linestring.intersection(joist_left)
             right_extent = support_linestring.intersection(joist_right)
-
             # Make sure the intersection geometries are not empty before proceeding
             # If one or more is empty, there is a problem that needs investigating
             assert not left_extent.is_empty
