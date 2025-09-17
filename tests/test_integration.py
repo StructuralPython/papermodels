@@ -110,6 +110,11 @@ def test_joists_loaded_sketch_to_scale(sketch_to_scale_to_trib_loaded_elements):
     assert j40_load["start_loc"] == 0.573
     assert j40_load["end_loc"] == 11.686
 
+    # TODO: Update this test with what start and end locs should actually be
+    fb1_3 = les["FB1.3"].model()
+    assert fb1_3["loads"]["distributed_loads"][0]["start_loc"] == 0.445
+    assert fb1_3["loads"]["distributed_loads"][0]["end_loc"] == 10.836
+
 
 def test_collector_extent_loads(load_collector_extents):
     assert load_collector_extents
