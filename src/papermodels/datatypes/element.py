@@ -1139,7 +1139,7 @@ def get_geometry_correspondents(
 ) -> dict[Annotation, dict]:
     """
     Returns a copy of 'tagged_annotations' with a 'correspondents' field added to that
-    attributes dictionary of each Annotation key.
+    attribute's dictionary of each Annotation key.
     """
     annots_by_page = annotations_by_page(tagged_annotations)
     descending_pages = sorted(annots_by_page.keys(), reverse=True)
@@ -1152,18 +1152,21 @@ def get_geometry_correspondents(
             next_page = page - 1
             annots_here = annots_by_page[page]
             annots_below = annots_by_page[next_page]
-            correspondents_above = {
-                j_attrs["tag"]: [] for j_attrs in annots_below.values()
-            }
-            correspondents_below = {}
+            # correspondents_above = {
+            #     j_attrs["tag"]: [] for j_attrs in annots_below.values()
+            # }
+            # correspondents_above = {}
+            # correspondents_below = {}
 
             for i_annot, i_attrs in annots_here.items():
+                corresponding_annotations[i_annot].setdefault('correspondents_below', [])
                 i_page = i_annot.page
                 i_tag = i_attrs["tag"]
                 i_geom = i_attrs["geometry"]
                 i_rank = i_attrs["rank"]
                 i_rxn_type = i_attrs.get("reaction_type", "point")
                 for j_annot, j_attrs in annots_below.items():
+                    corresponding_annotations[j_annot].setdefault('correspondents_above', [])
                     j_attrs = annots_below[j_annot]
                     j_page = j_annot.page
                     j_geom = j_attrs["geometry"]
@@ -1176,40 +1179,33 @@ def get_geometry_correspondents(
                     ):
                         continue  # No correspondence between lines
                     correspondence_ratio = geom_ops.check_corresponds(i_geom, j_geom)
-                    correspondents_below.setdefault(i_tag, [])
                     if (
                         correspondence_ratio and i_rank >= j_rank
                     ):  # Same rank allowed to transfer in correspondents (e.g. column to column)
-                        correspondents_below[i_tag].append(
-                            Correspondent(
+                        corr_below = Correspondent(
                                 correspondence_ratio,
                                 j_geom,
                                 j_tag,
                                 other_rank=j_rank,
                                 other_reaction_type=j_rxn_type,
                             )
-                        )
-                        correspondents_above[j_tag].append(
-                            Correspondent(
+                        corr_above = Correspondent(
                                 correspondence_ratio,
                                 i_geom,
                                 i_attrs["tag"],
                                 other_rank=i_rank,
                                 other_reaction_type=i_rxn_type,
                             )
-                        )
-                        corresponding_annotations[j_annot].setdefault(
-                            "correspondents_above", []
-                        )
-                        corresponding_annotations[i_annot].setdefault(
-                            "correspondents_below", []
-                        )
-                        corresponding_annotations[j_annot]["correspondents_above"] = (
-                            correspondents_above[j_tag]
-                        )
-                        corresponding_annotations[i_annot]["correspondents_below"] = (
-                            correspondents_below[i_tag]
-                        )
+                        if corr_below not in corresponding_annotations[i_annot]['correspondents_below']:
+                            if i_tag == "WT2.0":
+                                wtannot = i_annot
+                            print(i_tag, j_tag)
+                            corresponding_annotations[i_annot]['correspondents_below'].append(corr_below)
+                            if i_tag == "WT2.0":
+                                print(corresponding_annotations[i_annot]['correspondents_below'])
+                        if corr_above not in corresponding_annotations[j_annot]['correspondents_above']:
+                            corresponding_annotations[j_annot]['correspondents_above'].append(corr_above)
+
                     else:
                         # Populate empty fields for annotations with no correspondents
                         corresponding_annotations[i_annot].setdefault(
@@ -1219,6 +1215,7 @@ def get_geometry_correspondents(
                             "correspondents_above", []
                         )
         else:
+            correspondents_above = {}
             annots_last = annots_by_page[page]
             if len(descending_pages) == 1:
                 correspondents_above = (
@@ -1232,6 +1229,7 @@ def get_geometry_correspondents(
                 corresponding_annotations[i_annot]["correspondents_below"] = []
         if prev_page is None:
             prev_page = page
+    print(corresponding_annotations[wtannot]['correspondents_below'])
     return corresponding_annotations
 
 
