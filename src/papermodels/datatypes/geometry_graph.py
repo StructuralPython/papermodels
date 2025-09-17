@@ -756,7 +756,12 @@ class GeometryGraph(nx.DiGraph):
         Requires GraphViz to be independently installed. Installation instructions
         here: https://graphviz.org/download/
         """
-        plotting = nx.drawing.nx_agraph.to_agraph(self)
+        try:
+            plotting = nx.drawing.nx_agraph.to_agraph(self)
+        except:
+            raise ImportError(
+                "The GraphViz application is missing. Install at https://graphviz.org/download/"
+            )
         plotting.layout(prog="dot")
         svg_string = plotting.draw(format="svg")
         if filepath:
@@ -767,7 +772,7 @@ class GeometryGraph(nx.DiGraph):
             try:
                 from IPython.display import SVG, display
             except ImportError:
-                print(svg_string)
+                print("printing string")
                 return
             try:
                 get_ipython
