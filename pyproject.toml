@@ -27,6 +27,7 @@ dependencies = [
     "forallpeople",
     "tomli-w",
     "pygraphviz>=1.14",
+    "textalloc>=1.2.1",
 ]
 
 
