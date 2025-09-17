@@ -178,13 +178,16 @@ class Element:
         annotations_w_intersect_corrs = get_geometry_correspondents(
             annotations_w_intersect
         )
+        if correspond_with_like_only:
+            filtered_annots = filter_correspondents(annotations_w_intersect_corrs)
+        else:
+            filtered_annots = annotations_w_intersect_corrs
         trib_area_geoms = np.array(
             [annot_attrs["geometry"] for annot_attrs in trib_annotations.values()]
         )
         matching_trib_poly = None
         elements = []
-        for annot_attrs in annotations_w_intersect_corrs.values():
-            element_family = annot_attrs["tag"][0]
+        for annot_attrs in filtered_annots.values():
             geometry = annot_attrs["geometry"]
             if geometry.geom_type == "LineString" and trib_annotations:
                 intersection_mask = geometry.intersects(trib_area_geoms)
@@ -194,13 +197,6 @@ class Element:
                     get_intersection_lengths
                 )  # The matching trib is the one that is mostly in the trib poly
                 matching_trib_poly = trib_area_geoms[matching_trib_index]
-            if correspond_with_like_only:
-                corrs_a = prioritize_correspondents(
-                    annot_attrs["correspondents_above"], element_family
-                )
-                corrs_b = prioritize_correspondents(
-                    annot_attrs["correspondents_below"], element_family
-                )
 
             available_kwargs = {
                 k: v for k, v in annot_attrs.items() if k not in ELEMENT_ATTRS
@@ -212,8 +208,8 @@ class Element:
                 rank=annot_attrs["rank"],
                 intersections_above=annot_attrs["intersections_above"],
                 intersections_below=annot_attrs["intersections_below"],
-                correspondents_above=corrs_a,
-                correspondents_below=corrs_b,
+                correspondents_above=annot_attrs["correspondents_above"],
+                correspondents_below=annot_attrs["correspondents_below"],
                 plane_id=annot_attrs.get("page_label", None),
                 reaction_type=annot_attrs.get("reaction_type", "point"),
                 trib_area=matching_trib_poly,
@@ -432,7 +428,7 @@ def prioritize_correspondents(
     for correspondent in correspondents:
         corr_family = correspondent.other_tag[0]
         corr_rank = correspondent.other_rank
-        if corr_rank == 0:  # If the element transfers out
+        if corr_rank == 0 and corr_family == family:  # If the element transfers out
             filtered_transfers.append(correspondent)
         elif corr_family == family:
             filtered_same_family.append(correspondent)
@@ -1159,14 +1155,18 @@ def get_geometry_correspondents(
             # correspondents_below = {}
 
             for i_annot, i_attrs in annots_here.items():
-                corresponding_annotations[i_annot].setdefault('correspondents_below', [])
+                corresponding_annotations[i_annot].setdefault(
+                    "correspondents_below", []
+                )
                 i_page = i_annot.page
                 i_tag = i_attrs["tag"]
                 i_geom = i_attrs["geometry"]
                 i_rank = i_attrs["rank"]
                 i_rxn_type = i_attrs.get("reaction_type", "point")
                 for j_annot, j_attrs in annots_below.items():
-                    corresponding_annotations[j_annot].setdefault('correspondents_above', [])
+                    corresponding_annotations[j_annot].setdefault(
+                        "correspondents_above", []
+                    )
                     j_attrs = annots_below[j_annot]
                     j_page = j_annot.page
                     j_geom = j_attrs["geometry"]
@@ -1183,28 +1183,37 @@ def get_geometry_correspondents(
                         correspondence_ratio and i_rank >= j_rank
                     ):  # Same rank allowed to transfer in correspondents (e.g. column to column)
                         corr_below = Correspondent(
-                                correspondence_ratio,
-                                j_geom,
-                                j_tag,
-                                other_rank=j_rank,
-                                other_reaction_type=j_rxn_type,
-                            )
+                            correspondence_ratio,
+                            j_geom,
+                            j_tag,
+                            other_rank=j_rank,
+                            other_reaction_type=j_rxn_type,
+                        )
                         corr_above = Correspondent(
-                                correspondence_ratio,
-                                i_geom,
-                                i_attrs["tag"],
-                                other_rank=i_rank,
-                                other_reaction_type=i_rxn_type,
-                            )
-                        if corr_below not in corresponding_annotations[i_annot]['correspondents_below']:
-                            if i_tag == "WT2.0":
-                                wtannot = i_annot
-                            print(i_tag, j_tag)
-                            corresponding_annotations[i_annot]['correspondents_below'].append(corr_below)
-                            if i_tag == "WT2.0":
-                                print(corresponding_annotations[i_annot]['correspondents_below'])
-                        if corr_above not in corresponding_annotations[j_annot]['correspondents_above']:
-                            corresponding_annotations[j_annot]['correspondents_above'].append(corr_above)
+                            correspondence_ratio,
+                            i_geom,
+                            i_attrs["tag"],
+                            other_rank=i_rank,
+                            other_reaction_type=i_rxn_type,
+                        )
+                        if (
+                            corr_below
+                            not in corresponding_annotations[i_annot][
+                                "correspondents_below"
+                            ]
+                        ):
+                            corresponding_annotations[i_annot][
+                                "correspondents_below"
+                            ].append(corr_below)
+                        if (
+                            corr_above
+                            not in corresponding_annotations[j_annot][
+                                "correspondents_above"
+                            ]
+                        ):
+                            corresponding_annotations[j_annot][
+                                "correspondents_above"
+                            ].append(corr_above)
 
                     else:
                         # Populate empty fields for annotations with no correspondents
@@ -1229,8 +1238,46 @@ def get_geometry_correspondents(
                 corresponding_annotations[i_annot]["correspondents_below"] = []
         if prev_page is None:
             prev_page = page
-    print(corresponding_annotations[wtannot]['correspondents_below'])
     return corresponding_annotations
+
+
+def filter_correspondents(
+    tagged_annotations: dict[Annotation, dict],
+) -> dict[Annotation, dict]:
+    """
+    Applies the filter from prioritize_correspondents and back-propagates
+    the filtered correspodents to the correspondents_above:
+    """
+    copied_annotations = tagged_annotations.copy()
+    correspondents_above = {}
+    for annot, annot_attrs in tagged_annotations.items():
+        element_family = annot_attrs["tag"][0]
+        filtered_below = prioritize_correspondents(
+            annot_attrs["correspondents_below"], element_family
+        )
+        copied_annotations[annot]["correspondents_below"] = filtered_below
+        for corr in filtered_below:
+            corr: Correspondent
+            overlap_ratio = corr.overlap_ratio
+            overlap_area = overlap_ratio * annot_attrs["geometry"].area
+            above_overlap_ratio = overlap_area / corr.other_geometry.area
+            above_tag = corr.other_tag
+            corr_above = Correspondent(
+                overlap_ratio=above_overlap_ratio,
+                other_geometry=annot_attrs["geometry"],
+                other_tag=annot_attrs["tag"],
+                other_rank=annot_attrs["rank"],
+                other_reaction_type=annot_attrs["reaction_type"],
+            )
+            correspondents_above.setdefault(above_tag, [])
+            correspondents_above[above_tag].append(corr_above)
+
+    for copied_annot, copied_annot_attrs in copied_annotations.items():
+        copied_annot_attrs["correspondents_above"] = correspondents_above.get(
+            copied_annot_attrs["tag"], []
+        )
+
+    return copied_annotations
 
 
 def annotations_by_page(
