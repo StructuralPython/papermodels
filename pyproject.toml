@@ -25,7 +25,8 @@ dependencies = [
     "pycba",
     "rich",
     "forallpeople",
-    "tomli-w"
+    "tomli-w",
+    "pygraphviz>=1.14",
 ]
 
 

@@ -126,3 +126,11 @@ def test_many_correspondents(load_many_correspondents):
     assert len(graph.nodes["WB1.1"]["element"].correspondents_above) == 1
     assert graph.nodes["WT2.0"]["element"].correspondents_below[0].other_tag == "WB1.1"
     assert graph.nodes["WB1.1"]["element"].correspondents_above[0].other_tag == "WT2.0"
+
+
+def test_plot_connectivity(load_collector_extents, capsys):
+    # Not currently testing for correct SVG output because 
+    graph = load_collector_extents
+    graph.plot_connectivity() # Should write bytes to stdout
+    captured = capsys.readouterr()
+    assert captured.out is not None
