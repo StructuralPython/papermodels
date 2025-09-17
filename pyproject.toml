@@ -6,7 +6,6 @@ build-backend = "flit_core.buildapi"
 name = "papermodels"
 authors = [{name = "Connor Ferster", email = "connor@structuralpython.com"}]
 license = {file = "LICENSE"}
-classifiers = ["License :: OSI Approved :: Apache Software License"]
 dynamic = ["version", "description"]
 dependencies = [
     "shapely >= 2.0.0",
@@ -26,13 +25,17 @@ dependencies = [
     "rich",
     "forallpeople",
     "tomli-w",
-    "pygraphviz>=1.14",
     "textalloc>=1.2.1",
 ]
 
 
 [project.urls]
 Home = "https://github.com/structuralpython/papermodels"
+
+[project.optional-dependencies]
+graphviz = [
+    "pygraphviz>=1.14",
+]
 
 [dependency-groups]
 dev = [

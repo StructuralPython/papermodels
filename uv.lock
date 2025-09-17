@@ -693,7 +693,7 @@ wheels = [
 
 [[package]]
 name = "papermodels"
-version = "0.11.8"
+version = "0.12.0"
 source = { editable = "." }
 dependencies = [
     { name = "colour" },
@@ -706,7 +706,6 @@ dependencies = [
     { name = "parse" },
     { name = "pikepdf" },
     { name = "pycba" },
-    { name = "pygraphviz" },
     { name = "pynitefea" },
     { name = "pytest" },
     { name = "rich" },
@@ -714,6 +713,11 @@ dependencies = [
     { name = "shapely" },
     { name = "textalloc" },
     { name = "tomli-w" },
+]
+
+[package.optional-dependencies]
+graphviz = [
+    { name = "pygraphviz" },
 ]
 
 [package.dev-dependencies]
@@ -735,7 +739,7 @@ requires-dist = [
     { name = "parse" },
     { name = "pikepdf" },
     { name = "pycba" },
-    { name = "pygraphviz", specifier = ">=1.14" },
+    { name = "pygraphviz", marker = "extra == 'graphviz'", specifier = ">=1.14" },
     { name = "pynitefea", specifier = ">=1.0.0" },
     { name = "pytest" },
     { name = "rich" },
