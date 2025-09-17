@@ -772,7 +772,7 @@ class GeometryGraph(nx.DiGraph):
             try:
                 from IPython.display import SVG, display
             except ImportError:
-                print("printing string")
+                print(svg_string)
                 return
             try:
                 get_ipython

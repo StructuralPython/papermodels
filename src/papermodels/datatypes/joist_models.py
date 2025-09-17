@@ -49,8 +49,16 @@ class CollectorTribModel:
         e = self.element
         geom = e.geometry
         collector_extents = e.get_collector_extents(relative=False)
-        left = [extent[0] for extent in collector_extents.values()]
-        right = [extent[1] for extent in collector_extents.values()]
+        left = []
+        right = []
+        for extent in collector_extents.values():
+            p0_relation = geom_ops.relate_point_to_line(extent[0], geom)
+            if p0_relation in (("left", "above"), ("right", "above")):
+                left.append(extent[0])
+                right.append(extent[1])
+            elif p0_relation in (("left", "below"), ("right", "below")):
+                left.append(extent[1])
+                right.append(extent[0])
         left_dist = [geom.distance(extent) for extent in left]
         right_dist = [geom.distance(extent) for extent in right]
         left_minimum_idx = left_dist.index(min(left_dist))

@@ -19,6 +19,7 @@ from shapely import (
 import shapely.ops as ops
 import shapely.affinity as aff
 from papermodels.datatypes.exceptions import GeometryError
+import load_distribution as ld
 
 Geometry = Union[LineString, Polygon]
 IntersectingGeometry = Union[Point, LineString]
@@ -539,6 +540,29 @@ def order_nodes_positive(points: list[Point]) -> tuple[Point]:
     with a "positive x bias" because such a vector will never point in the -ve x direction.
     """
     return tuple(sorted(points, key=lambda x: x.coords[0]))
+
+
+def relate_point_to_line(point: Point, line: LineString) -> tuple:
+    """
+    REturns a tuple of ('left'/'right', 'above'/'below') to describe
+    where teh point is in relation to the line
+    """
+    try:
+        slope, intercept = ld.get_slope_and_intercept(*line.coords)
+    except ZeroDivisionError:
+        slope = 1
+        intercept = float("inf")
+    xp, yp = point.coords[0]
+    yl = slope * xp + intercept
+    delta_y = yl - yp
+    if delta_y > 0 and slope >= 0:
+        return ("right", "below")
+    elif delta_y > 0 and slope < 0:
+        return ("left", "below")
+    elif delta_y < 0 and slope >= 0:
+        return ("left", "above")
+    elif delta_y < 0 and slope < 0:
+        return ("right", "above")
 
 
 def project_node(node: Point, vector: np.ndarray, magnitude: float):
