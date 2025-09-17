@@ -122,7 +122,7 @@ def test_resi_dormers_array(load_resi_dormers):
 
 def test_many_correspondents(load_many_correspondents):
     graph = load_many_correspondents
-    assert len(graph.nodes['WT2.0']['element'].correspondents_below) == 1
-    assert len(graph.nodes['WB1.1']['element'].correspondents_above) == 1
-    assert graph.nodes['WT2.0']['element'].correspondents_below[0].other_tag == "WB1.1"
-    assert graph.nodes['WB1.1']['element'].correspondents_above[0].other_tag == "WT2.0"
+    assert len(graph.nodes["WT2.0"]["element"].correspondents_below) == 1
+    assert len(graph.nodes["WB1.1"]["element"].correspondents_above) == 1
+    assert graph.nodes["WT2.0"]["element"].correspondents_below[0].other_tag == "WB1.1"
+    assert graph.nodes["WB1.1"]["element"].correspondents_above[0].other_tag == "WT2.0"
