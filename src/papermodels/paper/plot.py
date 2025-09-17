@@ -9,6 +9,7 @@ import numpy as np
 import parse
 from ..datatypes.annotation import Annotation
 from shapely.ops import polylabel
+import textalloc as ta
 
 
 def plot_annotations(
@@ -32,6 +33,11 @@ def plot_annotations(
     has_tags = False
     min_extent = np.array([float("-inf"), float("-inf")])
     max_extent = np.array([float("inf"), float("inf")])
+    text_annotations = []
+    initial_positions_x = []
+    initial_positions_y = []
+    lines_x = []
+    lines_y = []
     for idx, annot in enumerate(annots):
         if annotation_dict:
             has_tags = "tag" in annots[annot]
@@ -50,6 +56,11 @@ def plot_annotations(
             "rectangle",
             "rectangle sketch to scale",
         ):
+            geom = annots[annot]['geometry']
+            minx, miny, maxx, maxy = geom.bounds
+            lines_x.append([minx * dpi / 72, maxx * dpi / 72])
+            lines_y.append([miny * dpi / 72, maxy * dpi / 72])
+
             xy = xy_vertices(annot.vertices, dpi)
             if sum(max_extent) == float("inf"):
                 min_extent = np.maximum(max_extent, np.max(xy, axis=1))
@@ -71,6 +82,8 @@ def plot_annotations(
             )
         elif annot.object_type.lower() in ("line", "polyline"):
             xy = xy_vertices(annot.vertices, dpi)
+            lines_x.append(xy[0])
+            lines_y.append(xy[1])
             ax.plot(
                 xy[0],
                 xy[1],
@@ -86,11 +99,14 @@ def plot_annotations(
             rep_point = np.array(geom.representative_point().coords[0])
             centroid_point = np.array(geom.centroid.coords[0])
             plot_point = (rep_point + centroid_point) / 2
-            ax.annotate(
-                tag,
-                plot_point * dpi / 72,
-                zorder=100 * len(annots),
-            )
+            initial_positions_x.append(plot_point[0] * dpi / 72)
+            initial_positions_y.append(plot_point[1] * dpi / 72)
+            text_annotations.append(tag)
+            # ax.annotate(
+            #     tag,
+            #     plot_point * dpi / 72,
+            #     zorder=100 * len(annots),
+            # )
 
     ax.set_aspect("equal")
     plot_margin_metric = np.linalg.norm(
@@ -103,6 +119,19 @@ def plot_annotations(
     ax.set_ylim(
         min_extent[1] - plot_margin_metric * 0.05,
         max_extent[1] + plot_margin_metric * 0.05,
+    )
+    ta.allocate(
+        ax=ax,
+        x=initial_positions_x,
+        y=initial_positions_y,
+        text_list=text_annotations,
+        x_lines=lines_x,
+        y_lines=lines_y,
+        textsize=8,
+        textcolor='k',
+        linecolor='k',
+        avoid_label_lines_overlap=True,
+        avoid_crossing_label_lines=True,
     )
     return fig
 

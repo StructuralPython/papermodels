@@ -738,8 +738,48 @@ class GeometryGraph(nx.DiGraph):
         graph.loading_geometries = parsed_annotations_to_loading_geometry(load_entries)
         return graph
 
-    def plot_connectivity(self):
-        return nx.draw_spectral(self, with_labels=True)
+    def plot_connectivity(self, filepath: Optional[pathlib.Path | str] = None) -> None:
+        """
+        Using GraphViz, this function plots the connectivity, a representation of
+        a load path, between members where each member is represented as a node in
+        the graph and each connection is represented by a directional edge (arrow).
+
+        If 'filepath' is provided, then the resulting SVG image of the graph will
+        be saved to disk.
+
+        If 'filepath' is None, then display of the SVG will be attempted through
+        IPython.display.
+
+        If the designer is not within a Jupyter-like environment, then the SVG
+        string will be returned.
+
+        Requires GraphViz to be independently installed. Installation instructions
+        here: https://graphviz.org/download/
+        """
+        try:
+            plotting = nx.drawing.nx_agraph.to_agraph(self)
+        except:
+            raise ImportError(
+                "The GraphViz application is missing. Install at https://graphviz.org/download/"
+            )
+        plotting.layout(prog="dot")
+        svg_string = plotting.draw(format="svg")
+        if filepath:
+            with open(filepath, "wb") as file:
+                file.write(svg_string)
+                return
+        else:
+            try:
+                from IPython.display import SVG, display
+            except ImportError:
+                print("printing string")
+                return
+            try:
+                get_ipython
+            except NameError:
+                display(svg_string)
+                return
+            display(SVG(svg_string))
 
     def plot_annotations(
         self, page_idx: int, figsize: tuple[float, float] = (8, 8), dpi: int = 150

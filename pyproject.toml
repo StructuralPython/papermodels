@@ -25,7 +25,9 @@ dependencies = [
     "pycba",
     "rich",
     "forallpeople",
-    "tomli-w"
+    "tomli-w",
+    "pygraphviz>=1.14",
+    "textalloc>=1.2.1",
 ]
 
 
@@ -34,5 +36,6 @@ Home = "https://github.com/structuralpython/papermodels"
 
 [dependency-groups]
 dev = [
+    "black>=25.1.0",
     "ipykernel>=6.30.1",
 ]
