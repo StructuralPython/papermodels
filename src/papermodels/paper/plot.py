@@ -56,7 +56,7 @@ def plot_annotations(
             "rectangle",
             "rectangle sketch to scale",
         ):
-            geom = annots[annot]['geometry']
+            geom = annots[annot]["geometry"]
             minx, miny, maxx, maxy = geom.bounds
             lines_x.append([minx * dpi / 72, maxx * dpi / 72])
             lines_y.append([miny * dpi / 72, maxy * dpi / 72])
@@ -128,8 +128,8 @@ def plot_annotations(
         x_lines=lines_x,
         y_lines=lines_y,
         textsize=8,
-        textcolor='k',
-        linecolor='k',
+        textcolor="k",
+        linecolor="k",
         avoid_label_lines_overlap=True,
         avoid_crossing_label_lines=True,
     )
