@@ -737,13 +737,12 @@ class GeometryGraph(nx.DiGraph):
         graph.legend_entries = legend_entries
         graph.loading_geometries = parsed_annotations_to_loading_geometry(load_entries)
         return graph
-    
 
     def plot_connectivity(self, filepath: Optional[pathlib.Path | str] = None) -> None:
         """
-        Using GraphViz, this function plots the connectivity, a representation of 
-        a load path, between members where each member is represented as a node in 
-        the graph and each connection is represented by a directional edge (arrow). 
+        Using GraphViz, this function plots the connectivity, a representation of
+        a load path, between members where each member is represented as a node in
+        the graph and each connection is represented by a directional edge (arrow).
 
         If 'filepath' is provided, then the resulting SVG image of the graph will
         be saved to disk.
@@ -758,10 +757,10 @@ class GeometryGraph(nx.DiGraph):
         here: https://graphviz.org/download/
         """
         plotting = nx.drawing.nx_agraph.to_agraph(self)
-        plotting.layout(prog='dot')
-        svg_string = plotting.draw(format='svg')
+        plotting.layout(prog="dot")
+        svg_string = plotting.draw(format="svg")
         if filepath:
-            with open(filepath, 'wb') as file:
+            with open(filepath, "wb") as file:
                 file.write(svg_string)
                 return
         else:
@@ -776,7 +775,6 @@ class GeometryGraph(nx.DiGraph):
                 display(svg_string)
                 return
             display(SVG(svg_string))
-
 
     def plot_annotations(
         self, page_idx: int, figsize: tuple[float, float] = (8, 8), dpi: int = 150
