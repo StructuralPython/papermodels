@@ -6,4 +6,4 @@ from . import datatypes
 from . import loads
 from . import paper
 
-__version__ = "0.12.1"
+__version__ = "0.13.0"
