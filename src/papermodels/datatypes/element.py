@@ -543,6 +543,8 @@ class LoadedElement(Element):
                 "horz_intersects_below": [
                     inter.other_tag for inter in self.intersections_below
                 ],
+                "reaction_type": self.reaction_type,
+                "rank": self.rank,
                 "user_defined": available_kwargs,
             },
             "element_geometry": {
@@ -590,7 +592,7 @@ class LoadedElement(Element):
                 supports_acc.append(
                     {"location": round(support_location, precision), "fixity": fixity}
                 )
-            return supports_acc
+            return sorted(supports_acc, key=lambda x: x["location"])
         else:
             return []
 
