@@ -623,6 +623,17 @@ class LoadedElement(Element):
                     for intersection in self.intersections_above
                 ],
             )
+        elif self.geometry.geom_type == "Polygon" and self.reaction_type == "linear":
+            coords_a, coords_b = Point(coords_a), Point(coords_b)
+            ordered_coords = geom_ops.order_nodes_positive([coords_a, coords_b])
+            start_coord = ordered_coords[0]
+            transfer_locations = geom_ops.get_local_intersection_ordinates(
+                start_coord,
+                [
+                    intersection.intersecting_region
+                    for intersection in self.intersections_above
+                ],
+            )
         else:  # But not when it is a column
             start_coord = coords_a
             # This is where teh eccentricity can be calculated based on using the

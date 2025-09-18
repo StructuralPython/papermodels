@@ -10,6 +10,7 @@ from pytest import fixture
 from shapely import Polygon, box, Point
 import pathlib
 import fixtures
+import math
 from decimal import Decimal
 
 QUARTER_INCH_SCALE = Decimal(1) / Decimal(72) * Decimal(4)
@@ -182,3 +183,25 @@ def test_collector_extent_creates_loaded_elements(
     )
     assert les["FB0.0"].model()["loads"]["distributed_loads"][1]["start_loc"] == 3.01
     assert les["FB0.0"].model()["loads"]["distributed_loads"][1]["end_loc"] == 3.912
+
+
+def test_wall_point_load_locations(sketch_to_scale_to_array_loaded_elements):
+    les = sketch_to_scale_to_array_loaded_elements
+    wt4_pt = les["WT4.0"].model()["loads"]["point_loads"]
+    acc = []
+    for load in wt4_pt:
+        acc.append(load["location"])
+
+    # Test that all intervals are about the same size by not exceeding the prescribed spacing
+    # First, for walls
+    joist_intervals = [x[0] - x[1] for x in zip(acc[:-1], acc[1:])]
+    assert math.isclose(max(joist_intervals), 1)
+
+    # Test that all intervals are about the same size by not exceeding the prescribed spacing
+    # Next, for beams
+    fb4_pt = les["FB4.0"].model()["loads"]["point_loads"]
+    acc = []
+    for load in fb4_pt:
+        acc.append(load["location"])
+    joist_intervals = [x[0] - x[1] for x in zip(acc[:-1], acc[1:])]
+    assert math.isclose(max(joist_intervals), 1)
