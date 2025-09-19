@@ -833,6 +833,7 @@ class LoadedElement(Element):
                         "applied_area": round(
                             intersected_poly.area * trapezoid_ratio, precision
                         ),
+                        "total_area_ratio": trapezoid_ratio,
                         "start_loc": round(start_x, precision),
                         "start_magnitude": round(start_y, precision),
                         "end_loc": round(end_x, precision),
