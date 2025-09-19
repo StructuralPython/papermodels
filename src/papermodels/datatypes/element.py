@@ -823,8 +823,13 @@ class LoadedElement(Element):
                     area_dist_load = geom_ops.trapezoid_area(
                         h=(end_x - start_x), b1=start_y, b2=end_y
                     )
-                    trapezoid_ratio = area_dist_load / total_polygon_area
+                    try:
+                        trapezoid_ratio = area_dist_load / total_polygon_area
+                    except ZeroDivisionError:
+                        continue # Skip this dist load if there is no polygon area
                     intersected_poly, applied_loading = self.applied_loading_areas[idx]
+                    if trapezoid_ratio == 0.0 and intersected_poly.area == 0.0:
+                        continue # Skip this dist load if there is no intersection area
                     dist_load = {
                         "transfer_source": "",
                         "transfer_reaction_index": "",
