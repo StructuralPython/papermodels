@@ -210,17 +210,27 @@ def get_joist_extents(
         (the relevant line segment which provides the support to 'joist_prototype')
     'trib_area' if passed, the intersection of the trib area and the support geoms
         will be used to determine the extent locations.
+    'extent_polygon', an optional parameter which changes the behaviour of this function
+        for situations when the extents of the total extent polygon are required, regardless
+        of the support locations within it.
     'eps' is a small tolerance amount to deal with floating point error in the extent
         calcualtion.
     """
-    # if extent_polygon is not None:
-    #     sorted_support_geoms = sort_supports(joist_prototype, joist_supports)
-    #     extents = []
-    #     for support_geom in sorted_support_geoms:
-    #         intersecting_region: LineString = trib_area.intersection(support_geom)
-    #         extent_start, extent_end = get_start_end_nodes(intersecting_region)
-    #         extents.append((extent_start, extent_end))
-    #     return extents
+    if extent_polygon is not None:
+        joist_vector = np.abs(get_direction_vector(joist_prototype))
+        # This is one of the places where orthogonality is assumed
+        joist_orientation = None
+        if joist_vector[0] > joist_vector[1]:
+            joist_orientation = "horizontal"
+        elif joist_vector[1] > joist_vector[0]:
+            joist_orientation = "vertical"
+        
+        minx, miny, maxx, maxy = extent_polygon.bounds
+        if joist_orientation == "horizontal":
+            extents = [(Point(minx, miny), Point(minx, maxy)), (Point(maxx, miny), Point(maxx, maxy))]
+        else:
+            extents = [(Point(minx, miny), Point(maxx, miny)), (Point(minx, maxy), Point(maxx, maxy))] 
+        return extents
     
     # TODO: The trib_area may not be what we think when it comes to add_intersection_indexes_below
     if trib_area is not None:
@@ -240,15 +250,15 @@ def get_joist_extents(
     left_coords = []
     right_coords = []
     for joist_support in joist_supports:
-        display("Joist Support before intersection")
-        display(GeometryCollection([extended_joist_prototype, joist_support, box(*supports_bbox)]))
+        # display("Joist Support before intersection")
+        # display(GeometryCollection([extended_joist_prototype, joist_support, box(*supports_bbox)]))
         joist_support = joist_support.intersection(box(*supports_bbox))
-        display(f"{joist_support.is_empty=}")
+        # display(f"{joist_support.is_empty=}")
 
         start_coord, end_coord = joist_support.coords
         start_coord, end_coord = Point(start_coord), Point(end_coord)
-        print(f"{extended_joist_prototype.intersects(start_coord)=}")
-        display(GeometryCollection([extended_joist_prototype, joist_support, start_coord, end_coord]))
+        # print(f"{extended_joist_prototype.intersects(start_coord)=}")
+        # display(GeometryCollection([extended_joist_prototype, joist_support, start_coord, end_coord]))
 
         # display(GeometryCollection([start_coord, end_coord, extended_joist_prototype]))
         start_coord_rotation = cross_product_2d(
@@ -257,7 +267,7 @@ def get_joist_extents(
         end_coord_rotation = cross_product_2d(
             joist_vector, np.array(end_coord.coords[0]) - orig_joist_origin
         )
-        print(f"{start_coord_rotation=} | {end_coord_rotation=}")
+        # print(f"{start_coord_rotation=} | {end_coord_rotation=}")
         # if 0.0 <= start_coord_rotation:
         #     left_coords.append(start_coord)
         # elif start_coord_rotation < 0.0:
@@ -530,6 +540,8 @@ def sort_supports(
     docstring for get_start_end_nodes for more explanation of the +ve vector direction.
     """
     all_supports = MultiLineString(supports)
+    from IPython.display import display
+    display(GeometryCollection([joist_prototype] + supports))
     ordered_intersections = order_nodes_positive((joist_prototype & all_supports).geoms)
     ordered_supports = []
     for point in ordered_intersections:
