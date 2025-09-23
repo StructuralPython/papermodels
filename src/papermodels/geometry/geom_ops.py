@@ -213,14 +213,14 @@ def get_joist_extents(
     'eps' is a small tolerance amount to deal with floating point error in the extent
         calcualtion.
     """
-    if extent_polygon is not None:
-        sorted_support_geoms = sort_supports(joist_prototype, joist_supports)
-        extents = []
-        for support_geom in sorted_support_geoms:
-            intersecting_region: LineString = trib_area.intersection(support_geom)
-            extent_start, extent_end = get_start_end_nodes(intersecting_region)
-            extents.append((extent_start, extent_end))
-        return extents
+    # if extent_polygon is not None:
+    #     sorted_support_geoms = sort_supports(joist_prototype, joist_supports)
+    #     extents = []
+    #     for support_geom in sorted_support_geoms:
+    #         intersecting_region: LineString = trib_area.intersection(support_geom)
+    #         extent_start, extent_end = get_start_end_nodes(intersecting_region)
+    #         extents.append((extent_start, extent_end))
+    #     return extents
     
     # TODO: The trib_area may not be what we think when it comes to add_intersection_indexes_below
     if trib_area is not None:

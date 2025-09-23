@@ -401,7 +401,7 @@ class JoistArrayModel:
         self.use_subelements = True
         try:
             self._extents = geom_ops.get_joist_extents(
-                self.joist_prototype, self.joist_supports, trib_area=None, extent_polygon=self.extent_polygon
+                self.joist_prototype, self.joist_supports, trib_area=self.extent_polygon, extent_polygon=self.extent_polygon
             )
             # self._extents = geom_ops.get_joist_extents(
             #     self.joist_prototype, self.joist_supports, trib_area=self.extent_polygon, extent_polygon=self.extent_polygon
@@ -490,10 +490,10 @@ class JoistArrayModel:
             intersections_below = []
             for sup_idx, support_geom in enumerate(self.joist_supports):
                 other_tag = self.joist_support_tags[sup_idx]
-                # from IPython.display import display
-                # print(self.element.tag)
-                # display(GeometryCollection(self.joist_supports + [joist_geom]))
-                # display(GeometryCollection(self.joist_supports + [self.element.geometry]))
+                from IPython.display import display
+                print(self.element.tag)
+                display(GeometryCollection(self.joist_supports + [joist_geom]))
+                display(GeometryCollection(self.joist_supports + [self.element.geometry]))
                 intersection_attrs = geom_ops.get_intersection(
                     joist_geom, support_geom, other_tag
                 )
