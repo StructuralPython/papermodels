@@ -401,8 +401,11 @@ class JoistArrayModel:
         self.use_subelements = True
         try:
             self._extents = geom_ops.get_joist_extents(
-                self.joist_prototype, self.joist_supports, trib_area=self.extent_polygon
+                self.joist_prototype, self.joist_supports, trib_area=None, extent_polygon=self.extent_polygon
             )
+            # self._extents = geom_ops.get_joist_extents(
+            #     self.joist_prototype, self.joist_supports, trib_area=self.extent_polygon, extent_polygon=self.extent_polygon
+            # )
         except AssertionError as e:
             raise AssertionError(
                 f"No intersection within joist extents: {element.tag=}"
@@ -429,7 +432,6 @@ class JoistArrayModel:
             self.initial_offset,
             self.joist_at_start,
         )
-        print(f"{self.joist_locations=}")
         self.joist_geoms = [
             self.generate_joist_geom(idx) for idx, _ in enumerate(self.joist_locations)
         ]
@@ -575,6 +577,7 @@ class JoistArrayModel:
             ray_b = LineString([ray_bi, ray_bj])
             support_a_loc = ray_a.intersection(self._supports[0])
             support_b_loc = ray_b.intersection(self._supports[-1])
+            print(f"{support_a_loc=} | {support_b_loc=}")
 
             end_a = support_a_loc
             end_b = support_b_loc

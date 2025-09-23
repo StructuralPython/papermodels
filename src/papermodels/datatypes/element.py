@@ -279,6 +279,7 @@ class Element:
                     self.geometry,
                     ordered_support_geoms,
                     self.trib_area,
+                    extent_polygon=self.extent_polygon
                 )
             except AssertionError as e:
                 raise AssertionError(
