@@ -428,7 +428,6 @@ class JoistArrayModel:
             self.spacing,
             self.initial_offset,
             self.joist_at_start,
-            self.joist_at_end,
         )
         print(f"{self.joist_locations=}")
         self.joist_geoms = [
