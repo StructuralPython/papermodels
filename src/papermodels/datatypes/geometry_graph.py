@@ -324,6 +324,8 @@ class GeometryGraph(nx.DiGraph):
                                 start_coord, sub_dependent_intersections
                             )
                             subextents = subelem.get_collector_extents()
+                            print(subelem.tag)
+                            print(subextents)
                             sub_sorted_below_ints = sorted(
                                 sub_local_coords, key=lambda x: x[0]
                             )

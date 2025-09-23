@@ -217,6 +217,7 @@ def get_joist_extents(
         calcualtion.
     """
     if extent_polygon is not None:
+        print("HERE")
         joist_vector = np.abs(get_direction_vector(joist_prototype))
         # This is one of the places where orthogonality is assumed
         joist_orientation = None

@@ -530,7 +530,7 @@ class JoistArrayModel:
                 subelements=None,
                 trib_area=trib_area,
                 kwargs=self.elem_kwargs,
-                extent_polygon=self.extent_polygon,
+                # extent_polygon=self.extent_polygon,
 
             )
             subelements.append(element)
