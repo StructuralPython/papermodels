@@ -369,9 +369,13 @@ class JoistArrayModel:
         joist_at_end: bool = False,
         cantilever_tolerance: float = 1e-2,
     ):
+        from shapely.wkt import dumps
         self.joist_prototype = LineString(
             geom_ops.get_start_end_nodes(element.geometry)
         )
+        # from IPython.display import display
+        # display(GeometryCollection([self.joist_prototype, element.geometry]))
+        # display(self.joist_prototype == element.geometry)
         self.element = element
         try:
             self.joist_supports = geom_ops.clean_polygon_supports(
@@ -382,6 +386,7 @@ class JoistArrayModel:
             raise AssertionError(
                 f"No intersection at cleaned_support: {element.tag=}. Is geometry right on the edge of the support?"
             )
+        
         self.joist_support_tags = [ib.other_tag for ib in element.intersections_below]
         self.id = element.tag
         self.plane_id = element.plane_id
@@ -396,7 +401,7 @@ class JoistArrayModel:
         self.use_subelements = True
         try:
             self._extents = geom_ops.get_joist_extents(
-                self.joist_prototype, self.joist_supports
+                self.joist_prototype, self.joist_supports, trib_area=self.extent_polygon
             )
         except AssertionError as e:
             raise AssertionError(
@@ -411,15 +416,21 @@ class JoistArrayModel:
         )
         self.vector_parallel = geom_ops.get_direction_vector(self.joist_prototype)
         self.vector_normal = geom_ops.rotate_90_vector(self.vector_parallel, ccw=True)
-        self.joist_at_start = float(joist_at_start)
-        self.joist_at_end = float(joist_at_end)
+        # display(self.vector_parallel)
+        # display(self.joist_prototype)
+        # display(self.element.geometry)
+
+        self.joist_at_start = joist_at_start
+        self.joist_at_end = joist_at_end
         self.joist_locations = geom_ops.get_joist_locations(
             self.get_extent_edge("start"),
             self.get_extent_edge("end"),
             self.spacing,
             self.initial_offset,
             self.joist_at_start,
+            self.joist_at_end,
         )
+        print(f"{self.joist_locations=}")
         self.joist_geoms = [
             self.generate_joist_geom(idx) for idx, _ in enumerate(self.joist_locations)
         ]
@@ -478,6 +489,10 @@ class JoistArrayModel:
             intersections_below = []
             for sup_idx, support_geom in enumerate(self.joist_supports):
                 other_tag = self.joist_support_tags[sup_idx]
+                # from IPython.display import display
+                # print(self.element.tag)
+                # display(GeometryCollection(self.joist_supports + [joist_geom]))
+                # display(GeometryCollection(self.joist_supports + [self.element.geometry]))
                 intersection_attrs = geom_ops.get_intersection(
                     joist_geom, support_geom, other_tag
                 )
@@ -496,6 +511,7 @@ class JoistArrayModel:
                 trib_area=trib_area,
                 kwargs=self.elem_kwargs,
                 extent_polygon=self.extent_polygon,
+
             )
             subelements.append(element)
         new_element = Element(
@@ -633,16 +649,16 @@ class JoistArrayModel:
         # Left - # TODO: Can I not just buffer the joist? I guess that if the joist is on an
         # angle then extents won't capture the angle.
         if trib_left != 0.0:
-            i_left = geom_ops.project_node(i_node, -self.vector_normal, trib_left)
-            j_left = geom_ops.project_node(j_node, -self.vector_normal, trib_left)
+            i_left = geom_ops.project_node(i_node, self.vector_normal, trib_left)
+            j_left = geom_ops.project_node(j_node, self.vector_normal, trib_left)
             trib_area_left = convex_hull(MultiPoint([i_left, j_left, j_node, i_node]))
         else:
             trib_area_left = Polygon()
 
         # Right
         if trib_right != 0.0:
-            i_right = geom_ops.project_node(i_node, self.vector_normal, trib_right)
-            j_right = geom_ops.project_node(j_node, self.vector_normal, trib_right)
+            i_right = geom_ops.project_node(i_node, -self.vector_normal, trib_right)
+            j_right = geom_ops.project_node(j_node, -self.vector_normal, trib_right)
             trib_area_right = convex_hull(
                 MultiPoint([i_right, j_right, j_node, i_node])
             )
