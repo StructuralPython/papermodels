@@ -213,7 +213,7 @@ def get_joist_extents(
     'eps' is a small tolerance amount to deal with floating point error in the extent
         calcualtion.
     """
-    if trib_area is None and extent_polygon is not None:
+    if extent_polygon is not None:
         sorted_support_geoms = sort_supports(joist_prototype, joist_supports)
         extents = []
         for support_geom in sorted_support_geoms:
@@ -258,14 +258,20 @@ def get_joist_extents(
             joist_vector, np.array(end_coord.coords[0]) - orig_joist_origin
         )
         print(f"{start_coord_rotation=} | {end_coord_rotation=}")
+        # if 0.0 <= start_coord_rotation:
+        #     left_coords.append(start_coord)
+        # elif start_coord_rotation < 0.0:
+        #     right_coords.append(start_coord)
+        # if 0.0 < end_coord_rotation:
+        #     left_coords.append(end_coord)
+        # elif end_coord_rotation <= 0.0:
+        #     right_coords.append(end_coord)
         if 0.0 <= start_coord_rotation:
             left_coords.append(start_coord)
-        elif start_coord_rotation < 0.0:
-            right_coords.append(start_coord)
-        if 0.0 < end_coord_rotation:
-            left_coords.append(end_coord)
-        elif end_coord_rotation <= 0.0:
             right_coords.append(end_coord)
+        else:
+            left_coords.append(end_coord)
+            right_coords.append(start_coord)
 
     closest_left_coord = min(
         left_coords, key=lambda x: x.distance(extended_joist_prototype)
