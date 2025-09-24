@@ -68,6 +68,7 @@ def plot_annotations(
             else:
                 min_extent = np.minimum(min_extent, np.min(xy, axis=1))
                 max_extent = np.maximum(max_extent, np.max(xy, axis=1))
+            face_color = tuple(float(elem) for elem in annot.fill_color) if annot.fill_color is not None else None
             ax.add_patch(
                 Polygon(
                     xy=xy.T,
@@ -75,8 +76,8 @@ def plot_annotations(
                     linestyle=annot.line_type,
                     linewidth=float(annot.line_weight),
                     ec=tuple(float(elem) for elem in annot.line_color),
-                    fc=tuple(float(elem) for elem in annot.fill_color),
-                    alpha=float(annot.fill_opacity),
+                    fc=face_color,
+                    alpha=0.2 * float(annot.fill_opacity),
                     zorder=idx,
                 )
             )

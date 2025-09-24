@@ -22,6 +22,7 @@ from ..paper.annotations import (
     filter_annotations,
     tag_parsed_annotations,
     assign_page_id_to_annotations,
+    annotation_to_shapely
 )
 from ..paper.plot import plot_annotations
 from ..paper import pdf
@@ -278,6 +279,8 @@ class GeometryGraph(nx.DiGraph):
             dependents = list(self.successors(node))
             dependent_intersections = get_dependent_intersections(element, dependents)
             dependent_correspondents = get_dependent_correspondents(element, dependents)
+            if not dependent_intersections and not dependent_correspondents:
+                continue
             if element.geometry.geom_type == "Polygon":  # node geometry is polygon
                 updated_intersections_below = []
                 all_extents = {}
@@ -420,6 +423,8 @@ class GeometryGraph(nx.DiGraph):
                 for correspondent in element.correspondents_above
                 if correspondent.other_tag in predecessors
             ]
+            if not predecessor_intersections and not predecessor_correspondents:
+                continue
             indexed_intersections_above = []
             for intersection in predecessor_intersections:
                 other_tag = intersection.other_tag
@@ -577,7 +582,7 @@ class GeometryGraph(nx.DiGraph):
         dxf_filepath: pathlib.Path | str,
         legend_table: dict | pathlib.Path | str,
         page_idx: int = 0,
-        scale: float= 1.0,
+        scale: Decimal = Decimal(1.0),
         debug: bool = False,
         progress: bool = False,
         do_not_process: bool = False,
@@ -606,6 +611,10 @@ class GeometryGraph(nx.DiGraph):
         annotations = dxf.load_dxf_annotations(dxf_filepath, page_idx)
         scaled_annotations = scale_annotations(annotations, scale=scale, paper_origin=(0,0))
 
+            # parsed_annotations = parse_annotations(
+            #     scaled_annots_in_page, legend_entries, legend_identifier
+            # )
+
         load_entries = {}
         trib_area_entries = {}
         structural_element_entries = {}
@@ -614,11 +623,38 @@ class GeometryGraph(nx.DiGraph):
         for idx, scaled_annot in enumerate(scaled_annotations):
             raw_annot = annotations[idx]
             layer_name = scaled_annot.text
-            annot_attrs = legend_table.get(layer_name, {})
+            annot_attrs = legend_table.get(layer_name)
+            if annot_attrs is None:
+                continue
+            annot_attrs = {k.lower(): v for k, v in annot_attrs.items()}
+
+            annot_attrs.update({"extent_polygon": None})
+            existing_annot_tag = annot_attrs.get("tag", None)
+            annot_geom = annotation_to_shapely(scaled_annot)
+            annot_attrs["geometry"] = annot_geom
+            annot_attrs["page_label"] = scaled_annot.page
+            annot_attrs["tag"] = existing_annot_tag
+
+            if "extent" in annot_attrs["type"]:
+                parsed_annotations.update({scaled_annot: annot_attrs})
+            else:
+                annot_attrs.setdefault("reaction_type", "point")
+                annot_attrs["reaction_type"] = annot_attrs["reaction_type"].lower()
+                if (
+                    annot_geom.geom_type == "Polygon"
+                    and annot_attrs["reaction_type"] == "linear"
+                ):
+                    annot_attrs["length"] = geom.get_rectangle_centerline(
+                        annot_geom
+                    ).length
+                parsed_annotations.update({scaled_annot: annot_attrs})
+
             parsed_annotations[scaled_annot] = annot_attrs
             raw_annotations[raw_annot] = annot_attrs
 
             if "occupancy" in annot_attrs:
+                load_entries.update({scaled_annot: annot_attrs})
+            elif "type" in annot_attrs and "hole" in annot_attrs['type'].lower():
                 load_entries.update({scaled_annot: annot_attrs})
             elif "type" in annot_attrs and "trib area" in annot_attrs['type'].lower():
                 trib_area_entries.update({scaled_annot: annot_attrs})
@@ -628,11 +664,54 @@ class GeometryGraph(nx.DiGraph):
                 structural_element_entries.update({scaled_annot: annot_attrs})
 
         elements = Element.from_parsed_annotations(structural_element_entries, trib_area_entries)
+        # print(elements)
         graph = cls.from_elements(elements, do_not_process=do_not_process)
         graph.parsed_annotations = tag_parsed_annotations(parsed_annotations)
         graph.raw_annotations = tag_parsed_annotations(raw_annotations)
         graph.legend_entries = {}
         graph.loading_geometries = parsed_annotations_to_loading_geometry(load_entries)
+        return graph
+
+
+
+    def parse_annotations():
+        parsed_annotations = {}
+        for legend_item in legend:
+            legend_properties = {
+                prop: getattr(legend_item, prop) for prop in properties_to_match
+            }
+            matching_annots = filter_annotations(annots, legend_properties)
+            annot_attributes = parse_legend(legend_item.text, legend_identifier)
+            for annot in matching_annots:
+                if annot in legend:
+                    continue
+                annot_kwargs = parse_annot_kwargs(annot.text)
+                existing_annot_tag = annot_kwargs.get("tag", None)
+                annot_geom = annotation_to_shapely(annot)
+                annot_attrs = {}
+                annot_attrs["geometry"] = annot_geom
+                annot_attrs["page_label"] = annot.page
+                annot_attrs["tag"] = existing_annot_tag
+                for annot_key, annot_attr in annot_attributes.items():
+                    annot_attrs[annot_key] = str_to_int(
+                        annot_attr.split("<")[0]
+                    )  # .split() to remove trailing HTML tags
+
+                # Run tests for this first
+                # annot_attrs["rank"] = int(annot_attributes["rank"])
+                if "extent" in annot_attrs["type"]:
+                    parsed_annotations.update({annot: annot_attrs})
+                else:
+                    annot_attrs.setdefault("reaction_type", "point")
+                    annot_attrs["reaction_type"] = annot_attrs["reaction_type"].lower()
+                    if (
+                        annot_geom.geom_type == "Polygon"
+                        and annot_attrs["reaction_type"] == "linear"
+                    ):
+                        annot_attrs["length"] = geom_ops.get_rectangle_centerline(
+                            annot_geom
+                        ).length
+                    parsed_annotations.update({annot: annot_attrs | annot_kwargs})
         
         
     def unassigned_collectors(self) -> list[str]:

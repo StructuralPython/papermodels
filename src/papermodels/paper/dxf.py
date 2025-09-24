@@ -102,8 +102,8 @@ def dxf_entity_to_annotation(entity: ezdxf.entities.DXFGraphic, page_idx: int, l
     line_color = (0, 0, 0)#entity.dxf.color # convert to RBG tuple
     line_type = None #entity.dxf.linetype
     line_weight = 1.0#entity.dxf.thickness
-    transparency = 1.0 #entity.dxf.transparency or 1.0
-    opacity = 1.0 - transparency
+    # transparency = 1.0 #entity.dxf.transparency or 1.0
+    opacity = 1.0 #- transparency
     vertices = coords_to_vertices_list(coords)
     return Annotation(
         page=page_idx,
@@ -111,7 +111,7 @@ def dxf_entity_to_annotation(entity: ezdxf.entities.DXFGraphic, page_idx: int, l
         text=text,
         vertices=vertices,
         line_color=line_color,
-        fill_color = (1, 1, 1),
+        fill_color = None,
         line_type=line_type,
         line_weight=line_weight,
         line_opacity=opacity,
@@ -150,8 +150,10 @@ def parse_line_coords(entity: ezdxf.entities.DXFGraphic):
 
 
 def parse_polyline_coords(entity: ezdxf.entities.DXFGraphic):
-    print(entity.get_points())
-    coords = [[(p[0][0], p[0][1]), (p[1][0], p[1][1])] for p in entity.get_points()]
+    # point_pairs = zip(entity.get_points(), entity.get_points()[1:])
+    # coords = [[(p[0][0], p[0][1]), (p[1][0], p[1][1])] for p in point_pairs]
+    coords = [(p[0], p[1]) for p in entity.get_points()]
+
     return coords
 
 
@@ -178,7 +180,7 @@ def coords_to_vertices_list(coords: list[tuple[float, float]]) -> list:
     """
     vertices = []
     for coord in coords:
-        coord_i, coord_j = coord[0], coord[1]
-        vertices.append(coord_i)
-        vertices.append(coord_j)
+        x, y = coord[0], coord[1]
+        vertices.append(Decimal(x))
+        vertices.append(Decimal(y))
     return tuple(vertices)
