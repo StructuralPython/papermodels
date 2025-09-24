@@ -52,7 +52,7 @@ class GeometryGraph(nx.DiGraph):
 
     @property
     def collector_elements(self):
-        return [node for node in self.nodes if not list(self.predecessors(node))]
+        return [node for node in self.nodes if not list(self.predecessors(node)) if self.nodes[node]['element'].rank == 0]
 
     @property
     def transfer_elements(self):
