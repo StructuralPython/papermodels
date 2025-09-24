@@ -7,6 +7,7 @@ from papermodels.datatypes.joist_models import JoistArrayModel, CollectorTribMod
 import numpy as np
 import numpy.testing as npt
 from pytest import fixture
+from pytest_check import check
 from shapely import Polygon, box, Point
 import pathlib
 import fixtures
@@ -104,17 +105,18 @@ def test_kwargs_pass_thru_sketch_to_scale_array(
 def test_joists_loaded_sketch_to_scale(sketch_to_scale_to_trib_loaded_elements):
     les = sketch_to_scale_to_trib_loaded_elements
     j40_joist = les["J4.0"].model()
-    assert j40_joist["loads"]["distributed_loads"][0]["occupancy"] == "roof"
-    assert j40_joist["loads"]["distributed_loads"][0]["applied_area"] == 188.505
-    j40_load = les["WT4.0"].model()["loads"]["distributed_loads"][0]
-    assert j40_load["transfer_source"] == "J4.0"
-    assert j40_load["start_loc"] == 0.573
-    assert j40_load["end_loc"] == 11.687
+    with check:
+        assert j40_joist["loads"]["distributed_loads"][0]["occupancy"] == "roof"
+        assert j40_joist["loads"]["distributed_loads"][0]["applied_area"] == 188.505
+        j40_load = les["WT4.0"].model()["loads"]["distributed_loads"][0]
+        assert j40_load["transfer_source"] == "J4.0"
+        assert j40_load["start_loc"] == 0.573
+        assert j40_load["end_loc"] == 11.687
 
-    # TODO: Update this test with what start and end locs should actually be
-    fb1_3 = les["FB1.3"].model()
-    assert fb1_3["loads"]["distributed_loads"][0]["start_loc"] == 0.446
-    assert fb1_3["loads"]["distributed_loads"][0]["end_loc"] == 10.837
+        # TODO: Update this test with what start and end locs should actually be
+        fb1_3 = les["FB1.3"].model()
+        assert fb1_3["loads"]["distributed_loads"][0]["start_loc"] == 0.446
+        assert fb1_3["loads"]["distributed_loads"][0]["end_loc"] == 10.837
 
 
 def test_collector_extent_loads(load_collector_extents):
@@ -158,31 +160,38 @@ def test_collector_extent_creates_loaded_elements(
             "CT0.3",
         ]
     )
-    assert les["WT0.3"].model()["loads"][
-        "distributed_loads"
-    ]  # There are loads present on the intermediate support
+    with check:
+        assert les["WT0.3"].model()["loads"][
+            "distributed_loads"
+        ]  # There are loads present on the intermediate support
 
-    assert (
-        les["WT0.1"].model()["loads"]["distributed_loads"][0]["transfer_source"]
-        == "SJ0.0-0"
-    )
-    assert les["WT0.1"].model()["loads"]["distributed_loads"][0]["start_loc"] == 2.521
-    # assert les["WT0.1"].model()["loads"]["distributed_loads"][0]["end_loc"] == 3.858
+        assert (
+            les["WT0.1"].model()["loads"]["distributed_loads"][0]["transfer_source"]
+            == "SJ0.0-0"
+        )
+        assert les["WT0.1"].model()["loads"]["distributed_loads"][0]["start_loc"] == 2.521
+        assert les["WT0.1"].model()["loads"]["distributed_loads"][0]["end_loc"] == 3.858
 
-    # This member experiences a splitting that occurs from an intermediate support that is found
-    # within its overlap region.
-    assert (
-        les["FB0.0"].model()["loads"]["distributed_loads"][0]["transfer_source"]
-        == "SJ0.0-2"
-    )
-    # assert les["FB0.0"].model()["loads"]["distributed_loads"][0]["start_loc"] == 0.327
-    assert les["FB0.0"].model()["loads"]["distributed_loads"][0]["end_loc"] == 3.011
-    assert (
-        les["FB0.0"].model()["loads"]["distributed_loads"][1]["transfer_source"]
-        == "SJ0.0-3"
-    )
-    # assert les["FB0.0"].model()["loads"]["distributed_loads"][1]["start_loc"] == 3.01
-    assert les["FB0.0"].model()["loads"]["distributed_loads"][1]["end_loc"] == 3.912
+        assert les["WT0.1"].model()["loads"]["distributed_loads"][1]["start_loc"] == 3.858
+        assert les["WT0.1"].model()["loads"]["distributed_loads"][1]["end_loc"] == 6.72
+
+        # This member experiences a splitting that occurs from an intermediate support that is found
+        # within its overlap region.
+        assert (
+            les["FB0.0"].model()["loads"]["distributed_loads"][0]["transfer_source"]
+            == "SJ0.0-2"
+        )
+        assert les["FB0.0"].model()["loads"]["distributed_loads"][0]["start_loc"] == 0.327
+        assert les["FB0.0"].model()["loads"]["distributed_loads"][0]["end_loc"] == 3.011
+
+        assert les["FB0.0"].model()["loads"]["distributed_loads"][1]["start_loc"] == 3.011
+        assert les["FB0.0"].model()["loads"]["distributed_loads"][1]["end_loc"] == 3.912
+        assert (
+            les["FB0.0"].model()["loads"]["distributed_loads"][1]["transfer_source"]
+            == "SJ0.0-3"
+        )
+        # assert les["FB0.0"].model()["loads"]["distributed_loads"][1]["start_loc"] == 3.01
+        assert les["FB0.0"].model()["loads"]["distributed_loads"][1]["end_loc"] == 3.912
 
 
 def test_wall_point_load_locations(sketch_to_scale_to_array_loaded_elements):
@@ -192,16 +201,17 @@ def test_wall_point_load_locations(sketch_to_scale_to_array_loaded_elements):
     for load in wt4_pt:
         acc.append(load["location"])
 
-    # Test that all intervals are about the same size by not exceeding the prescribed spacing
-    # First, for walls
-    joist_intervals = [x[0] - x[1] for x in zip(acc[:-1], acc[1:])]
-    assert math.isclose(max(joist_intervals), 1)
+    with check:
+        # Test that all intervals are about the same size by not exceeding the prescribed spacing
+        # First, for walls
+        joist_intervals = [x[0] - x[1] for x in zip(acc[:-1], acc[1:])]
+        assert math.isclose(max(joist_intervals), 1)
 
-    # Test that all intervals are about the same size by not exceeding the prescribed spacing
-    # Next, for beams
-    fb4_pt = les["FB4.0"].model()["loads"]["point_loads"]
-    acc = []
-    for load in fb4_pt:
-        acc.append(load["location"])
-    joist_intervals = [x[0] - x[1] for x in zip(acc[:-1], acc[1:])]
-    assert math.isclose(max(joist_intervals), 1)
+        # Test that all intervals are about the same size by not exceeding the prescribed spacing
+        # Next, for beams
+        fb4_pt = les["FB4.0"].model()["loads"]["point_loads"]
+        acc = []
+        for load in fb4_pt:
+            acc.append(load["location"])
+        joist_intervals = [x[0] - x[1] for x in zip(acc[:-1], acc[1:])]
+        assert math.isclose(max(joist_intervals), 1)

@@ -693,7 +693,7 @@ wheels = [
 
 [[package]]
 name = "papermodels"
-version = "0.12.0"
+version = "0.14.1"
 source = { editable = "." }
 dependencies = [
     { name = "colour" },
@@ -724,6 +724,7 @@ graphviz = [
 dev = [
     { name = "black" },
     { name = "ipykernel" },
+    { name = "pytest-check" },
 ]
 
 [package.metadata]
@@ -753,6 +754,7 @@ requires-dist = [
 dev = [
     { name = "black", specifier = ">=25.1.0" },
     { name = "ipykernel", specifier = ">=6.30.1" },
+    { name = "pytest-check", specifier = ">=2.5.4" },
 ]
 
 [[package]]
@@ -1028,6 +1030,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/a3/5c/00a0e072241553e1a7496d638deababa67c5058571567b92a7eaa258397c/pytest-8.4.2.tar.gz", hash = "sha256:86c0d0b93306b961d58d62a4db4879f27fe25513d4b969df351abdddb3c30e01", size = 1519618 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/a8/a4/20da314d277121d6534b3a980b29035dcd51e6744bd79075a6ce8fa4eb8d/pytest-8.4.2-py3-none-any.whl", hash = "sha256:872f880de3fc3a5bdc88a11b39c9710c3497a547cfa9320bc3c5e62fbf272e79", size = 365750 },
+]
+
+[[package]]
+name = "pytest-check"
+version = "2.5.4"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pytest" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/7c/cf/8403d8332b1b5e9b59e4877e3057541addc3d8fbb1ffcdfbc59e36ef999f/pytest_check-2.5.4.tar.gz", hash = "sha256:33d87e28d5e49217f413277e1e0d267cd66c90a85a208944c44312c9c8e4ff74", size = 27602 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/6b/e2/c1bbad57e1616506ab9e49578807ff9e66d2adc3d977b02a14363b460b81/pytest_check-2.5.4-py3-none-any.whl", hash = "sha256:08c5f0ef40717ef8e55ee09d65dd7c919502db6eadb37a09818c12c28a57ad50", size = 16001 },
 ]
 
 [[package]]

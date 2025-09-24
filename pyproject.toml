@@ -41,4 +41,5 @@ graphviz = [
 dev = [
     "black>=25.1.0",
     "ipykernel>=6.30.1",
+    "pytest-check>=2.5.4",
 ]
