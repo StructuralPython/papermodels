@@ -236,7 +236,6 @@ class Element:
         If 'relative' == False, then the values returned are absolute Point objects.
         """
         # When we have collector extents and an extent_polygon
-        print(self.tag)
         if self.trib_area is None and self.extent_polygon is not None:
             tagged_extents = {}
             for ib in self.intersections_below:
@@ -269,7 +268,6 @@ class Element:
             support_geoms = geom_ops.clean_polygon_supports(
                 poly_support_geoms, self.geometry
             )
-            # print(f"{support_geoms=}")
             cleaned_supports_map = {}
             for idx, poly_support_geom in enumerate(poly_support_geoms):
                 clean_support_geom = support_geoms[idx]
@@ -280,9 +278,8 @@ class Element:
                     self.geometry,
                     ordered_support_geoms,
                     self.trib_area,
-                    extent_polygon=self.extent_polygon
+                    extent_polygon=self.extent_polygon,
                 )
-                # print(f"{extents=}")
             except AssertionError as e:
                 raise e
                 # raise AssertionError(
