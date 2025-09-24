@@ -246,9 +246,9 @@ def get_joist_extents(
     magnitude_max = get_magnitude(supports_bbox)
     joist_vector = get_direction_vector(joist_prototype).flatten()
     orig_joist_origin, orig_joist_end = get_start_end_nodes(joist_prototype)
-    joist_origin = set_precision(project_node(orig_joist_origin, -joist_vector, magnitude_max / 2), grid_size=1e-3)
-    joist_end = set_precision(project_node(orig_joist_end, joist_vector, magnitude_max / 2), grid_size=1e-3)
-    extended_joist_prototype = set_precision(LineString([joist_origin, joist_end]), grid_size=1e-3)
+    joist_origin = project_node(orig_joist_origin, -joist_vector, magnitude_max / 2)
+    joist_end = project_node(orig_joist_end, joist_vector, magnitude_max / 2)
+    extended_joist_prototype = LineString([joist_origin, joist_end])
     joist_origin = np.array(joist_origin.coords[0])
     orig_joist_origin = np.array(orig_joist_origin.coords[0])
 
@@ -256,13 +256,14 @@ def get_joist_extents(
     right_coords = []
     # print(f"{supports_bbox=} | {list(extended_joist_prototype.coords)=}")
     for joist_support in joist_supports:
+        print(f"{list(joist_support.coords)=}")
         # display("Joist Support before intersection")
         # display(GeometryCollection([extended_joist_prototype, joist_support, box(*supports_bbox)]))
-        joist_support = set_precision(joist_support.intersection(box(*supports_bbox)), grid_size=1e-3)
+        joist_support = joist_support.intersection(box(*supports_bbox))
         # display(f"{joist_support.is_empty=}")
 
         start_coord, end_coord = joist_support.coords
-        start_coord, end_coord = set_precision(Point(start_coord), grid_size=1e-3), set_precision(Point(end_coord), grid_size=1e-3)
+        start_coord, end_coord = Point(start_coord), Point(end_coord)
         # print(f"{extended_joist_prototype.intersects(start_coord)=}")
         # display(GeometryCollection([extended_joist_prototype, joist_support, start_coord, end_coord]))
 
@@ -282,7 +283,26 @@ def get_joist_extents(
         #     left_coords.append(end_coord)
         # elif end_coord_rotation <= 0.0:
         #     right_coords.append(end_coord)
-        if 0.0 < start_coord_rotation:
+        print(f"{start_coord_rotation=}")
+        print(f"{end_coord_rotation=}")
+        if start_coord_rotation == 0.0:
+            print("Start is 0.0")
+            if end_coord_rotation > 0.0:
+                right_coords.append(start_coord)
+                left_coords.append(end_coord)
+            else:
+                left_coords.append(start_coord)
+                right_coords.append(end_coord)
+
+        elif end_coord_rotation == 0.0:
+            print("End is 0.0")
+            if start_coord_rotation > 0.0:
+                left_coords.append(start_coord)
+                right_coords.append(end_coord)
+            else:
+                right_coords.append(start_coord)
+                left_coords.append(end_coord)
+        elif 0.0 < start_coord_rotation:
             left_coords.append(start_coord)
             right_coords.append(end_coord)
             # left_coords.append(end_coord)
@@ -292,8 +312,9 @@ def get_joist_extents(
             right_coords.append(start_coord)
             # left_coords.append(start_coord)
             # right_coords.append(end_coord)
-    # print(f"{left_coords=}")
-    # print(f"{right_coords=}")
+    print(f"{left_coords=}")
+    print(f"{right_coords=}")
+    print()
     # print(f"{[list(js.coords) for js in joist_supports]}")
 
     closest_left_coord = min(

@@ -236,6 +236,7 @@ class Element:
         If 'relative' == False, then the values returned are absolute Point objects.
         """
         # When we have collector extents and an extent_polygon
+        print(self.tag)
         if self.trib_area is None and self.extent_polygon is not None:
             tagged_extents = {}
             for ib in self.intersections_below:
