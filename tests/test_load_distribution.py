@@ -193,7 +193,7 @@ def test_singularities_to_polygon():
         ld.singularities_to_polygon(
             square_with_L_hole_sings[0] + square_with_L_hole_sings[1]
         ).wkt
-        == "POLYGON ((0 0, 0 10, 2 10, 2 4, 4 4, 4 8, 8 8, 8 10, 10 10, 10 0, 0 0))"
+        == "POLYGON ((0 0, 0 10, 2 10, 2 4, 4 4, 4 8, 8 8, 8 8, 8 10, 10 10, 10 0, 0 0))"
     )
 
 

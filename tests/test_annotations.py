@@ -9,20 +9,24 @@ from shapely import Polygon, box, Point
 import pathlib
 import fixtures
 
+
 @fixture()
 def page_annotation():
     page_geom = box(200, 200, 480, 360)
     return fixtures.shapely_to_annotation(page_geom)
+
 
 @fixture()
 def page_polygon():
     page_geom = box(200, 200, 480, 360)
     return page_geom
 
+
 @fixture()
 def origin_annotation():
     origin_geom = box(215, 210, 225, 220)
     return fixtures.shapely_to_annotation(origin_geom)
+
 
 @fixture()
 def three_page_annots():
@@ -30,17 +34,22 @@ def three_page_annots():
     annots = pdf.load_pdf_annotations(path / "test_data" / "three-pages-on-one.pdf")
     return annots
 
+
 def test__annotation_to_wkt():
     wkt_0 = _annotation_to_wkt(A0)
     wkt_1 = _annotation_to_wkt(A1)
 
 
 def test_get_page_bottom_left_corner(page_polygon):
-    npt.assert_array_equal(an.get_page_bottom_left_corner(page_polygon), np.array([200.0, 200.0]))
+    npt.assert_array_equal(
+        an.get_page_bottom_left_corner(page_polygon), np.array([200.0, 200.0])
+    )
 
 
 def test_get_origin_offset(origin_annotation, page_polygon):
-    npt.assert_array_equal(an.get_origin_offset(origin_annotation, page_polygon), np.array([20., 15.]))
+    npt.assert_array_equal(
+        an.get_origin_offset(origin_annotation, page_polygon), np.array([20.0, 15.0])
+    )
 
 
 def test_enumerate_page_annotations(three_page_annots):
@@ -56,7 +65,9 @@ def test_sort_annotations_by_page_polygon(three_page_annots):
     page_annots = [annot for annot in three_page_annots if annot.text == "page"]
     other_annots = [annot for annot in three_page_annots if annot not in page_annots]
     page_geom_map = an.enumerate_page_annotations(page_annots)
-    sorted_annotations = an.sort_annotations_by_page_polygon(other_annots, page_geom_map)
+    sorted_annotations = an.sort_annotations_by_page_polygon(
+        other_annots, page_geom_map
+    )
 
     # Check correct number of annotations per page
     assert len(sorted_annotations[page_geom_map[0]]) == 4
@@ -64,27 +75,97 @@ def test_sort_annotations_by_page_polygon(three_page_annots):
     assert len(sorted_annotations[page_geom_map[2]]) == 4
 
     # Check that they are not the same annotations on each page
-    assert len((set(sorted_annotations[page_geom_map[0]]) - set(sorted_annotations[page_geom_map[1]]))) == 4
-    assert len((set(sorted_annotations[page_geom_map[1]]) - set(sorted_annotations[page_geom_map[2]]))) == 4
-    assert len((set(sorted_annotations[page_geom_map[2]]) - set(sorted_annotations[page_geom_map[0]]))) == 4
-    assert len((set(sorted_annotations[page_geom_map[2]]) - set(sorted_annotations[page_geom_map[2]]))) == 0
+    assert (
+        len(
+            (
+                set(sorted_annotations[page_geom_map[0]])
+                - set(sorted_annotations[page_geom_map[1]])
+            )
+        )
+        == 4
+    )
+    assert (
+        len(
+            (
+                set(sorted_annotations[page_geom_map[1]])
+                - set(sorted_annotations[page_geom_map[2]])
+            )
+        )
+        == 4
+    )
+    assert (
+        len(
+            (
+                set(sorted_annotations[page_geom_map[2]])
+                - set(sorted_annotations[page_geom_map[0]])
+            )
+        )
+        == 4
+    )
+    assert (
+        len(
+            (
+                set(sorted_annotations[page_geom_map[2]])
+                - set(sorted_annotations[page_geom_map[2]])
+            )
+        )
+        == 0
+    )
 
     # Check they all have an origin annotation
-    assert next((annot for annot in sorted_annotations[page_geom_map[0]] if annot.text=="origin"))
-    assert next((annot for annot in sorted_annotations[page_geom_map[1]] if annot.text=="origin"))
-    assert next((annot for annot in sorted_annotations[page_geom_map[2]] if annot.text=="origin"))
+    assert next(
+        (
+            annot
+            for annot in sorted_annotations[page_geom_map[0]]
+            if annot.text == "origin"
+        )
+    )
+    assert next(
+        (
+            annot
+            for annot in sorted_annotations[page_geom_map[1]]
+            if annot.text == "origin"
+        )
+    )
+    assert next(
+        (
+            annot
+            for annot in sorted_annotations[page_geom_map[2]]
+            if annot.text == "origin"
+        )
+    )
 
 
 def test_align_annotations_to_pages(three_page_annots):
     page_annots = [annot for annot in three_page_annots if annot.text == "page"]
     other_annots = [annot for annot in three_page_annots if annot not in page_annots]
     page_geom_map = an.enumerate_page_annotations(page_annots)
-    sorted_annotations = an.sort_annotations_by_page_polygon(other_annots, page_geom_map)
+    sorted_annotations = an.sort_annotations_by_page_polygon(
+        other_annots, page_geom_map
+    )
     aligned_annotations = an.align_annotations_to_pages(sorted_annotations)
 
-    origin_annot_1 = next((annot for annot in aligned_annotations[page_geom_map[0]] if annot.text=="origin"))
-    origin_annot_2 = next((annot for annot in aligned_annotations[page_geom_map[1]] if annot.text=="origin"))
-    origin_annot_3 = next((annot for annot in aligned_annotations[page_geom_map[2]] if annot.text=="origin"))
+    origin_annot_1 = next(
+        (
+            annot
+            for annot in aligned_annotations[page_geom_map[0]]
+            if annot.text == "origin"
+        )
+    )
+    origin_annot_2 = next(
+        (
+            annot
+            for annot in aligned_annotations[page_geom_map[1]]
+            if annot.text == "origin"
+        )
+    )
+    origin_annot_3 = next(
+        (
+            annot
+            for annot in aligned_annotations[page_geom_map[2]]
+            if annot.text == "origin"
+        )
+    )
 
     origin_centroid_1 = an.get_origin_centroid(origin_annot_1)
     origin_centroid_2 = an.get_origin_centroid(origin_annot_2)
@@ -94,9 +175,27 @@ def test_align_annotations_to_pages(three_page_annots):
     npt.assert_array_almost_equal(origin_centroid_1, origin_centroid_2)
     npt.assert_array_almost_equal(origin_centroid_1, origin_centroid_3)
 
-    frame_annot_1 = next((annot for annot in aligned_annotations[page_geom_map[0]] if annot.object_type=="Line"))
-    frame_annot_2 = next((annot for annot in aligned_annotations[page_geom_map[1]] if annot.object_type=="Line"))
-    frame_annot_3 = next((annot for annot in aligned_annotations[page_geom_map[2]] if annot.object_type=="Line"))
+    frame_annot_1 = next(
+        (
+            annot
+            for annot in aligned_annotations[page_geom_map[0]]
+            if annot.object_type == "Line"
+        )
+    )
+    frame_annot_2 = next(
+        (
+            annot
+            for annot in aligned_annotations[page_geom_map[1]]
+            if annot.object_type == "Line"
+        )
+    )
+    frame_annot_3 = next(
+        (
+            annot
+            for annot in aligned_annotations[page_geom_map[2]]
+            if annot.object_type == "Line"
+        )
+    )
 
     # Test that the frame annotations have the same coordinates
     frame_geom_1 = an.annotation_to_shapely(frame_annot_1)
@@ -105,10 +204,13 @@ def test_align_annotations_to_pages(three_page_annots):
 
     # Check to see if the frame elements are close to each other
     # In testing the abs_delta ~0.233, rel_delta ~0.00254
-    # However it seems that the tolerance setting required to pass this is decimal=0 
+    # However it seems that the tolerance setting required to pass this is decimal=0
     # which is perhaps more tolerant than I would like to have in this test but I think it represents
     # a reasonable amount of discrepancy which would still allow correspondent polygons to overlap across
     # pages.
-    npt.assert_array_almost_equal(np.array(frame_geom_1.coords[0]), np.array(frame_geom_2.coords[0]), decimal=0)
-    npt.assert_array_almost_equal(np.array(frame_geom_1.coords[0]), np.array(frame_geom_3.coords[0]), decimal=0)
-
+    npt.assert_array_almost_equal(
+        np.array(frame_geom_1.coords[0]), np.array(frame_geom_2.coords[0]), decimal=0
+    )
+    npt.assert_array_almost_equal(
+        np.array(frame_geom_1.coords[0]), np.array(frame_geom_3.coords[0]), decimal=0
+    )

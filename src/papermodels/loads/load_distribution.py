@@ -3,11 +3,7 @@ from typing import Optional
 from dataclasses import dataclass
 import numpy.typing as npt
 from ..geometry import geom_ops
-from shapely.geometry import (
-    Polygon,
-    MultiPolygon,
-    LineString
-)
+from shapely.geometry import Polygon, MultiPolygon, LineString
 import itertools
 
 
@@ -16,6 +12,7 @@ class LoadingGeometry:
     """
     Represents a LoadingGeometry
     """
+
     geometry: Polygon | LineString
     occupancy: str
     load_components: npt.ArrayLike
@@ -32,6 +29,7 @@ class DistributedLoad:
     'w0': The starting magnitude
     'w1': The end magnitude
     """
+
     x0: float
     x1: float
     w0: float
@@ -60,6 +58,7 @@ class Overlap:
 # Examples
 OL0 = Overlap(x0=-5.0, x1=10.0, ma=-4.0, ba=15.0, mb=2, bb=-2.0)
 OL1 = Overlap(x0=12.3, x1=16.3, ma=0.5, ba=6.1, mb=-3.34, bb=2.5)
+
 
 @dataclass
 class Singularity:
@@ -115,7 +114,7 @@ def get_distributed_loads_from_projected_polygons(
         # Apply a unit load for all distributed loads
         poly_xy = project_polygon(load_geom, 1.0, xy=True)
         projected_poly_coords = list(zip(*poly_xy))
-        polygon_dist_loads = [] # Polygon may have many pairs
+        polygon_dist_loads = []  # Polygon may have many pairs
         inner_pair = []
         for idx, coord in enumerate(projected_poly_coords[1:-1]):
             if idx % 2 == 1:
