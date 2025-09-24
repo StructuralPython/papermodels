@@ -13,6 +13,7 @@ from shapely import (
     convex_hull,
     GeometryCollection,
     box,
+    set_precision
 )
 import shapely.ops as ops
 
@@ -521,6 +522,13 @@ class JoistArrayModel:
                 intersection_attrs = geom_ops.get_intersection(
                     joist_geom, support_geom, other_tag
                 )
+                if sub_id == "J0.2-0":
+                    from IPython.display import display
+                    display(GeometryCollection(self.joist_supports + [joist_geom]))
+                    print(other_tag)
+                    print(intersection_attrs)
+                    print(list(support_geom.coords))
+                    print(list(joist_geom.coords))
                 if intersection_attrs is None:
                     continue
                 intersection_below = Intersection(*intersection_attrs)

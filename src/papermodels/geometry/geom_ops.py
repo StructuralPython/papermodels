@@ -171,8 +171,8 @@ def clean_polygon_supports(
     for support_geom in support_geoms:
         if support_geom.geom_type == "Polygon":
             support_lines = explode_polygon(support_geom)
-            print(f"{joist_prototype.intersects(support_geom)=}")
-            print(f"{joist_prototype.intersects(np.array(support_lines))=}")
+            # print(f"{joist_prototype.intersects(support_geom)=}")
+            # print(f"{joist_prototype.intersects(np.array(support_lines))=}")
             support_intersections = joist_prototype.intersects(np.array(support_lines))
             if sum(support_intersections) == 1:  # Intersects on one edge only
                 intersecting_line_index = int(support_intersections.nonzero()[0][0])
@@ -221,7 +221,7 @@ def get_joist_extents(
     """
     if extent_polygon is not None:
         supports_bbox = extent_polygon.bounds
-        print("HERE")
+        # print("HERE")
         # joist_vector = np.abs(get_direction_vector(joist_prototype))
         # # This is one of the places where orthogonality is assumed
         # joist_orientation = None
@@ -254,7 +254,7 @@ def get_joist_extents(
 
     left_coords = []
     right_coords = []
-    print(f"{supports_bbox=} | {list(extended_joist_prototype.coords)=}")
+    # print(f"{supports_bbox=} | {list(extended_joist_prototype.coords)=}")
     for joist_support in joist_supports:
         # display("Joist Support before intersection")
         # display(GeometryCollection([extended_joist_prototype, joist_support, box(*supports_bbox)]))
@@ -292,9 +292,9 @@ def get_joist_extents(
             right_coords.append(start_coord)
             # left_coords.append(start_coord)
             # right_coords.append(end_coord)
-    print(f"{left_coords=}")
-    print(f"{right_coords=}")
-    print(f"{[list(js.coords) for js in joist_supports]}")
+    # print(f"{left_coords=}")
+    # print(f"{right_coords=}")
+    # print(f"{[list(js.coords) for js in joist_supports]}")
 
     closest_left_coord = min(
         left_coords, key=lambda x: x.distance(extended_joist_prototype)
@@ -306,8 +306,8 @@ def get_joist_extents(
     closest_left_distance = set_precision(closest_left_coord, grid_size=1e-3).distance(extended_joist_prototype)
     closest_right_distance = set_precision(closest_right_coord, grid_size=1e-3).distance(extended_joist_prototype)
     joist_vector_normal = rotate_90_vector(joist_vector, ccw=True)
-    print(f"{joist_vector_normal=} | {closest_left_distance=} | {joist_origin=} | {extended_joist_prototype.intersects(Point(joist_origin))=}")
-    print(f"{-joist_vector_normal=} | {closest_right_distance=} | {joist_origin=} | {extended_joist_prototype.intersects(Point(joist_origin))=}")
+    # print(f"{joist_vector_normal=} | {closest_left_distance=} | {joist_origin=} | {extended_joist_prototype.intersects(Point(joist_origin))=}")
+    # print(f"{-joist_vector_normal=} | {closest_right_distance=} | {joist_origin=} | {extended_joist_prototype.intersects(Point(joist_origin))=}")
     joist_left = set_precision(LineString(
         [
             project_node(
@@ -347,8 +347,8 @@ def get_joist_extents(
         support_linestring = set_precision(support_linestring, grid_size=1e-3)
         # joist_left = ops.snap(joist_left, support_linestring, tolerance=1e-6)
         # joist_right = ops.snap(joist_right, support_linestring, tolerance=1e-6)
-        display(GeometryCollection([support_linestring, joist_right, joist_left]))
-        print(f"{joist_right.wkt=} | {support_linestring.wkt=} | {joist_right.intersection(support_linestring)=}")
+        # display(GeometryCollection([support_linestring, joist_right, joist_left]))
+        # print(f"{joist_right.wkt=} | {support_linestring.wkt=} | {joist_right.intersection(support_linestring)=}")
 
         left_extent = support_linestring.intersection(joist_left)
         right_extent = support_linestring.intersection(joist_right)

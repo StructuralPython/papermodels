@@ -562,7 +562,7 @@ class GeometryGraph(nx.DiGraph):
                 callable_instance = element_constructor(node_element, *args, **kwargs)
                 new_elem = callable_instance()
                 node_attrs["element"] = new_elem
-            print(self.nodes[node]['element'].subelements)
+            # print(self.nodes[node]['element'].subelements)
         self.add_intersection_indexes_below()
         self.add_intersection_indexes_above()
 
