@@ -388,6 +388,7 @@ class JoistArrayModel:
                     support = geom_ops.get_rectangle_centerline(ib.other_geometry)
             else:
                 support = ib.other_geometry
+            
             self.joist_supports.append(support)
 
         # try:
@@ -416,7 +417,7 @@ class JoistArrayModel:
             self._extents = geom_ops.get_joist_extents(
                 self.joist_prototype,
                 self.joist_supports,
-                trib_area=self.extent_polygon,
+                trib_area=None,
                 extent_polygon=self.extent_polygon,
             )
             # self._extents = geom_ops.get_joist_extents(
@@ -426,7 +427,6 @@ class JoistArrayModel:
             raise AssertionError(
                 f"No intersection within joist extents: {element.tag=}"
             )
-
         self._supports = self.joist_supports
         self._cantilevers = geom_ops.get_cantilever_segments(
             self.joist_prototype, self._supports
@@ -562,12 +562,12 @@ class JoistArrayModel:
             new_centroid = geom_ops.project_node(
                 start_centroid, -self.vector_normal, joist_distance  # orig -ve
             )
-            if not self.extent_polygon:
-                system_bounds = geom_ops.get_system_bounds(
-                    self._joist_prototype, list(self._supports)
-                )
-            else:
-                system_bounds = self.extent_polygon.bounds
+            # if not self.extent_polygon:
+            system_bounds = geom_ops.get_system_bounds(
+                self._joist_prototype, list(self._supports)
+            )
+            # else:
+            #     system_bounds = self.extent_polygon.bounds
             projection_distance = geom_ops.get_magnitude(system_bounds)
             ray_ai = geom_ops.project_node(
                 new_centroid, self.vector_parallel, projection_distance  # orig +ve

@@ -273,6 +273,7 @@ class Element:
                 clean_support_geom = support_geoms[idx]
                 cleaned_supports_map.update({clean_support_geom: poly_support_geom})
             ordered_support_geoms = geom_ops.sort_supports(self.geometry, support_geoms)
+            print(f"{ordered_support_geoms=}")
             try:
                 extents = geom_ops.get_joist_extents(
                     self.geometry,

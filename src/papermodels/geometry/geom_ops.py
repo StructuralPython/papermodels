@@ -217,14 +217,27 @@ def get_joist_extents(
         calcualtion.
     """
     if extent_polygon is not None:
-        supports_bbox = extent_polygon.bounds
-
-    # TODO: The trib_area may not be what we think when it comes to add_intersection_indexes_below
-    elif trib_area is not None:
+        supports_bbox = get_system_bounds(joist_prototype, joist_supports, normal=False, extent_polygon=extent_polygon)
+        minx, miny, maxx, maxy = supports_bbox
+        joist_vector = np.abs(get_direction_vector(joist_prototype))
+        # This is one of the places where orthogonality is assumed
+        joist_orientation = None
+        if joist_vector[0] > joist_vector[1]:
+            joist_orientation = "horizontal"
+        elif joist_vector[1] > joist_vector[0]:
+            joist_orientation = "vertical"
+        else:
+            print(f"JOIST ORIENTATION VERIANT: {joist_prototype=}")
+        if joist_orientation == "horizontal":
+            extents = [(Point(minx, miny), Point(minx, maxy)), (Point(maxx, miny), Point(maxx, maxy))]
+        if joist_orientation == "vertical":
+            extents = [(Point(minx, miny), Point(maxx, miny)), (Point(minx, maxy), Point(maxx, maxy))]
+        return extents
+    
+    if trib_area is not None:
         supports_bbox = trib_area.bounds
     else:
-        supports_bbox = get_system_bounds(joist_prototype, joist_supports)
-
+        supports_bbox = get_system_bounds(joist_prototype, joist_supports, normal=True, extent_polygon=extent_polygon)
     magnitude_max = get_magnitude(supports_bbox)
     joist_vector = get_direction_vector(joist_prototype).flatten()
     orig_joist_origin, orig_joist_end = get_start_end_nodes(joist_prototype)
@@ -464,15 +477,56 @@ def translate_joist_to_point(
 
 
 def get_system_bounds(
-    joist_prototype: LineString, joist_supports: list[LineString]
+    joist_prototype: LineString, joist_supports: list[LineString], normal: bool = True, extent_polygon: Optional[Polygon] = None
 ) -> tuple[float, float, float, float]:
     """
     Returns the minx, miny, maxx, maxy bounding box of all the LineStrings in 'joist_supports',
     taken as a group.
     """
-    all_lines = MultiLineString(joist_supports + [joist_prototype])
-    bbox = all_lines.bounds
-    return bbox
+    if normal:
+        all_lines = MultiLineString(joist_supports + [joist_prototype])
+        bbox = all_lines.bounds
+        return bbox
+    else:
+        joist_vector = np.abs(get_direction_vector(joist_prototype))
+        # This is one of the places where orthogonality is assumed
+        joist_orientation = None
+        if joist_vector[0] > joist_vector[1]:
+            joist_orientation = "horizontal"
+        elif joist_vector[1] > joist_vector[0]:
+            joist_orientation = "vertical"
+        else:
+            print(f"JOIST ORIENTATION VERIANT: {joist_prototype=}")
+
+        overlap_polys = []
+        overlap_poly = None
+        for start_support in joist_supports:
+            for end_support in joist_supports:
+                if start_support == end_support:
+                    continue
+                pa0, pa1 = start_support.coords
+                pb0, pb1 = end_support.coords
+                if joist_orientation == "vertical":
+                    overlap_region = ld.get_overlap_coords(
+                        pa0[0], pa1[0], pb0[0], pb1[0]
+                    )
+                    if overlap_region is not None:
+                        overlap_poly = box(
+                            overlap_region[0], pa0[1], overlap_region[1], pb1[1]
+                        )
+                elif joist_orientation == "horizontal":
+                    overlap_region = ld.get_overlap_coords(
+                        pa0[1], pa1[1], pb0[1], pb1[1]
+                    )
+                    if overlap_region is not None:
+                        overlap_poly = box(
+                            pa0[0], overlap_region[0], pb1[0], overlap_region[1]
+                        )
+                if overlap_poly is not None:
+                    if extent_polygon is not None:
+                        overlap_poly = extent_polygon.intersection(overlap_poly)
+                    overlap_polys.append(overlap_poly)
+        return MultiPolygon(overlap_polys).bounds
 
 
 def get_magnitude(bounds: tuple[float, float, float, float]) -> float:
