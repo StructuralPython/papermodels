@@ -114,6 +114,7 @@ class CollectorTribModel:
                 elif ib.other_geometry.geom_type == "LineString":
                     support_lines.update({ib.other_geometry: ib.other_tag})
             support_geoms = [ib.other_geometry for ib in e.intersections_below]
+            print(f"Collector: {support_geoms=}")
 
             # 1. Find polygon extent edges that intersect with joist prototype
             # These will be our extent boundaries for the length of the prototype
@@ -263,6 +264,9 @@ class CollectorTribModel:
                         break
                 joist_prototype_geometries.append(new_joist)
 
+            from IPython.display import display
+            display(GeometryCollection(joist_prototype_geometries + support_geoms))
+
             # 7. Create an Element for each new joist prototype geometries
             subelements = []
             sorted_joist_geoms = sorted(
@@ -283,14 +287,16 @@ class CollectorTribModel:
                 assert joist_geom.intersects(trib_area)
                 for support_geom in support_geoms:
                     if support_geom.geom_type == "Polygon":
+                        # support_line = geom_ops.clean_polygon_supports([support_geom], joist_geom)
                         support_line = geom_ops.get_rectangle_centerline(support_geom)
                     elif support_geom.geom_type == "LineString":
                         support_line = support_geom
-
+                    tag = support_lines[support_line]
                     support_intersection = joist_geom.intersection(support_line)
                     # intersecting_region = trib_area.intersection(support_line)
                     intersecting_region = support_line.intersection(joist_geom)
                     if support_intersection.is_empty:
+                        print(f"Other tag: {tag=}; self: {self.element.tag=}")
                         continue
                     # if intersecting_region.is_empty:
                     #     continue
@@ -303,6 +309,7 @@ class CollectorTribModel:
                         ),
                     )
                     intersections.append(intersection)
+                print(f"{intersections=}")
                 subelement = Element(
                     geometry=joist_geom,
                     tag=subelement_tag,
@@ -440,8 +447,8 @@ class JoistArrayModel:
 
         self.joist_at_start = joist_at_start
         self.joist_at_end = joist_at_end
-        print(f"{self.get_extent_edge('start')=}")
-        print(f"{self.get_extent_edge('end')=}")
+        # print(f"{self.get_extent_edge('start')=}")
+        # print(f"{self.get_extent_edge('end')=}")
         self.joist_locations = geom_ops.get_joist_locations(
             self.get_extent_edge("start"),
             self.get_extent_edge("end"),
@@ -562,7 +569,7 @@ class JoistArrayModel:
             go to n, the last joist in the array.
         """
         start_centroid = self.get_extent_edge("start").centroid
-        print(f"{start_centroid=}")
+        # print(f"{start_centroid=}")
         try:
             joist_distance = self.joist_locations[index]
         except IndexError as e:
@@ -601,7 +608,7 @@ class JoistArrayModel:
             sorted_supports = geom_ops.sort_supports(ray_a | ray_b, intersecting_supports)
             support_a_loc = ray_a.intersection(sorted_supports[0])
             support_b_loc = ray_b.intersection(sorted_supports[-1])
-            print(f"{projection_distance=} | {ray_a=} | {ray_b=} | {support_a_loc=} | {support_b_loc=}")
+            # print(f"{projection_distance=} | {ray_a=} | {ray_b=} | {support_a_loc=} | {support_b_loc=}")
             # print(f"{support_a_loc=} | {support_b_loc=}")
 
             end_a = support_a_loc

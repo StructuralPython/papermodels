@@ -265,14 +265,16 @@ class Element:
                 for ib in self.intersections_below
             }
             poly_support_geoms = list(support_tags_by_geom.keys())
+            print(f"{self.intersections_below=}")
             support_geoms = geom_ops.clean_polygon_supports(
                 poly_support_geoms, self.geometry
             )
-            print(f"{support_geoms=}")
+            # print(f"{support_geoms=}")
             cleaned_supports_map = {}
             for idx, poly_support_geom in enumerate(poly_support_geoms):
                 clean_support_geom = support_geoms[idx]
                 cleaned_supports_map.update({clean_support_geom: poly_support_geom})
+            print(self.tag)
             ordered_support_geoms = geom_ops.sort_supports(self.geometry, support_geoms)
             try:
                 extents = geom_ops.get_joist_extents(
@@ -281,11 +283,12 @@ class Element:
                     self.trib_area,
                     extent_polygon=self.extent_polygon
                 )
-                print(f"{extents=}")
+                # print(f"{extents=}")
             except AssertionError as e:
-                raise AssertionError(
-                    f"No intersection within joist extents: {self.tag=}"
-                )
+                raise e
+                # raise AssertionError(
+                #     f"No intersection within joist extents: {self.tag=}"
+                # )
             tagged_extents = {}
             for idx, extent in enumerate(extents):
                 support_geom = ordered_support_geoms[idx]

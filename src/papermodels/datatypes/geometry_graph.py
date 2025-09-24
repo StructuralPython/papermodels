@@ -323,9 +323,10 @@ class GeometryGraph(nx.DiGraph):
                             sub_local_coords = get_local_coords(
                                 start_coord, sub_dependent_intersections
                             )
+                            # print(subelem.tag)
+                            # print(sub_dependent_intersections)
                             subextents = subelem.get_collector_extents()
-                            print(subelem.tag)
-                            print(subextents)
+                            # print(subextents)
                             sub_sorted_below_ints = sorted(
                                 sub_local_coords, key=lambda x: x[0]
                             )
@@ -561,6 +562,7 @@ class GeometryGraph(nx.DiGraph):
                 callable_instance = element_constructor(node_element, *args, **kwargs)
                 new_elem = callable_instance()
                 node_attrs["element"] = new_elem
+            print(self.nodes[node]['element'].subelements)
         self.add_intersection_indexes_below()
         self.add_intersection_indexes_above()
 
