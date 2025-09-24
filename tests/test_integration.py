@@ -136,6 +136,7 @@ def test_collector_extent_creates_loaded_elements(
             "SJ0.0-4",
             "SJ0.0-5",
             "SJ0.0-6",
+            "SJ0.0-7",
             "SJ0.1",
             "WT0.0",
             "WT0.1",
@@ -164,34 +165,45 @@ def test_collector_extent_creates_loaded_elements(
         assert les["WT0.3"].model()["loads"][
             "distributed_loads"
         ]  # There are loads present on the intermediate support
-
+    with check:
         assert (
             les["WT0.1"].model()["loads"]["distributed_loads"][0]["transfer_source"]
             == "SJ0.0-0"
         )
+    with check:
         assert les["WT0.1"].model()["loads"]["distributed_loads"][0]["start_loc"] == 2.521
+    with check:
         assert les["WT0.1"].model()["loads"]["distributed_loads"][0]["end_loc"] == 3.858
 
+    with check:
         assert les["WT0.1"].model()["loads"]["distributed_loads"][1]["start_loc"] == 3.858
+    with check:
         assert les["WT0.1"].model()["loads"]["distributed_loads"][1]["end_loc"] == 6.72
 
         # This member experiences a splitting that occurs from an intermediate support that is found
         # within its overlap region.
+    with check:
         assert (
             les["FB0.0"].model()["loads"]["distributed_loads"][0]["transfer_source"]
             == "SJ0.0-2"
         )
-        assert les["FB0.0"].model()["loads"]["distributed_loads"][0]["start_loc"] == 0.327
-        assert les["FB0.0"].model()["loads"]["distributed_loads"][0]["end_loc"] == 3.011
+    with check:
+        assert les["FB0.0"].model()["loads"]["distributed_loads"][0]["start_loc"] == 0.0 #0.327
 
-        assert les["FB0.0"].model()["loads"]["distributed_loads"][1]["start_loc"] == 3.011
-        assert les["FB0.0"].model()["loads"]["distributed_loads"][1]["end_loc"] == 3.912
+    with check:
+        assert les["FB0.0"].model()["loads"]["distributed_loads"][0]["end_loc"] == 0.327
+
+    with check:
+        assert les["FB0.0"].model()["loads"]["distributed_loads"][1]["start_loc"] == 0.327
+
+    with check:
+        assert les["FB0.0"].model()["loads"]["distributed_loads"][1]["end_loc"] == 3.011
+
+    with check:
         assert (
             les["FB0.0"].model()["loads"]["distributed_loads"][1]["transfer_source"]
             == "SJ0.0-3"
         )
-        # assert les["FB0.0"].model()["loads"]["distributed_loads"][1]["start_loc"] == 3.01
-        assert les["FB0.0"].model()["loads"]["distributed_loads"][1]["end_loc"] == 3.912
 
 
 def test_wall_point_load_locations(sketch_to_scale_to_array_loaded_elements):

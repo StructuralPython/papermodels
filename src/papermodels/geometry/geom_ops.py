@@ -238,6 +238,7 @@ def get_joist_extents(
         supports_bbox = trib_area.bounds
     else:
         supports_bbox = get_system_bounds(joist_prototype, joist_supports, normal=True, extent_polygon=extent_polygon)
+    
     magnitude_max = get_magnitude(supports_bbox)
     joist_vector = get_direction_vector(joist_prototype).flatten()
     orig_joist_origin, orig_joist_end = get_start_end_nodes(joist_prototype)

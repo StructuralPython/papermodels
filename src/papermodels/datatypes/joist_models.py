@@ -319,7 +319,7 @@ class CollectorTribModel:
                     trib_area=trib_area,
                     reaction_type="linear",
                     kwargs=e.kwargs,
-                    extent_polygon=e.extent_polygon,
+                    # extent_polygon=e.extent_polygon,
                 )
                 subelements.append(subelement)
 
