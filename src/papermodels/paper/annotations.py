@@ -3,7 +3,7 @@ from copy import deepcopy
 from decimal import Decimal
 from dataclasses import asdict
 from shapely.wkt import loads as wkt_loads
-from shapely import Geometry, GeometryCollection, Point, Polygon
+from shapely import Geometry, GeometryCollection, Point, Polygon, set_precision
 from papermodels.datatypes.annotation import Annotation
 from papermodels.loads.load_distribution import LoadingGeometry
 from papermodels.geometry import geom_ops
@@ -34,7 +34,7 @@ def annotation_to_shapely(annot: Annotation) -> Any:
     Returns an shapely geometry created from the annotation type and
     vertices in 'annot'.
     """
-    return wkt_loads(_annotation_to_wkt(annot))
+    return set_precision(wkt_loads(_annotation_to_wkt(annot)), grid_size=1e-3)
 
 
 def get_annotation_geometry_pairs(

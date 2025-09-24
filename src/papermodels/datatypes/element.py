@@ -268,7 +268,6 @@ class Element:
             support_geoms = geom_ops.clean_polygon_supports(
                 poly_support_geoms, self.geometry
             )
-
             cleaned_supports_map = {}
             for idx, poly_support_geom in enumerate(poly_support_geoms):
                 clean_support_geom = support_geoms[idx]
@@ -279,11 +278,13 @@ class Element:
                     self.geometry,
                     ordered_support_geoms,
                     self.trib_area,
+                    extent_polygon=self.extent_polygon,
                 )
             except AssertionError as e:
-                raise AssertionError(
-                    f"No intersection within joist extents: {self.tag=}"
-                )
+                raise e
+                # raise AssertionError(
+                #     f"No intersection within joist extents: {self.tag=}"
+                # )
             tagged_extents = {}
             for idx, extent in enumerate(extents):
                 support_geom = ordered_support_geoms[idx]

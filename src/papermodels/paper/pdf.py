@@ -157,8 +157,9 @@ def pike_annotation_to_pm_annotation(
             x2 - b3 - b1,
             y1,
         )
-    elif annot_type == "Line":
+    elif annot_type.lower() in ("line", "arrow"):
         vertices = tuple(annot.get("/L", tuple()))
+        annot_type = "Line"
     else:
         print(f"Cannot read (yet): {annot_type}")
         return None

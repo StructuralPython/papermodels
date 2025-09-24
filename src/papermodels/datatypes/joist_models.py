@@ -13,6 +13,7 @@ from shapely import (
     convex_hull,
     GeometryCollection,
     box,
+    set_precision,
 )
 import shapely.ops as ops
 
@@ -283,10 +284,11 @@ class CollectorTribModel:
                 assert joist_geom.intersects(trib_area)
                 for support_geom in support_geoms:
                     if support_geom.geom_type == "Polygon":
+                        # support_line = geom_ops.clean_polygon_supports([support_geom], joist_geom)
                         support_line = geom_ops.get_rectangle_centerline(support_geom)
                     elif support_geom.geom_type == "LineString":
                         support_line = support_geom
-
+                    tag = support_lines[support_line]
                     support_intersection = joist_geom.intersection(support_line)
                     # intersecting_region = trib_area.intersection(support_line)
                     intersecting_region = support_line.intersection(joist_geom)
@@ -317,7 +319,7 @@ class CollectorTribModel:
                     trib_area=trib_area,
                     reaction_type="linear",
                     kwargs=e.kwargs,
-                    extent_polygon=e.extent_polygon,
+                    # extent_polygon=e.extent_polygon,
                 )
                 subelements.append(subelement)
 
@@ -373,15 +375,32 @@ class JoistArrayModel:
             geom_ops.get_start_end_nodes(element.geometry)
         )
         self.element = element
-        try:
-            self.joist_supports = geom_ops.clean_polygon_supports(
-                [ib.other_geometry for ib in element.intersections_below],
-                self.joist_prototype,
-            )
-        except AssertionError:
-            raise AssertionError(
-                f"No intersection at cleaned_support: {element.tag=}. Is geometry right on the edge of the support?"
-            )
+        self.joist_supports = []
+        for ib in element.intersections_below:
+            if ib.other_geometry.geom_type == "Polygon":
+                try:
+                    support = geom_ops.clean_polygon_supports(
+                        [ib.other_geometry], self.joist_prototype
+                    )
+                    self.joist_supports.extend(support)
+                    continue
+                except ValueError:
+                    support = geom_ops.get_rectangle_centerline(ib.other_geometry)
+            else:
+                support = ib.other_geometry
+            
+            self.joist_supports.append(support)
+
+        # try:
+        #     self.joist_supports = geom_ops.clean_polygon_supports(
+        #         [ib.other_geometry for ib in element.intersections_below],
+        #         self.joist_prototype,
+        #     )
+        # except AssertionError:
+        #     raise AssertionError(
+        #         f"No intersection at cleaned_support: {element.tag=}. Is geometry right on the edge of the support?"
+        #     )
+
         self.joist_support_tags = [ib.other_tag for ib in element.intersections_below]
         self.id = element.tag
         self.plane_id = element.plane_id
@@ -396,23 +415,27 @@ class JoistArrayModel:
         self.use_subelements = True
         try:
             self._extents = geom_ops.get_joist_extents(
-                self.joist_prototype, self.joist_supports
+                self.joist_prototype,
+                self.joist_supports,
+                trib_area=None,
+                extent_polygon=self.extent_polygon,
             )
+            # self._extents = geom_ops.get_joist_extents(
+            #     self.joist_prototype, self.joist_supports, trib_area=self.extent_polygon, extent_polygon=self.extent_polygon
+            # )
         except AssertionError as e:
             raise AssertionError(
                 f"No intersection within joist extents: {element.tag=}"
             )
-
-        self._supports = geom_ops.sort_supports(
-            self.joist_prototype, self.joist_supports
-        )
+        self._supports = self.joist_supports
         self._cantilevers = geom_ops.get_cantilever_segments(
             self.joist_prototype, self._supports
         )
         self.vector_parallel = geom_ops.get_direction_vector(self.joist_prototype)
         self.vector_normal = geom_ops.rotate_90_vector(self.vector_parallel, ccw=True)
-        self.joist_at_start = float(joist_at_start)
-        self.joist_at_end = float(joist_at_end)
+
+        self.joist_at_start = joist_at_start
+        self.joist_at_end = joist_at_end
         self.joist_locations = geom_ops.get_joist_locations(
             self.get_extent_edge("start"),
             self.get_extent_edge("end"),
@@ -474,13 +497,14 @@ class JoistArrayModel:
         for idx, joist_geom in enumerate(self.joist_geoms):
             trib_area = self.joist_trib_areas[idx]
             sub_id = f"{self.id}-{idx}"
-            # other_tag = self.joist_support_tags[idx]
             intersections_below = []
             for sup_idx, support_geom in enumerate(self.joist_supports):
                 other_tag = self.joist_support_tags[sup_idx]
                 intersection_attrs = geom_ops.get_intersection(
                     joist_geom, support_geom, other_tag
                 )
+                if intersection_attrs is None:
+                    continue
                 intersection_below = Intersection(*intersection_attrs)
                 intersections_below.append(intersection_below)
             element = Element(
@@ -495,7 +519,7 @@ class JoistArrayModel:
                 subelements=None,
                 trib_area=trib_area,
                 kwargs=self.elem_kwargs,
-                extent_polygon=self.extent_polygon,
+                # extent_polygon=self.extent_polygon,
             )
             subelements.append(element)
         new_element = Element(
@@ -538,10 +562,12 @@ class JoistArrayModel:
             new_centroid = geom_ops.project_node(
                 start_centroid, -self.vector_normal, joist_distance  # orig -ve
             )
-
+            # if not self.extent_polygon:
             system_bounds = geom_ops.get_system_bounds(
                 self._joist_prototype, list(self._supports)
             )
+            # else:
+            #     system_bounds = self.extent_polygon.bounds
             projection_distance = geom_ops.get_magnitude(system_bounds)
             ray_ai = geom_ops.project_node(
                 new_centroid, self.vector_parallel, projection_distance  # orig +ve
@@ -558,8 +584,16 @@ class JoistArrayModel:
                 new_centroid, -self.vector_parallel, projection_distance  # orig +ve
             )
             ray_b = LineString([ray_bi, ray_bj])
-            support_a_loc = ray_a.intersection(self._supports[0])
-            support_b_loc = ray_b.intersection(self._supports[-1])
+            intersecting_supports = [
+                support
+                for support in self._supports
+                if support.intersects(ray_a | ray_b)
+            ]
+            sorted_supports = geom_ops.sort_supports(
+                ray_a | ray_b, intersecting_supports
+            )
+            support_a_loc = ray_a.intersection(sorted_supports[0])
+            support_b_loc = ray_b.intersection(sorted_supports[-1])
 
             end_a = support_a_loc
             end_b = support_b_loc
@@ -633,16 +667,16 @@ class JoistArrayModel:
         # Left - # TODO: Can I not just buffer the joist? I guess that if the joist is on an
         # angle then extents won't capture the angle.
         if trib_left != 0.0:
-            i_left = geom_ops.project_node(i_node, -self.vector_normal, trib_left)
-            j_left = geom_ops.project_node(j_node, -self.vector_normal, trib_left)
+            i_left = geom_ops.project_node(i_node, self.vector_normal, trib_left)
+            j_left = geom_ops.project_node(j_node, self.vector_normal, trib_left)
             trib_area_left = convex_hull(MultiPoint([i_left, j_left, j_node, i_node]))
         else:
             trib_area_left = Polygon()
 
         # Right
         if trib_right != 0.0:
-            i_right = geom_ops.project_node(i_node, self.vector_normal, trib_right)
-            j_right = geom_ops.project_node(j_node, self.vector_normal, trib_right)
+            i_right = geom_ops.project_node(i_node, -self.vector_normal, trib_right)
+            j_right = geom_ops.project_node(j_node, -self.vector_normal, trib_right)
             trib_area_right = convex_hull(
                 MultiPoint([i_right, j_right, j_node, i_node])
             )
@@ -666,75 +700,3 @@ class JoistArrayModel:
                 self.joist_geoms + self.joist_trib_areas + self.joist_supports
             )
         )
-
-
-# @dataclass
-# class Joist:
-#     """
-#     Models a joist with a uniform load of
-#     'w' on all spans of the joist that exist.
-
-#                  w
-#     ||||||||||||||||||||||||||||
-#     ----------------------------
-#         ^                  ^
-#         R1                 R2
-#     < a ><      span      >< b >
-#     """
-
-#     span: float | Any
-#     a: float | Any = 0.0
-#     b: float | Any = 0.0
-
-#     def __post_init__(self):
-#         L = [self.a, self.span, self.b]
-#         EI = [1e3, 1e3, 1e3]
-#         R = [
-#             0.0,
-#             0.0,
-#             -1.0,
-#             0.0,
-#             -1.0,
-#             0.0,
-#             0.0,
-#             0.0,
-#         ]
-
-#         if self.a == 0:
-#             L.pop(0)
-#             EI.pop(0)
-#             R.pop(0)
-#             R.pop(0)
-#         if self.b == 0:
-#             L.pop()
-#             EI.pop()
-#             R.pop()
-#             R.pop()
-
-#         self._pycba_model = cba.BeamAnalysis(
-#             L,
-#             EI,
-#             R,
-#         )
-#         for idx, _ in enumerate(L):
-#             self._pycba_model.add_udl(idx + 1, 1)  # 1-based idx
-
-#     def get_r1(self):
-#         self._pycba_model.analyze()
-#         total_r1 = self._pycba_model._beam_results.R[0]
-#         total_load = self.get_total_load()
-#         return round(total_r1 / total_load, 9)
-
-#     def get_r2(self):
-#         self._pycba_model.analyze()
-#         total_r2 = self._pycba_model._beam_results.R[1]
-#         total_load = self.get_total_load()
-#         return round(total_r2 / total_load, 9)
-
-#     def get_total_load(self):
-#         w = 1
-#         total_load_a = w * self.a
-#         total_load_span = w * self.span
-#         total_load_b = w * self.b
-#         total_load = sum([total_load_a, total_load_span, total_load_b])
-#         return total_load

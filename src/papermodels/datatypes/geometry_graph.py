@@ -52,7 +52,12 @@ class GeometryGraph(nx.DiGraph):
 
     @property
     def collector_elements(self):
-        return [node for node in self.nodes if not list(self.predecessors(node))]
+        return [
+            node
+            for node in self.nodes
+            if not list(self.predecessors(node))
+            if self.nodes[node]["element"].rank == 0
+        ]
 
     @property
     def transfer_elements(self):
@@ -323,6 +328,7 @@ class GeometryGraph(nx.DiGraph):
                             sub_local_coords = get_local_coords(
                                 start_coord, sub_dependent_intersections
                             )
+                            sub_id = subelem.tag
                             subextents = subelem.get_collector_extents()
                             sub_sorted_below_ints = sorted(
                                 sub_local_coords, key=lambda x: x[0]
