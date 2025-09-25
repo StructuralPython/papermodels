@@ -583,6 +583,7 @@ class GeometryGraph(nx.DiGraph):
         legend_table: dict | pathlib.Path | str,
         page_idx: int = 0,
         scale: Decimal = Decimal(1.0),
+        polygonize_layers: Optional[list[str]] = None,
         debug: bool = False,
         progress: bool = False,
         do_not_process: bool = False,
@@ -608,7 +609,7 @@ class GeometryGraph(nx.DiGraph):
             legend_table_path = pathlib.Path(legend_table)
             with open(legend_table_path, 'r') as file:
                 legend_table = json.load(file)
-        annotations = dxf.load_dxf_annotations(dxf_filepath, page_idx)
+        annotations = dxf.load_dxf_annotations(dxf_filepath, page_idx, polygonize_layers=polygonize_layers)
         scaled_annotations = scale_annotations(annotations, scale=scale, paper_origin=(0,0))
 
             # parsed_annotations = parse_annotations(

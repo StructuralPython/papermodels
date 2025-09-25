@@ -9,6 +9,7 @@ import ezdxf.entities
 from papermodels.datatypes.annotation import Annotation
 from papermodels.paper.annotations import scale_annotations
 from papermodels.geometry import geom_ops
+import shapely as shp
 import pathlib
 import parse
 import numpy as np
@@ -37,11 +38,21 @@ def load_dxf_directory(
         annotations += file_annotations
     return annotations
 
-
 def load_dxf_annotations(
         dxf_path: pathlib.Path | str,
-        page_idx: int = 0
+        page_idx: int = 0,
+        polygonize_layers: Optional[list[str]] = None
 ) -> list[Annotation]:
+    dxf_entities = dxf_file_to_dxf_entities(dxf_path, page_idx, polygonize_layers=polygonize_layers)
+    annotations = dxf_entities_to_annotations(dxf_entities)
+    return annotations
+
+
+def dxf_file_to_dxf_entities(
+        dxf_path: pathlib.Path | str,
+        page_idx: int = 0,
+        polygonize_layers: Optional[list[str]] = None
+) -> dict:
     """
     Returns a lists of pdf annotations keyed by page index.
 
@@ -61,6 +72,8 @@ def load_dxf_annotations(
     'pages_layer_order': Optional[str], one of {"ltr", "rtl", "ttb", "btt"}
         left-to-right, right-to-left, top-to-bottom, bottom-to-top
         Which will be used to order the pages in ascending order.
+    'polygonize_layers': A list of layers if passed will polygonize the individual
+        linestrings on these layers.
     """
     dxf_path = pathlib.Path(dxf_path)
     doc = ezdxf.readfile(dxf_path)
@@ -70,56 +83,129 @@ def load_dxf_annotations(
     lwpolylines = msp.query("LWPOLYLINE")
     blocks = msp.query("INSERT")
     all_entities = list(lines) + list(lwpolylines) + list(blocks)
-    annotations = []
-    for local_idx, entity in enumerate(all_entities):
-        annotation = dxf_entity_to_annotation(entity, page_idx, local_idx)
-        if annotation.vertices:
-            annotations.append(annotation)
-    return annotations
+    dxf_entities = {}
+    filtered_entities = {}
+    for entity in all_entities:
+        dxf_type = entity.dxftype()
+        layer = entity.dxf.layer
+
+        if dxf_type == "LINE":
+            object_type = "Line"
+            geom = parse_line_coords(entity)
+            text = layer
+        elif dxf_type == "LWPOLYLINE":
+            object_type = "Polygon"
+            geom = parse_polyline_coords(entity)
+            text = layer
+        elif dxf_type == "INSERT":
+            object_type = "Polygon"
+            block_name = entity.get_dxf_attrib('name', default='')
+            geom = parse_block_coordinates(entity)
+            text = layer
+        else:
+            print(f"{dxf_type=}")
+        dxf_entities['page_idx'] = page_idx
+        dxf_entities.setdefault(layer, [])
+        dxf_entities[layer].append(geom)
+    poly_layers = []
+    if polygonize_layers is not None:
+        poly_layers = [f"{poly_layer}".lower() for poly_layer in polygonize_layers]
+    lower_layers  = [l.lower() for l in layers]
+    if polygonize_layers is not None and set(poly_layers) & set(lower_layers):
+        filtered_entities = {}
+        filtered_entities['page_idx'] = page_idx
+        for layer, geoms in dxf_entities.items():
+            if layer == 'page_idx' or layer.lower() not in poly_layers: 
+                continue
+            ls = [geom for geom in geoms if geom.geom_type == "LineString"]
+            others = [geom for geom in geoms if geom.geom_type != "LineString"]
+            line_unions = shp.polygonize(ls)
+            polys = shp.MultiPolygon([lu for lu in line_unions.geoms if lu.geom_type == "Polygon"])
+            dxf_polys = [poly for poly in polys.geoms if geom.geom_type == "Polygon"]
+            filtered_entities.update({layer: dxf_polys + others})
+
+    dxf_entities.update(filtered_entities)
+    return dxf_entities
 
 
-def dxf_entity_to_annotation(entity: ezdxf.entities.DXFGraphic, page_idx: int, local_idx: int) -> Annotation:
+def dxf_entity_to_shapely(entity: ezdxf.entities.DXFGraphic, page_idx: int, local_idx: int, polygonize_lines: bool = False) -> Annotation:
     """
     Converts the entity into an Annotation
     """
     dxf_type = entity.dxftype()
     layer = entity.dxf.layer
+    dxf_entities = {}
     if dxf_type == "LINE":
         object_type = "Line"
-        coords = parse_line_coords(entity)
+        geom = parse_line_coords(entity)
         text = layer
     elif dxf_type == "LWPOLYLINE":
         object_type = "Polygon"
-        coords = parse_polyline_coords(entity)
+        geom = parse_polyline_coords(entity)
         text = layer
     elif dxf_type == "INSERT":
         object_type = "Polygon"
         block_name = entity.get_dxf_attrib('name', default='')
-        coords = parse_block_coordinates(entity)
+        geom = parse_block_coordinates(entity)
         text = layer
     else:
         print(f"{dxf_type=}")
-    line_color = (0, 0, 0)#entity.dxf.color # convert to RBG tuple
-    line_type = None #entity.dxf.linetype
-    line_weight = 1.0#entity.dxf.thickness
-    # transparency = 1.0 #entity.dxf.transparency or 1.0
-    opacity = 1.0 #- transparency
-    vertices = coords_to_vertices_list(coords)
-    return Annotation(
-        page=page_idx,
-        object_type=object_type,
-        text=text,
-        vertices=vertices,
-        line_color=line_color,
-        fill_color = None,
-        line_type=line_type,
-        line_weight=line_weight,
-        line_opacity=opacity,
-        fill_opacity=opacity,
-        matrix=(1, 0, 0, 1, 0, 0),
-        local_id=local_idx
+    dxf_entities['page_idx'] = page_idx
+    dxf_entities.setdefault(layer, [])
+    dxf_entities[layer].append(geom)
+    if polygonize_lines:
+        filtered_entities = {}
+        filtered_entities['page_idx'] = page_idx
+        for layer, geoms in dxf_entities.items():
+            ls = [geom for geom in geoms if geom.geom_type == "LineString"]
+            others = [geom for geom in geoms if geom.geom_type != "LineString"]
+            polys = shp.polygonize(ls)
+            dxf_polys = [poly for poly in polys if geom.geom_type == "Polygon"]
+            filtered_entities.update({layer: dxf_polys + others})
+        return filtered_entities
+    return dxf_entities
 
-    )
+
+def dxf_entities_to_annotations(dxf_entities: dict[str, list | str]) -> list[Annotation]:
+    """
+    Returns a list of annotation for the dxf-entities
+    """
+    # dxf_path = pathlib.Path(dxf_path)
+    # doc = ezdxf.readfile(dxf_path)
+    # layers = doc.layers.entries
+    # msp = doc.modelspace()
+    page_idx = dxf_entities.pop('page_idx')
+    annotations = []
+    counter = 0
+    for layer, geoms in dxf_entities.items():
+        for geom in geoms:
+            if geom.geom_type == "Polygon":
+                vertices = geom_ops.flatten_vertex_array(np.array(geom.exterior.coords))
+            else:
+                vertices = geom_ops.flatten_vertex_array(np.array(geom.coords))
+            line_color = (0, 0, 0)#entity.dxf.color # convert to RBG tuple
+            line_type = None #entity.dxf.linetype
+            line_weight = 1.0#entity.dxf.thickness
+            transparency = 1.0 #entity.dxf.transparency or 1.0
+            opacity = 0.5 #- transparency
+            annot = Annotation(
+                page=page_idx,
+                object_type=geom.geom_type,
+                text=layer,
+                vertices=vertices,
+                line_color=line_color,
+                fill_color = None,
+                line_type=line_type,
+                line_weight=line_weight,
+                line_opacity=opacity,
+                fill_opacity=opacity,
+                matrix=(1, 0, 0, 1, 0, 0),
+                local_id=counter
+
+            )
+            annotations.append(annot)
+            counter += 1
+    return annotations
 
 
 def parse_block_coordinates(entity):
@@ -128,16 +214,14 @@ def parse_block_coordinates(entity):
     """
     geoms = []
     for e in entity.virtual_entities():
-        coords = None
+        geom = None
         if e.dxftype() == 'LINE':
-            coords = parse_line_coords(e)
+            geom = parse_line_coords(e)
         elif e.dxftype() == 'LWPOLYLINE':
-            coords = parse_polyline_coords(e)
+            geom = parse_polyline_coords(e)
         elif e.dxftype() == 'ARC':
-            coords = parse_arc_coords(e)
-        
-        if coords is not None:
-            geoms += coords
+            geom = parse_arc_coords(e)
+        geoms.append(geom)
     return geoms
 
 
@@ -146,7 +230,7 @@ def parse_line_coords(entity: ezdxf.entities.DXFGraphic):
         (entity.dxf.start[0], entity.dxf.start[1]), 
         (entity.dxf.end[0], entity.dxf.end[1])
     ]
-    return coords
+    return shp.set_precision(shp.LineString(coords), grid_size=1e-3)
 
 
 def parse_polyline_coords(entity: ezdxf.entities.DXFGraphic):
@@ -154,7 +238,7 @@ def parse_polyline_coords(entity: ezdxf.entities.DXFGraphic):
     # coords = [[(p[0][0], p[0][1]), (p[1][0], p[1][1])] for p in point_pairs]
     coords = [(p[0], p[1]) for p in entity.get_points()]
 
-    return coords
+    return shp.set_precision(shp.Polygon(coords), grid_size=1e-3)
 
 
 def parse_arc_coords(arc: ezdxf.entities.DXFGraphic, num_segments=12):
@@ -170,7 +254,7 @@ def parse_arc_coords(arc: ezdxf.entities.DXFGraphic, num_segments=12):
     
     angles = [start_angle + (end_angle - start_angle) * i / (num_segments - 1) for i in range(num_segments)]
     points = [(center[0] + radius * math.cos(a), center[1] + radius * math.sin(a)) for a in angles]
-    return points
+    return shp.set_precision(shp.LineString(points), grid_size=1e-3)
 
 
 def coords_to_vertices_list(coords: list[tuple[float, float]]) -> list:
