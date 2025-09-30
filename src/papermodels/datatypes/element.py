@@ -825,11 +825,16 @@ class LoadedElement(Element):
                         h=(end_x - start_x), b1=start_y, b2=end_y
                     )
                     try:
-                        trapezoid_ratio = area_dist_load / total_polygon_area
+                        # total_area_ratio = area_dist_load / total_polygon_area
+                        # THIS GIVES THE CORRECT TRAPEZOID RATIO FOR COLLECTORTRIBMODEL
+                        total_area_ratio = (
+                            self.applied_loading_areas[idx][0].area
+                            / self.trib_area.area
+                        )
                     except ZeroDivisionError:
                         continue  # Skip this dist load if there is no polygon area
                     intersected_poly, applied_loading = self.applied_loading_areas[idx]
-                    if trapezoid_ratio == 0.0 and intersected_poly.area == 0.0:
+                    if total_area_ratio == 0.0 and intersected_poly.area == 0.0:
                         continue  # Skip this dist load if there is no intersection area
                     dist_load = {
                         "transfer_source": "",
@@ -837,9 +842,9 @@ class LoadedElement(Element):
                         "occupancy": applied_loading.occupancy,
                         "load_components": applied_loading.load_components or [],
                         "applied_area": round(
-                            intersected_poly.area * trapezoid_ratio, precision
+                            intersected_poly.area * total_area_ratio, precision
                         ),
-                        "total_area_ratio": trapezoid_ratio,
+                        "total_area_ratio": total_area_ratio,
                         "start_loc": round(start_x, precision),
                         "start_magnitude": round(start_y, precision),
                         "end_loc": round(end_x, precision),
