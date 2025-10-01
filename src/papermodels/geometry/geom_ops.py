@@ -353,24 +353,40 @@ def get_joist_extents(
 def get_cantilever_segments(
     joist_prototype: LineString,
     ordered_supports: list[LineString],
-    tolerance: float = 1e-1,
+    rel_tol: float = 1e-2,
+    abs_tol: Optional[float] = None,
 ) -> dict[str, float]:
     """
     Returns a dictionary containing the cantilever lengths over-hanging supports "A" and
     "B", respectively. Returns a length of 0.0 if the length is less than the tolerance.
+
+    If 'abs_tol' is given, then 'rel_tol' is ignored
     """
-    joist_interior = convex_hull(MultiLineString([geom for geom in ordered_supports]))
-    cantilevers = ops.split(joist_prototype, joist_interior) - joist_interior
+    joist_interior_region = convex_hull(MultiLineString([geom for geom in ordered_supports]))
+    joist_interior = joist_interior_region & joist_prototype
+    joist_interior_length = joist_interior.length
+    cantilevers = ops.split(joist_prototype, joist_interior_region) - joist_interior_region
     cantilever_segments = {"A": 0.0, "B": 0.0}
     if isinstance(cantilevers, LineString):
         split_a = cantilevers
         split_b = Point()  # A geometry of length 0
     elif hasattr(cantilevers, "geoms"):
         split_a, split_b = cantilevers.geoms
+    else:
+        split_a, split_b = Point(joist_interior.coords[0]), Point(joist_interior.coords[-1])
+
+    if abs_tol is not None:
+        split_a = split_a if split_a.length > abs_tol else Point(joist_interior.coords[0])
+        split_b = split_b if split_b.length > abs_tol else Point(joist_interior.coords[-1])
+    elif rel_tol:
+        split_a = split_a if (split_a.length / joist_interior_length) > rel_tol else Point(joist_interior.coords[0])
+        split_b = split_b if (split_b.length / joist_interior_length) > rel_tol else Point(joist_interior.coords[-1])
+    
     if split_a.distance(ordered_supports[0]) < split_a.distance(ordered_supports[-1]):
         cantilever_segments = {"A": split_a.length, "B": split_b.length}
     else:
         cantilever_segments = {"A": split_b.length, "B": split_a.length}
+    print(f"{cantilever_segments=}")
     return cantilever_segments
 
 
@@ -598,6 +614,8 @@ def sort_supports(
     """
     all_supports = MultiLineString(supports)
     from IPython.display import display
+    joist_system = joist_prototype & all_supports
+    print(joist_system)
 
     ordered_intersections = order_nodes_positive((joist_prototype & all_supports).geoms)
     ordered_supports = []
