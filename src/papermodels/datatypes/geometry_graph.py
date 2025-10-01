@@ -734,6 +734,18 @@ class GeometryGraph(nx.DiGraph):
                 structural_element_entries, extent_entries
             )
 
+        if not structural_element_entries and not legend_entries:
+            raise ValueError(
+                "No structural element entities were found.\n"
+                "Did you forget to create some legend entries?"
+            )
+
+        elif not structural_element_entries:
+            raise ValueError(
+                "No structural element entities were found.\n"
+                "Do the annotation properties match the legend entry properties?"
+            )
+
         elements = Element.from_parsed_annotations(
             structural_element_entries, trib_area_entries
         )
