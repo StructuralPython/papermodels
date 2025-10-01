@@ -191,7 +191,7 @@ def test_collector_extent_creates_loaded_elements(
         assert les["FB0.0"].model()["loads"]["distributed_loads"][0]["start_loc"] == 0.0 #0.327
 
     with check:
-        assert les["FB0.0"].model()["loads"]["distributed_loads"][0]["end_loc"] == 0.327
+        assert les["FB0.0"].model()["loads"]["distributed_loads"][0]["end_loc"] == 0.377
 
     with check:
         assert les["FB0.0"].model()["loads"]["distributed_loads"][1]["start_loc"] == 0.327

@@ -148,14 +148,14 @@ def pike_annotation_to_pm_annotation(
         x1, y1, x2, y2 = bbox
         b1, b2, b3, b4 = buffers
         vertices = (
-            x1,
-            y1,
-            x1,
-            y2 - b4 - b2,
-            x2 - b3 - b1,
-            y2 - b4 - b2,
-            x2 - b3 - b1,
-            y1,
+            x1 + b1,  # x0
+            y1 + b4,  # y0
+            x1 + b1,  # x1
+            y2 - b2,  # y1
+            x2 - b3,  # x2
+            y2 - b2,  # y2
+            x2 - b3,  # x3
+            y1 + b4,  # y3
         )
     elif annot_type.lower() in ("line", "arrow"):
         vertices = tuple(annot.get("/L", tuple()))

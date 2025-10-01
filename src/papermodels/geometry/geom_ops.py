@@ -217,7 +217,9 @@ def get_joist_extents(
         calcualtion.
     """
     if extent_polygon is not None:
-        supports_bbox = get_system_bounds(joist_prototype, joist_supports, normal=False, extent_polygon=extent_polygon)
+        supports_bbox = get_system_bounds(
+            joist_prototype, joist_supports, normal=False, extent_polygon=extent_polygon
+        )
         minx, miny, maxx, maxy = supports_bbox
         joist_vector = np.abs(get_direction_vector(joist_prototype))
         # This is one of the places where orthogonality is assumed
@@ -229,16 +231,24 @@ def get_joist_extents(
         else:
             print(f"JOIST ORIENTATION VERIANT: {joist_prototype=}")
         if joist_orientation == "horizontal":
-            extents = [(Point(minx, miny), Point(minx, maxy)), (Point(maxx, miny), Point(maxx, maxy))]
+            extents = [
+                (Point(minx, miny), Point(minx, maxy)),
+                (Point(maxx, miny), Point(maxx, maxy)),
+            ]
         if joist_orientation == "vertical":
-            extents = [(Point(minx, miny), Point(maxx, miny)), (Point(minx, maxy), Point(maxx, maxy))]
+            extents = [
+                (Point(minx, miny), Point(maxx, miny)),
+                (Point(minx, maxy), Point(maxx, maxy)),
+            ]
         return extents
-    
+
     if trib_area is not None:
         supports_bbox = trib_area.bounds
     else:
-        supports_bbox = get_system_bounds(joist_prototype, joist_supports, normal=True, extent_polygon=extent_polygon)
-    
+        supports_bbox = get_system_bounds(
+            joist_prototype, joist_supports, normal=True, extent_polygon=extent_polygon
+        )
+
     magnitude_max = get_magnitude(supports_bbox)
     joist_vector = get_direction_vector(joist_prototype).flatten()
     orig_joist_origin, orig_joist_end = get_start_end_nodes(joist_prototype)
@@ -478,7 +488,10 @@ def translate_joist_to_point(
 
 
 def get_system_bounds(
-    joist_prototype: LineString, joist_supports: list[LineString], normal: bool = True, extent_polygon: Optional[Polygon] = None
+    joist_prototype: LineString,
+    joist_supports: list[LineString],
+    normal: bool = True,
+    extent_polygon: Optional[Polygon] = None,
 ) -> tuple[float, float, float, float]:
     """
     Returns the minx, miny, maxx, maxy bounding box of all the LineStrings in 'joist_supports',

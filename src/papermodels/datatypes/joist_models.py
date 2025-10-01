@@ -388,7 +388,7 @@ class JoistArrayModel:
                     support = geom_ops.get_rectangle_centerline(ib.other_geometry)
             else:
                 support = ib.other_geometry
-            
+
             self.joist_supports.append(support)
 
         # try:
