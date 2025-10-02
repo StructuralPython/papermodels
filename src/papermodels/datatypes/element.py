@@ -825,21 +825,35 @@ class LoadedElement(Element):
                         h=(end_x - start_x), b1=start_y, b2=end_y
                     )
                     try:
-                        trapezoid_ratio = area_dist_load / total_polygon_area
+                        if self.reaction_type == "point":
+                            # collectors from the JoistArrayModel have trib areas that reflect
+                            # the actual trib area for the subelement. Thus, the area reatio
+                            # should reflect the percentage of area from each distributed load
+                            # sub-section and what percentage that reflects of the complete
+                            # distributed load system which may consist of several trapezoids
+                            area_ratio = area_dist_load / total_polygon_area
+                        # THIS GIVES THE CORRECT TRAPEZOID RATIO FOR COLLECTORTRIBMODEL
+                        elif self.reaction_type == "linear":
+                            # In the CollectorTribModel the trib area reflects the size of a whole
+                            # spread of joists which will be reduced down to a reaction over a unit length.
+                            # In this case, we need an area ratio to reflect the percentage of area that
+                            # an area load covers in relation to the total trib area.
+                            area_ratio = (
+                                self.applied_loading_areas[idx][0].area
+                                / self.trib_area.area
+                            )
                     except ZeroDivisionError:
                         continue  # Skip this dist load if there is no polygon area
                     intersected_poly, applied_loading = self.applied_loading_areas[idx]
-                    if trapezoid_ratio == 0.0 and intersected_poly.area == 0.0:
+                    if area_ratio == 0.0 and intersected_poly.area == 0.0:
                         continue  # Skip this dist load if there is no intersection area
                     dist_load = {
                         "transfer_source": "",
                         "transfer_reaction_index": "",
                         "occupancy": applied_loading.occupancy,
                         "load_components": applied_loading.load_components or [],
-                        "applied_area": round(
-                            intersected_poly.area * trapezoid_ratio, precision
-                        ),
-                        "total_area_ratio": trapezoid_ratio,
+                        "applied_area": round(intersected_poly.area, precision),
+                        "applied_area_ratio": area_ratio,
                         "start_loc": round(start_x, precision),
                         "start_magnitude": round(start_y, precision),
                         "end_loc": round(end_x, precision),

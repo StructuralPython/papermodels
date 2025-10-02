@@ -266,6 +266,7 @@ def get_joist_extents(
     left_coords = []
     right_coords = []
     for joist_support in joist_supports:
+        # print(joist_support)
         joist_support = joist_support.intersection(box(*supports_bbox))
 
         start_coord, end_coord = joist_support.coords
