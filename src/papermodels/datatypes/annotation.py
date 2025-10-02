@@ -7,7 +7,7 @@ from typing import Any
 class Annotation:
     page: int
     object_type: str
-    text: str
+    text: str # in dxf this is the layer
     vertices: list[Decimal]
     line_color: tuple[Decimal]
     fill_color: tuple[Decimal]

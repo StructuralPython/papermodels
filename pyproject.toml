@@ -25,6 +25,7 @@ dependencies = [
     "rich",
     "forallpeople",
     "tomli-w",
+    "ezdxf",
     "textalloc>=1.2.1",
 ]
 

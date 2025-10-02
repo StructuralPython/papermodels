@@ -182,7 +182,7 @@ def _annotation_to_wkt(annot: Annotation) -> str:
     Returns a WKT string representing the geometry in 'annot'. The WKT
     string can be loaded with shapely.wkt.loads (see shapely documentation)
     """
-    if annot.object_type == "PolyLine" or annot.object_type == "Line":
+    if annot.object_type in ("Line", "PolyLine", "LineString"):
         grouped_vertices = geom_ops._group_vertices_str(annot.vertices)
         return f"LINESTRING({grouped_vertices})"
     elif annot.object_type in ("Polygon", "Rectangle", "Square"):

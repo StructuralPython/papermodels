@@ -5,6 +5,7 @@ from decimal import Decimal
 import pathlib
 import networkx as nx
 import hashlib
+import json
 
 from papermodels.datatypes.element import Element, LoadedElement, trim_cantilevers
 from shapely import Point, LineString, Polygon
@@ -21,9 +22,11 @@ from ..paper.annotations import (
     filter_annotations,
     tag_parsed_annotations,
     assign_page_id_to_annotations,
+    annotation_to_shapely
 )
 from ..paper.plot import plot_annotations
 from ..paper import pdf
+from ..paper import dxf
 from ..datatypes.exceptions import AnnotationError
 from rich.progress import track
 from rich import print
@@ -303,6 +306,8 @@ class GeometryGraph(nx.DiGraph):
             dependents = list(self.successors(node))
             dependent_intersections = get_dependent_intersections(element, dependents)
             dependent_correspondents = get_dependent_correspondents(element, dependents)
+            if not dependent_intersections and not dependent_correspondents:
+                continue
             if element.geometry.geom_type == "Polygon":  # node geometry is polygon
                 updated_intersections_below = []
                 all_extents = {}
@@ -445,6 +450,8 @@ class GeometryGraph(nx.DiGraph):
                 for correspondent in element.correspondents_above
                 if correspondent.other_tag in predecessors
             ]
+            if not predecessor_intersections and not predecessor_correspondents:
+                continue
             indexed_intersections_above = []
             for intersection in predecessor_intersections:
                 other_tag = intersection.other_tag
@@ -595,6 +602,146 @@ class GeometryGraph(nx.DiGraph):
         self.add_intersection_indexes_below()
         self.add_intersection_indexes_above()
 
+
+    @classmethod
+    def from_dxf_file(
+        cls,
+        dxf_filepath: pathlib.Path | str,
+        legend_table: dict | pathlib.Path | str,
+        page_idx: int = 0,
+        scale: Decimal = Decimal(1.0),
+        polygonize_layers: Optional[list[str]] = None,
+        debug: bool = False,
+        progress: bool = False,
+        do_not_process: bool = False,
+        show_skipped: bool = False,
+    ):
+        """
+        Returns a GeometryGraph built from the geometric entities (LINE, LWPOLYLINE, INSERT)
+        contained within 'dxf_filepath'. 
+
+
+        'legend_table': A dict (or a path to a JSON file) that maps layer names to 
+            annotation text properties
+        'scale': An optional scale to be applied to the annotations. If not provided,
+            the units of the annotations will be in PDF points where 1 point == 1 /72 inch
+        'debug':  When True, will provide verbose documentation of the annotation parsing
+            process to assist in reviewing errors and geometry inconsistencies.
+        'progress': When True, a progress bar will be displayed
+        'do_not_process': Reads the file and adds annotations to the graph but does not
+            process the connectivity. Useful for debugging and plotting prior to processing.
+        'show_skipped': Shows the skipped annotations that occured during pdf.load_pdf_annotations
+        """
+        if isinstance(legend_table, (str, pathlib.Path)):
+            legend_table_path = pathlib.Path(legend_table)
+            with open(legend_table_path, 'r') as file:
+                legend_table = json.load(file)
+        annotations = dxf.load_dxf_annotations(dxf_filepath, page_idx, polygonize_layers=polygonize_layers)
+        scaled_annotations = scale_annotations(annotations, scale=scale, paper_origin=(0,0))
+
+            # parsed_annotations = parse_annotations(
+            #     scaled_annots_in_page, legend_entries, legend_identifier
+            # )
+
+        load_entries = {}
+        trib_area_entries = {}
+        structural_element_entries = {}
+        parsed_annotations = {}
+        raw_annotations = {}
+        for idx, scaled_annot in enumerate(scaled_annotations):
+            raw_annot = annotations[idx]
+            layer_name = scaled_annot.text
+            annot_attrs = legend_table.get(layer_name)
+            if annot_attrs is None:
+                continue
+            annot_attrs = {k.lower(): v for k, v in annot_attrs.items()}
+
+            annot_attrs.update({"extent_polygon": None})
+            existing_annot_tag = annot_attrs.get("tag", None)
+            annot_geom = annotation_to_shapely(scaled_annot)
+            annot_attrs["geometry"] = annot_geom
+            annot_attrs["page_label"] = scaled_annot.page
+            annot_attrs["tag"] = existing_annot_tag
+
+            if "extent" in annot_attrs["type"]:
+                parsed_annotations.update({scaled_annot: annot_attrs})
+            else:
+                annot_attrs.setdefault("reaction_type", "point")
+                annot_attrs["reaction_type"] = annot_attrs["reaction_type"].lower()
+                if (
+                    annot_geom.geom_type == "Polygon"
+                    and annot_attrs["reaction_type"] == "linear"
+                ):
+                    annot_attrs["length"] = geom.get_rectangle_centerline(
+                        annot_geom
+                    ).length
+                parsed_annotations.update({scaled_annot: annot_attrs})
+
+            parsed_annotations[scaled_annot] = annot_attrs
+            raw_annotations[raw_annot] = annot_attrs
+
+            if "occupancy" in annot_attrs:
+                load_entries.update({scaled_annot: annot_attrs})
+            elif "type" in annot_attrs and "hole" in annot_attrs['type'].lower():
+                load_entries.update({scaled_annot: annot_attrs})
+            elif "type" in annot_attrs and "trib area" in annot_attrs['type'].lower():
+                trib_area_entries.update({scaled_annot: annot_attrs})
+            elif "type" not in annot_attrs:
+                continue
+            else:
+                structural_element_entries.update({scaled_annot: annot_attrs})
+
+        elements = Element.from_parsed_annotations(structural_element_entries, trib_area_entries)
+        # print(elements)
+        graph = cls.from_elements(elements, do_not_process=do_not_process)
+        graph.parsed_annotations = tag_parsed_annotations(parsed_annotations)
+        graph.raw_annotations = tag_parsed_annotations(raw_annotations)
+        graph.legend_entries = {}
+        graph.loading_geometries = parsed_annotations_to_loading_geometry(load_entries)
+        return graph
+
+
+
+    def parse_annotations():
+        parsed_annotations = {}
+        for legend_item in legend:
+            legend_properties = {
+                prop: getattr(legend_item, prop) for prop in properties_to_match
+            }
+            matching_annots = filter_annotations(annots, legend_properties)
+            annot_attributes = parse_legend(legend_item.text, legend_identifier)
+            for annot in matching_annots:
+                if annot in legend:
+                    continue
+                annot_kwargs = parse_annot_kwargs(annot.text)
+                existing_annot_tag = annot_kwargs.get("tag", None)
+                annot_geom = annotation_to_shapely(annot)
+                annot_attrs = {}
+                annot_attrs["geometry"] = annot_geom
+                annot_attrs["page_label"] = annot.page
+                annot_attrs["tag"] = existing_annot_tag
+                for annot_key, annot_attr in annot_attributes.items():
+                    annot_attrs[annot_key] = str_to_int(
+                        annot_attr.split("<")[0]
+                    )  # .split() to remove trailing HTML tags
+
+                # Run tests for this first
+                # annot_attrs["rank"] = int(annot_attributes["rank"])
+                if "extent" in annot_attrs["type"]:
+                    parsed_annotations.update({annot: annot_attrs})
+                else:
+                    annot_attrs.setdefault("reaction_type", "point")
+                    annot_attrs["reaction_type"] = annot_attrs["reaction_type"].lower()
+                    if (
+                        annot_geom.geom_type == "Polygon"
+                        and annot_attrs["reaction_type"] == "linear"
+                    ):
+                        annot_attrs["length"] = geom_ops.get_rectangle_centerline(
+                            annot_geom
+                        ).length
+                    parsed_annotations.update({annot: annot_attrs | annot_kwargs})
+        
+        
     def unassigned_collectors(self) -> list[str]:
         """
         Returns a list of str that represents collector nodes who do not currently
@@ -611,7 +758,7 @@ class GeometryGraph(nx.DiGraph):
     @classmethod
     def from_pdf_file(
         cls,
-        pdf_filepath: pathlib.path | str,
+        pdf_filepath: pathlib.Path | str,
         legend_identifier: str = "legend",
         scale: Optional[Decimal] = None,
         debug: bool = False,
@@ -623,7 +770,7 @@ class GeometryGraph(nx.DiGraph):
     ):
         """
         Returns a GeometryGraph built from that annotations in the provided PDF file
-        at 'filepath'.
+        at 'pdf_filepath'.
 
         The provided annotations are parsed into four different categories:
             0. Legend entries - All legend entries must contain the 'legend_identifier'
