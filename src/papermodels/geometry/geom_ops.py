@@ -178,7 +178,8 @@ def clean_polygon_supports(
                 # Ensure there are no missing intersections on the support line
                 assert support_line.intersects(joist_prototype)
             elif sum(support_intersections) == 0:
-                assert support_geom.intersects(support_lines)
+                # assert support_geom.intersects(support_lines).any()
+
                 raise GeometryError(
                     f"The geometry {support_geom.wkt} does not intersect {joist_prototype.wkt}"
                 )
@@ -187,6 +188,10 @@ def clean_polygon_supports(
                 # Can sometimes be caused by a joist intersecting with a column
                 # (joists should not be "supported" by columns)
                 support_line = get_rectangle_centerline(support_geom)
+                if not support_line.intersects(joist_prototype):
+                    support_line = get_rectangle_centerline(
+                        support_geom, on_long_edge=True
+                    )
                 assert support_line.intersects(joist_prototype)
             cleaned_supports.append(support_line)
         else:
@@ -363,24 +368,73 @@ def get_joist_extents(
 def get_cantilever_segments(
     joist_prototype: LineString,
     ordered_supports: list[LineString],
-    tolerance: float = 1e-1,
+    rel_tol: float = 5e-2,
+    abs_tol: Optional[float] = None,
 ) -> dict[str, float]:
     """
     Returns a dictionary containing the cantilever lengths over-hanging supports "A" and
     "B", respectively. Returns a length of 0.0 if the length is less than the tolerance.
+
+    If 'abs_tol' is given, then 'rel_tol' is ignored
     """
-    joist_interior = convex_hull(MultiLineString([geom for geom in ordered_supports]))
-    cantilevers = ops.split(joist_prototype, joist_interior) - joist_interior
+    joist_interior_region = convex_hull(
+        MultiLineString([geom for geom in ordered_supports])
+    )
+    joist_interior = joist_interior_region & joist_prototype
+    joist_interior_length = joist_interior.length
+    cantilevers = (
+        ops.split(joist_prototype, joist_interior_region) - joist_interior_region
+    )
     cantilever_segments = {"A": 0.0, "B": 0.0}
     if isinstance(cantilevers, LineString):
         split_a = cantilevers
         split_b = Point()  # A geometry of length 0
     elif hasattr(cantilevers, "geoms"):
         split_a, split_b = cantilevers.geoms
-    if split_a.distance(ordered_supports[0]) < split_a.distance(ordered_supports[-1]):
-        cantilever_segments = {"A": split_a.length, "B": split_b.length}
     else:
-        cantilever_segments = {"A": split_b.length, "B": split_a.length}
+        split_a, split_b = Point(joist_interior.coords[0]), Point(
+            joist_interior.coords[-1]
+        )
+    a_orig = split_a.length
+    b_orig = split_b.length
+
+    if abs_tol is not None:
+        split_a = (
+            split_a if split_a.length > abs_tol else Point(joist_interior.coords[0])
+        )
+        split_b = (
+            split_b if split_b.length > abs_tol else Point(joist_interior.coords[-1])
+        )
+    elif rel_tol:
+        split_a = (
+            split_a
+            if (split_a.length / joist_interior_length) > rel_tol
+            else Point(joist_interior.coords[0])
+        )
+        split_b = (
+            split_b
+            if (split_b.length / joist_interior_length) > rel_tol
+            else Point(joist_interior.coords[-1])
+        )
+
+    if split_a.distance(ordered_supports[0]) < split_a.distance(ordered_supports[-1]):
+        cantilever_segments = {
+            "A": split_a.length,
+            "A_intersection": ordered_supports[0] & joist_prototype,
+            "A_orig": a_orig,
+            "B": split_b.length,
+            "B_intersection": ordered_supports[-1] & joist_prototype,
+            "B_orig": b_orig,
+        }
+    else:
+        cantilever_segments = {
+            "A": split_b.length,
+            "A_intersection": ordered_supports[-1] & joist_prototype,
+            "A_orig": a_orig,
+            "B": split_a.length,
+            "B_intersection": ordered_supports[0] & joist_prototype,
+            "B_orig": b_orig,
+        }
     return cantilever_segments
 
 
@@ -612,7 +666,9 @@ def sort_supports(
     all_supports = MultiLineString(supports)
     from IPython.display import display
 
-    ordered_intersections = order_nodes_positive((joist_prototype & all_supports).geoms)
+    joist_intersections = joist_prototype & all_supports
+    assert len(joist_intersections.geoms) > 1
+    ordered_intersections = order_nodes_positive(joist_intersections.geoms)
     ordered_supports = []
     for point in ordered_intersections:
         for linestring in supports:
@@ -865,7 +921,7 @@ def explode_polygon(p: Polygon) -> list[LineString]:
     return exploded
 
 
-def get_rectangle_centerline(p: Polygon) -> LineString:
+def get_rectangle_centerline(p: Polygon, on_long_edge: bool = False) -> LineString:
     """
     Returns the centerline of the Polygon 'p' assuming that 'p' represents
     a regular rectangle with a long dimension and a short dimension.
@@ -874,7 +930,11 @@ def get_rectangle_centerline(p: Polygon) -> LineString:
     rectangle_edges = explode_polygon(p)
     sorted_edges = sorted(rectangle_edges, key=lambda x: x.length)
     short_edges = sorted_edges[:2]
-    edge1, edge2 = short_edges
+    long_edges = sorted_edges[2:]
+    if on_long_edge:
+        edge1, edge2 = long_edges
+    else:
+        edge1, edge2 = short_edges
     start, end = order_nodes_positive([edge1.centroid, edge2.centroid])
     center_line = LineString([start, end])
     return center_line

@@ -1261,6 +1261,47 @@ def get_geometry_correspondents(
     return corresponding_annotations
 
 
+def trim_cantilevers(
+    element: Element, rel_tol: float = 2e-2, abs_tol: Optional[float] = None
+):
+    """
+    Mutates the geometry in node elements so that any cantilevers which are
+    below self.cantilever_rel_tol or self.cantilever_abs_tol are removed from
+    the geometry and the geometry spans exactly from support to support.
+    """
+    geometry = element.geometry
+    if geometry.geom_type == "LineString" and not element.extent_polygon:
+        orig_support_geoms = [ib.other_geometry for ib in element.intersections_below]
+        support_geoms = geom_ops.clean_polygon_supports(orig_support_geoms, geometry)
+        support_geoms = geom_ops.sort_supports(geometry, support_geoms)
+        cantilevers = geom_ops.get_cantilever_segments(
+            geometry, support_geoms, rel_tol=rel_tol, abs_tol=abs_tol
+        )
+        start_point, end_point = Point(geometry.coords[0]), Point(geometry.coords[-1])
+        if cantilevers["A"] == 0.0 and cantilevers["A"] != cantilevers["A_orig"]:
+            start_point = cantilevers["A_intersection"]
+        if cantilevers["B"] == 0.0 and cantilevers["B"] != cantilevers["B_orig"]:
+            end_point = cantilevers["B_intersection"]
+        new_geometry = LineString([start_point, end_point])  # type: ignore
+        element.geometry = new_geometry
+        intersection_checks = [
+            new_geometry.intersection(support_geom) for support_geom in support_geoms
+        ]
+        new_intersections_below = [
+            Intersection(
+                intersecting_region=new_geometry.intersection(ib.other_geometry),
+                other_tag=ib.other_tag,
+                other_geometry=ib.other_geometry,
+                other_reaction_type=ib.other_reaction_type,
+                other_extents=ib.other_extents,
+                other_index=ib.other_index,
+            )
+            for ib in element.intersections_below
+        ]
+        element.intersections_below = new_intersections_below
+    return element
+
+
 def filter_correspondents(
     tagged_annotations: dict[Annotation, dict],
 ) -> dict[Annotation, dict]:
