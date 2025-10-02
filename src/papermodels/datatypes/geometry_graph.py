@@ -6,7 +6,7 @@ import pathlib
 import networkx as nx
 import hashlib
 
-from papermodels.datatypes.element import Element, LoadedElement
+from papermodels.datatypes.element import Element, LoadedElement, trim_cantilevers
 from shapely import Point, LineString, Polygon
 from ..geometry import geom_ops as geom
 from ..datatypes.element import (
@@ -40,7 +40,12 @@ class GeometryGraph(nx.DiGraph):
     The node_hash is how changes to the graph nodes can be tracked.
     """
 
-    def __init__(self, do_not_process: bool = False, cantilever_rel_tol: Optional[float] = None, cantilever_abs_tol: Optional[float] = None):
+    def __init__(
+        self,
+        do_not_process: bool = False,
+        cantilever_rel_tol: float = 2e-2,
+        cantilever_abs_tol: Optional[float] = None,
+    ):
         super().__init__()
         self.do_not_process = do_not_process
         self.node_hash = None
@@ -49,7 +54,7 @@ class GeometryGraph(nx.DiGraph):
         self.raw_annotations = None
         self.legend_entries = None
         self.pdf_path = None
-        self.cantilever_rel_tol: Optional[float] = cantilever_rel_tol
+        self.cantilever_rel_tol: float = cantilever_rel_tol
         self.cantilever_abs_tol: Optional[float] = cantilever_abs_tol
 
     @property
@@ -67,13 +72,19 @@ class GeometryGraph(nx.DiGraph):
 
     @classmethod
     def from_elements(
-        cls, elements: list[Element], do_not_process: bool = False, cantilever_rel_tol: Optional[float] = None, cantilever_abs_tol: Optional[float] = None
+        cls,
+        elements: list[Element],
+        do_not_process: bool = False,
+        cantilever_rel_tol: float = 2e-2,
+        cantilever_abs_tol: Optional[float] = None,
     ) -> GeometryGraph:
         """
         Returns a GeometryGraph (networkx.DiGraph) based upon the intersections and correspondents
         of the 'elements'.
         """
-        g = cls(cantilever_rel_tol=cantilever_rel_tol, cantilever_abs_tol=cantilever_abs_tol)
+        g = cls(
+            cantilever_rel_tol=cantilever_rel_tol, cantilever_abs_tol=cantilever_abs_tol
+        )
         elements_copy = deepcopy(elements)
         for element in elements_copy:
             hash = hashlib.sha256(str(element).encode()).hexdigest()
@@ -113,7 +124,7 @@ class GeometryGraph(nx.DiGraph):
         if do_not_process:
             return g
 
-        # g.trim_cantilevers()
+        g.trim_cantilevers()
         g.remove_excess_correspondent_load_paths()
         g.add_intersection_indexes_below()
         g.add_intersection_indexes_above()
@@ -122,20 +133,16 @@ class GeometryGraph(nx.DiGraph):
 
     def trim_cantilevers(self):
         """
-        Mutates the geometry in node elements so that any cantilevers which are
-        below self.cantilever_rel_tol or self.cantilever_abs_tol are removed from
-        the geometry and the geometry spans exactly from support to support.
+        Trims cantilevers if they are within the tolerance
         """
-        sorted_node_names = nx.topological_sort(self)
-        for node_name in sorted_node_names:
+        node_names = self.transfer_elements
+        for node_name in node_names:
             node = self.nodes[node_name]
-            element = node['element']
-            geometry = element.geometry
-            support_geoms = [ib.other_geom for ib in element.intersections_below]
-            support_geoms = geom.clean_polygon_supports(support_geoms, geometry)
-            support_geoms = geom.sort_supports(geometry, support_geoms)
-            cantilevers = geom.get_cantilever_segments(geometry, support_geoms)
-
+            element = node["element"]
+            new_element = trim_cantilevers(
+                element, self.cantilever_rel_tol, self.cantilever_abs_tol
+            )
+            node["element"] = new_element
 
     def remove_excess_correspondent_load_paths(self):
         """

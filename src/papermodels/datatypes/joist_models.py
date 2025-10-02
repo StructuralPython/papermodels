@@ -17,7 +17,7 @@ from shapely import (
 )
 import shapely.ops as ops
 
-from papermodels.datatypes.element import Element, Intersection
+from papermodels.datatypes.element import Element, Intersection, trim_cantilevers
 from papermodels.geometry import geom_ops
 import load_distribution as ld
 
@@ -388,7 +388,7 @@ class JoistArrayModel:
                     support = geom_ops.get_rectangle_centerline(ib.other_geometry)
             else:
                 support = ib.other_geometry
-            
+
             self.joist_supports.append(support)
 
         # try:
@@ -429,7 +429,7 @@ class JoistArrayModel:
             )
         self._supports = self.joist_supports
         self._cantilevers = geom_ops.get_cantilever_segments(
-            self.joist_prototype, self._supports
+            self.joist_prototype, self._supports, abs_tol=0
         )
         self.vector_parallel = geom_ops.get_direction_vector(self.joist_prototype)
         self.vector_normal = geom_ops.rotate_90_vector(self.vector_parallel, ccw=True)
@@ -507,7 +507,7 @@ class JoistArrayModel:
                     continue
                 intersection_below = Intersection(*intersection_attrs)
                 intersections_below.append(intersection_below)
-            element = Element(
+            subelement = Element(
                 joist_geom,
                 sub_id,
                 intersections_below=intersections_below,
@@ -521,7 +521,7 @@ class JoistArrayModel:
                 kwargs=self.elem_kwargs,
                 # extent_polygon=self.extent_polygon,
             )
-            subelements.append(element)
+            subelements.append(subelement)
         new_element = Element(
             e.geometry,
             tag=e.tag,
