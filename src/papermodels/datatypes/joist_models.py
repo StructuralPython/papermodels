@@ -2,7 +2,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 import math
 from typing import Any, Optional
-import pycba as cba
 import numpy as np
 from shapely import (
     LineString,

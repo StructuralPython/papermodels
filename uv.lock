@@ -292,15 +292,6 @@ wheels = [
 ]
 
 [[package]]
-name = "forallpeople"
-version = "2.7.1"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/a1/a4/472da01db5a6f22696f913499b25ab4f8999220b4feed87f0424084ce1a6/forallpeople-2.7.1.tar.gz", hash = "sha256:cc46bcf0a468df5868113b8eb00191cfc8cc42103506aaa58e38237debcdb982", size = 851994 }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/2c/0f/bd1a37730538268ae350c3481f8ce9786b345617b1b929ebd82a87999021/forallpeople-2.7.1-py2.py3-none-any.whl", hash = "sha256:9b8abf690c508672fac0a48a53463f091f2df8709c6bd3ba2fd4840136a0e7d3", size = 40758 },
-]
-
-[[package]]
 name = "iniconfig"
 version = "2.1.0"
 source = { registry = "https://pypi.org/simple" }
@@ -739,12 +730,11 @@ wheels = [
 
 [[package]]
 name = "papermodels"
-version = "0.14.1"
+version = "0.14.2"
 source = { editable = "." }
 dependencies = [
     { name = "colour" },
     { name = "ezdxf" },
-    { name = "forallpeople" },
     { name = "load-distribution" },
     { name = "matplotlib" },
     { name = "networkx" },
@@ -752,8 +742,6 @@ dependencies = [
     { name = "pandas" },
     { name = "parse" },
     { name = "pikepdf" },
-    { name = "pycba" },
-    { name = "pynitefea" },
     { name = "pytest" },
     { name = "rich" },
     { name = "scikit-spatial" },
@@ -778,8 +766,7 @@ dev = [
 requires-dist = [
     { name = "colour" },
     { name = "ezdxf" },
-    { name = "forallpeople" },
-    { name = "load-distribution" },
+    { name = "load-distribution", specifier = ">=0.1.4" },
     { name = "matplotlib" },
     { name = "networkx" },
     { name = "numpy" },
@@ -787,9 +774,7 @@ requires-dist = [
     { name = "pandas", specifier = ">=2.0.0" },
     { name = "parse" },
     { name = "pikepdf" },
-    { name = "pycba" },
     { name = "pygraphviz", marker = "extra == 'graphviz'", specifier = ">=1.14" },
-    { name = "pynitefea", specifier = ">=1.0.0" },
     { name = "pytest" },
     { name = "rich" },
     { name = "scikit-spatial", specifier = ">=8.1.0" },
@@ -946,18 +931,6 @@ wheels = [
 ]
 
 [[package]]
-name = "prettytable"
-version = "3.16.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "wcwidth" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/99/b1/85e18ac92afd08c533603e3393977b6bc1443043115a47bb094f3b98f94f/prettytable-3.16.0.tar.gz", hash = "sha256:3c64b31719d961bf69c9a7e03d0c1e477320906a98da63952bc6698d6164ff57", size = 66276 }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/02/c7/5613524e606ea1688b3bdbf48aa64bafb6d0a4ac3750274c43b6158a390f/prettytable-3.16.0-py3-none-any.whl", hash = "sha256:b5eccfabb82222f5aa46b798ff02a8452cf530a352c31bddfa29be41242863aa", size = 33863 },
-]
-
-[[package]]
 name = "prompt-toolkit"
 version = "3.0.52"
 source = { registry = "https://pypi.org/simple" }
@@ -1004,20 +977,6 @@ wheels = [
 ]
 
 [[package]]
-name = "pycba"
-version = "0.5.2"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "matplotlib" },
-    { name = "numpy" },
-    { name = "scipy" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/e1/9a/48c95e689b1c6901dd37df2f732172176255d18570dc1fcc12753f28a12b/pycba-0.5.2.tar.gz", hash = "sha256:9f9ed0a0a538233f860d337a944abd13567f210ab14e9096a0f764c2e678abb5", size = 32831 }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/69/51/f60d590f2b0975877394d7fc19e48cfaee610132963897310267628d9188/PyCBA-0.5.2-py2.py3-none-any.whl", hash = "sha256:3f1c058368bb486a0c96bdf5f56397ff001ee4d79bd8a273ef7098a724cf1158", size = 33006 },
-]
-
-[[package]]
 name = "pycparser"
 version = "2.23"
 source = { registry = "https://pypi.org/simple" }
@@ -1040,21 +999,6 @@ name = "pygraphviz"
 version = "1.14"
 source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/66/ca/823d5c74a73d6b8b08e1f5aea12468ef334f0732c65cbb18df2a7f285c87/pygraphviz-1.14.tar.gz", hash = "sha256:c10df02377f4e39b00ae17c862f4ee7e5767317f1c6b2dfd04cea6acc7fc2bea", size = 106003 }
-
-[[package]]
-name = "pynitefea"
-version = "1.4.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "matplotlib" },
-    { name = "numpy" },
-    { name = "prettytable" },
-    { name = "scipy" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/59/a0/3cc770950d298d76b5395514fdedef26d6d3f0636ccf21a9f893f6a2a320/pynitefea-1.4.0.tar.gz", hash = "sha256:3c3e03ae9e301bc883199f2a74c4cc85da8904f87a7c09e768b2cd061bf9d6f3", size = 148783 }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/69/db/01e3383d579dafa56fd994094ff3adbcd311f866364887b541fd9d8cf77a/pynitefea-1.4.0-py3-none-any.whl", hash = "sha256:3d466f753437cd90c1402dc667bce42dc42ddeb8bed2a255d9b8ba834241a20a", size = 152723 },
-]
 
 [[package]]
 name = "pyparsing"
