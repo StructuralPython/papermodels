@@ -11,7 +11,7 @@ from ..paper.annotations import (
     tag_parsed_annotations,
 )
 from ..geometry import geom_ops
-from ..loads import load_distribution as ld
+import load_distribution as ld
 import parse
 import math
 import tomli_w
@@ -59,6 +59,7 @@ class Correspondent(NamedTuple):
     other_rank: int
     other_reaction_type: str = "point"
     other_extents: Optional[tuple] = None
+
 
 
 @dataclass
