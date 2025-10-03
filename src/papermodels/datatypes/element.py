@@ -272,7 +272,9 @@ class Element:
                 clean_support_geom = support_geoms[idx]
                 cleaned_supports_map.update({clean_support_geom: poly_support_geom})
             try:
-                ordered_support_geoms = geom_ops.sort_supports(self.geometry, support_geoms)
+                ordered_support_geoms = geom_ops.sort_supports(
+                    self.geometry, support_geoms
+                )
                 extents = geom_ops.get_joist_extents(
                     self.geometry,
                     ordered_support_geoms,
@@ -1293,11 +1295,17 @@ def trim_cantilevers(
         orig_support_geoms = [ib.other_geometry for ib in element.intersections_below]
         support_geoms = geom_ops.clean_polygon_supports(orig_support_geoms, geometry)
         support_geoms = geom_ops.sort_supports(geometry, support_geoms)
-        ordered_geom = LineString(geom_ops.order_nodes_positive([Point(geometry.coords[0]), Point(geometry.coords[-1])]))
+        ordered_geom = LineString(
+            geom_ops.order_nodes_positive(
+                [Point(geometry.coords[0]), Point(geometry.coords[-1])]
+            )
+        )
         cantilevers = geom_ops.get_cantilever_segments(
             ordered_geom, support_geoms, rel_tol=rel_tol, abs_tol=abs_tol
         )
-        start_point, end_point = Point(ordered_geom.coords[0]), Point(ordered_geom.coords[-1])
+        start_point, end_point = Point(ordered_geom.coords[0]), Point(
+            ordered_geom.coords[-1]
+        )
         if (cantilevers["A"] == 0.0) and (cantilevers["A"] != cantilevers["A_orig"]):
             start_point = cantilevers["A_intersection"]
         if (cantilevers["B"] == 0.0) and (cantilevers["B"] != cantilevers["B_orig"]):
