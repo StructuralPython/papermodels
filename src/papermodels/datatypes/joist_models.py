@@ -595,7 +595,6 @@ class JoistArrayModel:
 
             end_a = support_a_loc
             end_b = support_b_loc
-
         # These clauses req'd to deal with floating point error possible
         # on the end joists (occurs after performing project_node)
         elif index == 0:
@@ -614,9 +613,7 @@ class JoistArrayModel:
                 support_b_loc, self.vector_parallel, self._cantilevers["B"]
             )
         joist_geom = LineString([end_a, end_b])
-        if self.element.tag.startswith("RJ"):
-            from IPython.display import display
-            display(GeometryCollection([joist_geom] + self._supports))
+
         return joist_geom
 
     def get_extent_edge(self, edge: str = "start"):

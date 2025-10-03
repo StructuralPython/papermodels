@@ -667,7 +667,8 @@ def sort_supports(
     from IPython.display import display
 
     joist_intersections = joist_prototype & all_supports
-    assert len(joist_intersections.geoms) > 1
+    assert joist_intersections.geom_type != "Point"
+    assert not joist_intersections.is_empty
     ordered_intersections = order_nodes_positive(joist_intersections.geoms)
     ordered_supports = []
     for point in ordered_intersections:
