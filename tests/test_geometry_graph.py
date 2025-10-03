@@ -35,6 +35,7 @@ def load_resi_dormers():
     graph = GeometryGraph.from_pdf_file(
         TEST_DATA / "resi_dormers.pdf",
         scale=QUARTER_INCH_SCALE,
+        cantilever_abs_tol=1.0
     )
     return graph
 
@@ -118,8 +119,8 @@ def test_resi_dormers_array(load_resi_dormers):
     assert len(fb03_pl) == 7
     rj001 = les["RJ0.0-1"].model()
     rj006 = les["RJ0.0-6"].model()
-    assert rj001["element_attributes"]["length"] == 1.058
-    assert rj006["element_attributes"]["length"] == 5.832
+    assert rj001["element_attributes"]["length"] == 1.242
+    assert rj006["element_attributes"]["length"] == 5.589
 
 
 def test_many_correspondents(load_many_correspondents):

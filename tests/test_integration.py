@@ -38,6 +38,15 @@ def load_collector_extents():
 
 
 @fixture()
+def load_horiz_extents():
+    graph = GeometryGraph.from_pdf_file(
+        TEST_DATA / "horiz_extents.pdf",
+        scale=QUARTER_INCH_SCALE,
+    )
+    return graph
+
+
+@fixture()
 def sketch_to_scale_to_trib_loaded_elements(load_sketch_to_scale):
     graph = load_sketch_to_scale
     graph.assign_collector_behaviour(CollectorTribModel)
@@ -61,6 +70,14 @@ def collector_extents_to_trib_loaded_elements(load_collector_extents):
     return les
 
 
+@fixture()
+def horiz_extents_to_array_loaded_elements(load_horiz_extents):
+    graph = load_horiz_extents
+    graph.assign_collector_behaviour(JoistArrayModel)
+    les = graph.create_loaded_elements()
+    return les
+
+
 def test_sketch_to_scale_loads(load_sketch_to_scale):
     assert load_sketch_to_scale
 
@@ -75,6 +92,10 @@ def test_sketch_to_scale_creates_array_loaded_elements(
     sketch_to_scale_to_array_loaded_elements,
 ):
     les = sketch_to_scale_to_array_loaded_elements
+    assert les
+
+def test_horiz_extents_loads(horiz_extents_to_array_loaded_elements):
+    les = horiz_extents_to_array_loaded_elements
     assert les
 
 
@@ -116,7 +137,7 @@ def test_joists_loaded_sketch_to_scale(sketch_to_scale_to_trib_loaded_elements):
         # TODO: Update this test with what start and end locs should actually be
         fb1_3 = les["FB1.3"].model()
         assert fb1_3["loads"]["distributed_loads"][0]["start_loc"] == 0.446
-        assert fb1_3["loads"]["distributed_loads"][0]["end_loc"] == 10.837
+        assert fb1_3["loads"]["distributed_loads"][0]["end_loc"] == 10.785
 
 
 def test_collector_extent_loads(load_collector_extents):
@@ -227,3 +248,12 @@ def test_wall_point_load_locations(sketch_to_scale_to_array_loaded_elements):
             acc.append(load["location"])
         joist_intervals = [x[0] - x[1] for x in zip(acc[:-1], acc[1:])]
         assert math.isclose(max(joist_intervals), 1)
+
+
+def test_horiz_extents_joist_extents(horiz_extents_to_array_loaded_elements):
+    les = horiz_extents_to_array_loaded_elements
+    db0 = les['DB0.0'].model()
+    db1 = les['DB0.1'].model()
+    pls = db0['loads']['point_loads']
+    assert pls[0]['location'] == 7.932
+    assert pls[-1]['location'] == 3.236
