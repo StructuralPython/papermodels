@@ -33,9 +33,7 @@ def load_frame_collectors_transfers():
 @fixture()
 def load_resi_dormers():
     graph = GeometryGraph.from_pdf_file(
-        TEST_DATA / "resi_dormers.pdf",
-        scale=QUARTER_INCH_SCALE,
-        cantilever_abs_tol=1.0
+        TEST_DATA / "resi_dormers.pdf", scale=QUARTER_INCH_SCALE, cantilever_abs_tol=1.0
     )
     return graph
 
