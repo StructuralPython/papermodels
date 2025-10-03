@@ -61,7 +61,6 @@ class Correspondent(NamedTuple):
     other_extents: Optional[tuple] = None
 
 
-
 @dataclass
 class Element:
     """
