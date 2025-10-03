@@ -614,6 +614,9 @@ class JoistArrayModel:
                 support_b_loc, self.vector_parallel, self._cantilevers["B"]
             )
         joist_geom = LineString([end_a, end_b])
+        if self.element.tag.startswith("RJ"):
+            from IPython.display import display
+            display(GeometryCollection([joist_geom] + self._supports))
         return joist_geom
 
     def get_extent_edge(self, edge: str = "start"):

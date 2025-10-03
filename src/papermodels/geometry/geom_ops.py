@@ -266,7 +266,6 @@ def get_joist_extents(
     left_coords = []
     right_coords = []
     for joist_support in joist_supports:
-        # print(joist_support)
         joist_support = joist_support.intersection(box(*supports_bbox))
 
         start_coord, end_coord = joist_support.coords
@@ -431,10 +430,10 @@ def get_cantilever_segments(
         cantilever_segments = {
             "A": split_b.length,
             "A_intersection": ordered_supports[-1] & joist_prototype,
-            "A_orig": a_orig,
+            "A_orig": b_orig,
             "B": split_a.length,
             "B_intersection": ordered_supports[0] & joist_prototype,
-            "B_orig": b_orig,
+            "B_orig": a_orig,
         }
     return cantilever_segments
 

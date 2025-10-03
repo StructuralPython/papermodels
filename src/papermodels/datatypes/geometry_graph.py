@@ -63,15 +63,15 @@ class GeometryGraph(nx.DiGraph):
     @property
     def collector_elements(self):
         return [
-            node
-            for node in self.nodes
-            if not list(self.predecessors(node))
-            if self.nodes[node]["element"].rank == 0
+            node_name
+            for node_name in self.nodes
+            if not list(self.predecessors(node_name))
+            if self.nodes[node_name]["element"].rank == 0
         ]
 
     @property
     def transfer_elements(self):
-        return [node for node in self.nodes if list(self.predecessors(node))]
+        return [node_name for node_name in self.nodes if list(self.predecessors(node_name))]
 
     @classmethod
     def from_elements(
@@ -146,6 +146,7 @@ class GeometryGraph(nx.DiGraph):
                 element, self.cantilever_rel_tol, self.cantilever_abs_tol
             )
             node["element"] = new_element
+
 
     def remove_excess_correspondent_load_paths(self):
         """
@@ -317,7 +318,7 @@ class GeometryGraph(nx.DiGraph):
                     extents = all_extents.get(intersection.other_tag)
                     new_intersection = Intersection(
                         intersection.intersecting_region,
-                        intersection.other_geometry,
+                        self.nodes[intersection.other_tag]['element'].geometry,
                         intersection.other_tag,
                         0,
                         intersection.other_reaction_type,
@@ -401,7 +402,7 @@ class GeometryGraph(nx.DiGraph):
                             local_index = other_tags_below.index(other_tag)
                             new_intersection = Intersection(
                                 intersection.intersecting_region,
-                                intersection.other_geometry,
+                                self.nodes[intersection.other_tag]['element'].geometry,
                                 intersection.other_tag,
                                 local_index,
                                 other_reaction_type=intersection.other_reaction_type,
@@ -419,7 +420,7 @@ class GeometryGraph(nx.DiGraph):
                         local_index = other_tags_below.index(other_tag)
                         new_intersection = Intersection(
                             intersection.intersecting_region,
-                            intersection.other_geometry,
+                            self.nodes[intersection.other_tag]['element'].geometry,
                             intersection.other_tag,
                             local_index,
                             other_reaction_type=intersection.other_reaction_type,
@@ -474,7 +475,7 @@ class GeometryGraph(nx.DiGraph):
                     other_extents = above_intersections_below[element_tag][1]
                     new_intersection = Intersection(
                         intersection.intersecting_region,
-                        intersection.other_geometry,
+                        element.geometry,
                         intersection.other_tag,
                         local_index,
                         element_above.reaction_type,
@@ -761,6 +762,8 @@ class GeometryGraph(nx.DiGraph):
         pdf_filepath: pathlib.Path | str,
         legend_identifier: str = "legend",
         scale: Optional[Decimal] = None,
+        cantilever_rel_tol: float = 2e-2,
+        cantilever_abs_tol: Optional[float] = None,
         debug: bool = False,
         progress: bool = False,
         do_not_process: bool = False,
@@ -802,7 +805,7 @@ class GeometryGraph(nx.DiGraph):
         """
         annotations = pdf.load_pdf_annotations(pdf_filepath, show_skipped)
         graph = cls.from_annotations(
-            annotations, legend_identifier, scale=scale, do_not_process=do_not_process
+            annotations, legend_identifier, scale=scale, do_not_process=do_not_process, cantilever_rel_tol=cantilever_rel_tol, cantilever_abs_tol=cantilever_abs_tol
         )
         graph.pdf_path = pathlib.Path(pdf_filepath).resolve()
         return graph
@@ -813,6 +816,8 @@ class GeometryGraph(nx.DiGraph):
         annotations: list[Annotation],
         legend_identifier: str = "legend",
         scale: Optional[Decimal] = None,
+        cantilever_rel_tol: float = 2e-2,
+        cantilever_abs_tol: Optional[float] = None,
         # area_load_properties: Optional[dict] = None,
         # trib_area_properties: Optional[dict] = None,
         debug: bool = False,
@@ -923,7 +928,7 @@ class GeometryGraph(nx.DiGraph):
         elements = Element.from_parsed_annotations(
             structural_element_entries, trib_area_entries
         )
-        graph = cls.from_elements(elements, do_not_process=do_not_process)
+        graph = cls.from_elements(elements, cantilever_rel_tol=cantilever_rel_tol, cantilever_abs_tol=cantilever_abs_tol, do_not_process=do_not_process)
         graph.parsed_annotations = tag_parsed_annotations(parsed_annotations_acc)
         graph.raw_annotations = tag_parsed_annotations(raw_annotations_acc)
         graph.legend_entries = legend_entries
