@@ -613,7 +613,8 @@ class JoistArrayModel:
             end_b = geom_ops.project_node(
                 support_b_loc, self.vector_parallel, self._cantilevers["B"]
             )
-        return LineString([end_a, end_b])
+        joist_geom = LineString([end_a, end_b])
+        return joist_geom
 
     def get_extent_edge(self, edge: str = "start"):
         """
