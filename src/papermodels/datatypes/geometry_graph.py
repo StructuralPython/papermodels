@@ -699,7 +699,6 @@ class GeometryGraph(nx.DiGraph):
         elements = Element.from_parsed_annotations(
             structural_element_entries, trib_area_entries
         )
-        # print(elements)
         graph = cls.from_elements(elements, do_not_process=do_not_process)
         graph.parsed_annotations = tag_parsed_annotations(parsed_annotations)
         graph.raw_annotations = tag_parsed_annotations(raw_annotations)

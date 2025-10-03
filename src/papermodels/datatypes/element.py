@@ -174,7 +174,6 @@ class Element:
         types described in the 'legend'. If an annotation is not described in the legend then it will
         not be included in the result list of Elements.
         """
-        # print(f"{parsed_annotations=}")
         tagged_annotations = tag_parsed_annotations(parsed_annotations)
         annotations_w_intersect = get_geometry_intersections(tagged_annotations)
         annotations_w_intersect_corrs = get_geometry_correspondents(
