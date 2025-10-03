@@ -1,17 +1,36 @@
 from __future__ import annotations
 from copy import deepcopy
 from decimal import Decimal
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
 from shapely.wkt import loads as wkt_loads
-from shapely import Geometry, GeometryCollection, Point, Polygon, set_precision
+from shapely import (
+    Geometry,
+    GeometryCollection,
+    Point,
+    Polygon,
+    set_precision,
+    LineString,
+)
 from papermodels.datatypes.annotation import Annotation
-from papermodels.loads.load_distribution import LoadingGeometry
 from papermodels.geometry import geom_ops
 from papermodels.datatypes.exceptions import LegendError, GeometryError, AnnotationError
 from typing import Any, Optional
 import re
 import numpy as np
+import numpy.typing as npt
 from numpy.typing import ArrayLike
+
+
+@dataclass
+class LoadingGeometry:
+    """
+    Represents a LoadingGeometry
+    """
+
+    geometry: Polygon | LineString
+    occupancy: str
+    load_components: npt.ArrayLike
+    plane_id: str | int
 
 
 def annotations_to_shapely(

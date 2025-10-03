@@ -237,8 +237,8 @@ def get_joist_extents(
             print(f"JOIST ORIENTATION VERIANT: {joist_prototype=}")
         if joist_orientation == "horizontal":
             extents = [
-                (Point(minx, miny), Point(minx, maxy)),
-                (Point(maxx, miny), Point(maxx, maxy)),
+                (Point(minx, maxy), Point(minx, miny)),
+                (Point(maxx, maxy), Point(maxx, miny)),
             ]
         if joist_orientation == "vertical":
             extents = [
@@ -266,7 +266,6 @@ def get_joist_extents(
     left_coords = []
     right_coords = []
     for joist_support in joist_supports:
-        # print(joist_support)
         joist_support = joist_support.intersection(box(*supports_bbox))
 
         start_coord, end_coord = joist_support.coords
@@ -278,7 +277,6 @@ def get_joist_extents(
         end_coord_rotation = cross_product_2d(
             joist_vector, np.array(end_coord.coords[0]) - orig_joist_origin
         )
-
         if start_coord_rotation == 0.0:
             if end_coord_rotation > 0.0:
                 right_coords.append(start_coord)
@@ -362,6 +360,7 @@ def get_joist_extents(
         # If one or more is empty, there is a problem that needs investigating
         assert not left_extent.is_empty
         assert not right_extent.is_empty
+        # Do not "sort_nodes_positive" on these nodes. They are in the correct order.
         extents.append((left_extent, right_extent))
     return extents
 
@@ -431,10 +430,10 @@ def get_cantilever_segments(
         cantilever_segments = {
             "A": split_b.length,
             "A_intersection": ordered_supports[-1] & joist_prototype,
-            "A_orig": a_orig,
+            "A_orig": b_orig,
             "B": split_a.length,
             "B_intersection": ordered_supports[0] & joist_prototype,
-            "B_orig": b_orig,
+            "B_orig": a_orig,
         }
     return cantilever_segments
 
@@ -668,7 +667,8 @@ def sort_supports(
     from IPython.display import display
 
     joist_intersections = joist_prototype & all_supports
-    assert len(joist_intersections.geoms) > 1
+    assert joist_intersections.geom_type != "Point"
+    assert not joist_intersections.is_empty
     ordered_intersections = order_nodes_positive(joist_intersections.geoms)
     ordered_supports = []
     for point in ordered_intersections:

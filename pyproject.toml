@@ -13,20 +13,17 @@ dependencies = [
     "numpy >= 2.0.0",
     "pandas >= 2.0.0",
     "scikit-spatial >= 8.1.0",
-    "load_distribution",
     "pikepdf",
     "parse",
     "colour",
     "pytest",
     "networkx",
     "numpy",
-    "PyNiteFEA >= 1.0.0",
-    "pycba",
     "rich",
-    "forallpeople",
     "tomli-w",
     "ezdxf",
     "textalloc>=1.2.1",
+    "load-distribution>=0.1.4",
 ]
 
 

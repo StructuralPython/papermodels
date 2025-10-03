@@ -2,7 +2,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 import math
 from typing import Any, Optional
-import pycba as cba
 import numpy as np
 from shapely import (
     LineString,
@@ -432,6 +431,7 @@ class JoistArrayModel:
             self.joist_prototype, self._supports, abs_tol=0
         )
         self.vector_parallel = geom_ops.get_direction_vector(self.joist_prototype)
+
         self.vector_normal = geom_ops.rotate_90_vector(self.vector_parallel, ccw=True)
 
         self.joist_at_start = joist_at_start
@@ -562,12 +562,9 @@ class JoistArrayModel:
             new_centroid = geom_ops.project_node(
                 start_centroid, -self.vector_normal, joist_distance  # orig -ve
             )
-            # if not self.extent_polygon:
             system_bounds = geom_ops.get_system_bounds(
                 self._joist_prototype, list(self._supports)
             )
-            # else:
-            #     system_bounds = self.extent_polygon.bounds
             projection_distance = geom_ops.get_magnitude(system_bounds)
             ray_ai = geom_ops.project_node(
                 new_centroid, self.vector_parallel, projection_distance  # orig +ve
@@ -597,7 +594,6 @@ class JoistArrayModel:
 
             end_a = support_a_loc
             end_b = support_b_loc
-
         # These clauses req'd to deal with floating point error possible
         # on the end joists (occurs after performing project_node)
         elif index == 0:
@@ -615,7 +611,9 @@ class JoistArrayModel:
             end_b = geom_ops.project_node(
                 support_b_loc, self.vector_parallel, self._cantilevers["B"]
             )
-        return LineString([end_a, end_b])
+        joist_geom = LineString([end_a, end_b])
+
+        return joist_geom
 
     def get_extent_edge(self, edge: str = "start"):
         """
@@ -625,10 +623,10 @@ class JoistArrayModel:
         """
         if edge == "start":
             node_i = self._extents[0][0]
-            node_j = self._extents[-1][0]
+            node_j = self._extents[1][0]
         elif edge == "end":
             node_i = self._extents[0][1]
-            node_j = self._extents[-1][1]
+            node_j = self._extents[1][1]
         return LineString([node_i, node_j])
 
     def get_joist_trib_widths(self, index) -> tuple[float, float]:

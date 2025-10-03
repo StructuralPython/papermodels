@@ -22,7 +22,7 @@ from ..paper.annotations import (
     filter_annotations,
     tag_parsed_annotations,
     assign_page_id_to_annotations,
-    annotation_to_shapely
+    annotation_to_shapely,
 )
 from ..paper.plot import plot_annotations
 from ..paper import pdf
@@ -63,15 +63,17 @@ class GeometryGraph(nx.DiGraph):
     @property
     def collector_elements(self):
         return [
-            node
-            for node in self.nodes
-            if not list(self.predecessors(node))
-            if self.nodes[node]["element"].rank == 0
+            node_name
+            for node_name in self.nodes
+            if not list(self.predecessors(node_name))
+            if self.nodes[node_name]["element"].rank == 0
         ]
 
     @property
     def transfer_elements(self):
-        return [node for node in self.nodes if list(self.predecessors(node))]
+        return [
+            node_name for node_name in self.nodes if list(self.predecessors(node_name))
+        ]
 
     @classmethod
     def from_elements(
@@ -317,7 +319,7 @@ class GeometryGraph(nx.DiGraph):
                     extents = all_extents.get(intersection.other_tag)
                     new_intersection = Intersection(
                         intersection.intersecting_region,
-                        intersection.other_geometry,
+                        self.nodes[intersection.other_tag]["element"].geometry,
                         intersection.other_tag,
                         0,
                         intersection.other_reaction_type,
@@ -401,7 +403,7 @@ class GeometryGraph(nx.DiGraph):
                             local_index = other_tags_below.index(other_tag)
                             new_intersection = Intersection(
                                 intersection.intersecting_region,
-                                intersection.other_geometry,
+                                self.nodes[intersection.other_tag]["element"].geometry,
                                 intersection.other_tag,
                                 local_index,
                                 other_reaction_type=intersection.other_reaction_type,
@@ -419,7 +421,7 @@ class GeometryGraph(nx.DiGraph):
                         local_index = other_tags_below.index(other_tag)
                         new_intersection = Intersection(
                             intersection.intersecting_region,
-                            intersection.other_geometry,
+                            self.nodes[intersection.other_tag]["element"].geometry,
                             intersection.other_tag,
                             local_index,
                             other_reaction_type=intersection.other_reaction_type,
@@ -474,7 +476,7 @@ class GeometryGraph(nx.DiGraph):
                     other_extents = above_intersections_below[element_tag][1]
                     new_intersection = Intersection(
                         intersection.intersecting_region,
-                        intersection.other_geometry,
+                        element.geometry,
                         intersection.other_tag,
                         local_index,
                         element_above.reaction_type,
@@ -602,7 +604,6 @@ class GeometryGraph(nx.DiGraph):
         self.add_intersection_indexes_below()
         self.add_intersection_indexes_above()
 
-
     @classmethod
     def from_dxf_file(
         cls,
@@ -618,10 +619,10 @@ class GeometryGraph(nx.DiGraph):
     ):
         """
         Returns a GeometryGraph built from the geometric entities (LINE, LWPOLYLINE, INSERT)
-        contained within 'dxf_filepath'. 
+        contained within 'dxf_filepath'.
 
 
-        'legend_table': A dict (or a path to a JSON file) that maps layer names to 
+        'legend_table': A dict (or a path to a JSON file) that maps layer names to
             annotation text properties
         'scale': An optional scale to be applied to the annotations. If not provided,
             the units of the annotations will be in PDF points where 1 point == 1 /72 inch
@@ -634,14 +635,18 @@ class GeometryGraph(nx.DiGraph):
         """
         if isinstance(legend_table, (str, pathlib.Path)):
             legend_table_path = pathlib.Path(legend_table)
-            with open(legend_table_path, 'r') as file:
+            with open(legend_table_path, "r") as file:
                 legend_table = json.load(file)
-        annotations = dxf.load_dxf_annotations(dxf_filepath, page_idx, polygonize_layers=polygonize_layers)
-        scaled_annotations = scale_annotations(annotations, scale=scale, paper_origin=(0,0))
+        annotations = dxf.load_dxf_annotations(
+            dxf_filepath, page_idx, polygonize_layers=polygonize_layers
+        )
+        scaled_annotations = scale_annotations(
+            annotations, scale=scale, paper_origin=(0, 0)
+        )
 
-            # parsed_annotations = parse_annotations(
-            #     scaled_annots_in_page, legend_entries, legend_identifier
-            # )
+        # parsed_annotations = parse_annotations(
+        #     scaled_annots_in_page, legend_entries, legend_identifier
+        # )
 
         load_entries = {}
         trib_area_entries = {}
@@ -682,25 +687,24 @@ class GeometryGraph(nx.DiGraph):
 
             if "occupancy" in annot_attrs:
                 load_entries.update({scaled_annot: annot_attrs})
-            elif "type" in annot_attrs and "hole" in annot_attrs['type'].lower():
+            elif "type" in annot_attrs and "hole" in annot_attrs["type"].lower():
                 load_entries.update({scaled_annot: annot_attrs})
-            elif "type" in annot_attrs and "trib area" in annot_attrs['type'].lower():
+            elif "type" in annot_attrs and "trib area" in annot_attrs["type"].lower():
                 trib_area_entries.update({scaled_annot: annot_attrs})
             elif "type" not in annot_attrs:
                 continue
             else:
                 structural_element_entries.update({scaled_annot: annot_attrs})
 
-        elements = Element.from_parsed_annotations(structural_element_entries, trib_area_entries)
-        # print(elements)
+        elements = Element.from_parsed_annotations(
+            structural_element_entries, trib_area_entries
+        )
         graph = cls.from_elements(elements, do_not_process=do_not_process)
         graph.parsed_annotations = tag_parsed_annotations(parsed_annotations)
         graph.raw_annotations = tag_parsed_annotations(raw_annotations)
         graph.legend_entries = {}
         graph.loading_geometries = parsed_annotations_to_loading_geometry(load_entries)
         return graph
-
-
 
     def parse_annotations():
         parsed_annotations = {}
@@ -740,8 +744,7 @@ class GeometryGraph(nx.DiGraph):
                             annot_geom
                         ).length
                     parsed_annotations.update({annot: annot_attrs | annot_kwargs})
-        
-        
+
     def unassigned_collectors(self) -> list[str]:
         """
         Returns a list of str that represents collector nodes who do not currently
@@ -761,6 +764,8 @@ class GeometryGraph(nx.DiGraph):
         pdf_filepath: pathlib.Path | str,
         legend_identifier: str = "legend",
         scale: Optional[Decimal] = None,
+        cantilever_rel_tol: float = 2e-2,
+        cantilever_abs_tol: Optional[float] = None,
         debug: bool = False,
         progress: bool = False,
         do_not_process: bool = False,
@@ -802,7 +807,12 @@ class GeometryGraph(nx.DiGraph):
         """
         annotations = pdf.load_pdf_annotations(pdf_filepath, show_skipped)
         graph = cls.from_annotations(
-            annotations, legend_identifier, scale=scale, do_not_process=do_not_process
+            annotations,
+            legend_identifier,
+            scale=scale,
+            do_not_process=do_not_process,
+            cantilever_rel_tol=cantilever_rel_tol,
+            cantilever_abs_tol=cantilever_abs_tol,
         )
         graph.pdf_path = pathlib.Path(pdf_filepath).resolve()
         return graph
@@ -813,6 +823,8 @@ class GeometryGraph(nx.DiGraph):
         annotations: list[Annotation],
         legend_identifier: str = "legend",
         scale: Optional[Decimal] = None,
+        cantilever_rel_tol: float = 2e-2,
+        cantilever_abs_tol: Optional[float] = None,
         # area_load_properties: Optional[dict] = None,
         # trib_area_properties: Optional[dict] = None,
         debug: bool = False,
@@ -923,7 +935,12 @@ class GeometryGraph(nx.DiGraph):
         elements = Element.from_parsed_annotations(
             structural_element_entries, trib_area_entries
         )
-        graph = cls.from_elements(elements, do_not_process=do_not_process)
+        graph = cls.from_elements(
+            elements,
+            cantilever_rel_tol=cantilever_rel_tol,
+            cantilever_abs_tol=cantilever_abs_tol,
+            do_not_process=do_not_process,
+        )
         graph.parsed_annotations = tag_parsed_annotations(parsed_annotations_acc)
         graph.raw_annotations = tag_parsed_annotations(raw_annotations_acc)
         graph.legend_entries = legend_entries

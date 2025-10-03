@@ -1,3 +1,4 @@
+from copy import deepcopy
 from dataclasses import dataclass
 from typing import Optional, Union, NamedTuple
 import numpy as np
@@ -10,7 +11,7 @@ from ..paper.annotations import (
     tag_parsed_annotations,
 )
 from ..geometry import geom_ops
-from ..loads import load_distribution as ld
+import load_distribution as ld
 import parse
 import math
 import tomli_w
@@ -173,7 +174,6 @@ class Element:
         types described in the 'legend'. If an annotation is not described in the legend then it will
         not be included in the result list of Elements.
         """
-        # print(f"{parsed_annotations=}")
         tagged_annotations = tag_parsed_annotations(parsed_annotations)
         annotations_w_intersect = get_geometry_intersections(tagged_annotations)
         annotations_w_intersect_corrs = get_geometry_correspondents(
@@ -265,16 +265,15 @@ class Element:
                 ]: ib.other_tag
                 for ib in self.intersections_below
             }
-            poly_support_geoms = list(support_tags_by_geom.keys())
-            support_geoms = geom_ops.clean_polygon_supports(
-                poly_support_geoms, self.geometry
-            )
+            support_geoms = list(support_tags_by_geom.keys())
             cleaned_supports_map = {}
-            for idx, poly_support_geom in enumerate(poly_support_geoms):
+            for idx, poly_support_geom in enumerate(support_geoms):
                 clean_support_geom = support_geoms[idx]
                 cleaned_supports_map.update({clean_support_geom: poly_support_geom})
-            ordered_support_geoms = geom_ops.sort_supports(self.geometry, support_geoms)
             try:
+                ordered_support_geoms = geom_ops.sort_supports(
+                    self.geometry, support_geoms
+                )
                 extents = geom_ops.get_joist_extents(
                     self.geometry,
                     ordered_support_geoms,
@@ -282,10 +281,10 @@ class Element:
                     extent_polygon=self.extent_polygon,
                 )
             except AssertionError as e:
-                raise e
-                # raise AssertionError(
-                #     f"No intersection within joist extents: {self.tag=}"
-                # )
+                # raise e
+                raise AssertionError(
+                    f"No intersection within joist extents: {self.tag=}"
+                )
             tagged_extents = {}
             for idx, extent in enumerate(extents):
                 support_geom = ordered_support_geoms[idx]
@@ -1289,23 +1288,31 @@ def trim_cantilevers(
     below self.cantilever_rel_tol or self.cantilever_abs_tol are removed from
     the geometry and the geometry spans exactly from support to support.
     """
+    new_element = deepcopy(element)
     geometry = element.geometry
     if geometry.geom_type == "LineString" and not element.extent_polygon:
         orig_support_geoms = [ib.other_geometry for ib in element.intersections_below]
         support_geoms = geom_ops.clean_polygon_supports(orig_support_geoms, geometry)
         support_geoms = geom_ops.sort_supports(geometry, support_geoms)
-        cantilevers = geom_ops.get_cantilever_segments(
-            geometry, support_geoms, rel_tol=rel_tol, abs_tol=abs_tol
+        ordered_geom = LineString(
+            geom_ops.order_nodes_positive(
+                [Point(geometry.coords[0]), Point(geometry.coords[-1])]
+            )
         )
-        start_point, end_point = Point(geometry.coords[0]), Point(geometry.coords[-1])
-        if cantilevers["A"] == 0.0 and cantilevers["A"] != cantilevers["A_orig"]:
+        cantilevers = geom_ops.get_cantilever_segments(
+            ordered_geom, support_geoms, rel_tol=rel_tol, abs_tol=abs_tol
+        )
+        start_point, end_point = Point(ordered_geom.coords[0]), Point(
+            ordered_geom.coords[-1]
+        )
+        if (cantilevers["A"] == 0.0) and (cantilevers["A"] != cantilevers["A_orig"]):
             start_point = cantilevers["A_intersection"]
-        if cantilevers["B"] == 0.0 and cantilevers["B"] != cantilevers["B_orig"]:
+        if (cantilevers["B"] == 0.0) and (cantilevers["B"] != cantilevers["B_orig"]):
             end_point = cantilevers["B_intersection"]
         new_geometry = LineString([start_point, end_point])  # type: ignore
-        element.geometry = new_geometry
+        new_element.geometry = new_geometry
         intersection_checks = [
-            new_geometry.intersection(support_geom) for support_geom in support_geoms
+            new_geometry.intersects(support_geom) for support_geom in support_geoms
         ]
         new_intersections_below = [
             Intersection(
@@ -1318,8 +1325,8 @@ def trim_cantilevers(
             )
             for ib in element.intersections_below
         ]
-        element.intersections_below = new_intersections_below
-    return element
+        new_element.intersections_below = new_intersections_below
+    return new_element
 
 
 def filter_correspondents(
