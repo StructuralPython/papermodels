@@ -460,15 +460,15 @@ wheels = [
 
 [[package]]
 name = "load-distribution"
-version = "0.1.4"
+version = "0.1.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "numpy" },
     { name = "shapely" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/2e/64/c404bc5a2512e46b43e3c012ba3758f9b50f47517c1ad57be66ce9d56825/load_distribution-0.1.4.tar.gz", hash = "sha256:3fd9e4f0f3e05d13cf177f1b0c3205f4794cbfd49887801ee1d2f1e5feaec143", size = 15835 }
+sdist = { url = "https://files.pythonhosted.org/packages/2e/b8/1f6ca326eb396dc21112b9093d19c6a6000b8512ae073458c4f5a8db0d23/load_distribution-0.1.5.tar.gz", hash = "sha256:c31cb93b1ef030c51cbbca5148696bae13e7079230c2a6ed49e5f5a4bb2b69fa", size = 15859 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/47/72/53de6becc8acb47b3a8edcb66928dd7e184f86a420c88eac87a2ef05904e/load_distribution-0.1.4-py3-none-any.whl", hash = "sha256:283fdc1fb6cddbfd71d459f406e3735ec5a016e553228f38a98e5f7cffd2760f", size = 17207 },
+    { url = "https://files.pythonhosted.org/packages/07/09/5e960e6a2b622f5142d40623791c48c02503554a3a310f6e33a77492d3be/load_distribution-0.1.5-py3-none-any.whl", hash = "sha256:b4eaafcb9388cc3f94ab60914d61b9f7f27c71767abad2f605c8e548b5b3d9db", size = 17226 },
 ]
 
 [[package]]
@@ -730,7 +730,7 @@ wheels = [
 
 [[package]]
 name = "papermodels"
-version = "0.14.2"
+version = "0.15.0"
 source = { editable = "." }
 dependencies = [
     { name = "colour" },
@@ -759,6 +759,7 @@ graphviz = [
 dev = [
     { name = "black" },
     { name = "ipykernel" },
+    { name = "pygraphviz" },
     { name = "pytest-check" },
 ]
 
@@ -766,7 +767,7 @@ dev = [
 requires-dist = [
     { name = "colour" },
     { name = "ezdxf" },
-    { name = "load-distribution", specifier = ">=0.1.4" },
+    { name = "load-distribution", specifier = ">=0.1.5" },
     { name = "matplotlib" },
     { name = "networkx" },
     { name = "numpy" },
@@ -787,6 +788,7 @@ requires-dist = [
 dev = [
     { name = "black", specifier = ">=25.1.0" },
     { name = "ipykernel", specifier = ">=6.30.1" },
+    { name = "pygraphviz", specifier = ">=1.14" },
     { name = "pytest-check", specifier = ">=2.5.4" },
 ]
 

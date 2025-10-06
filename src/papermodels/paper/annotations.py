@@ -11,6 +11,7 @@ from shapely import (
     set_precision,
     LineString,
 )
+import load_distribution as ld
 from papermodels.datatypes.annotation import Annotation
 from papermodels.geometry import geom_ops
 from papermodels.datatypes.exceptions import LegendError, GeometryError, AnnotationError
@@ -19,18 +20,6 @@ import re
 import numpy as np
 import numpy.typing as npt
 from numpy.typing import ArrayLike
-
-
-@dataclass
-class LoadingGeometry:
-    """
-    Represents a LoadingGeometry
-    """
-
-    geometry: Polygon | LineString
-    occupancy: str
-    load_components: npt.ArrayLike
-    plane_id: str | int
 
 
 def annotations_to_shapely(
@@ -67,13 +56,13 @@ def get_annotation_geometry_pairs(
 
 def parsed_annotations_to_loading_geometry(
     parsed_annots: dict[Annotation, dict],
-) -> list[LoadingGeometry]:
+) -> list[ld.LoadingGeometry]:
     """
     Convert annotations representing loading areas into a list of LoadingArea
     """
     acc = []
     for annot, annot_attrs in parsed_annots.items():
-        lg = LoadingGeometry(
+        lg = ld.LoadingGeometry(
             geometry=annot_attrs["geometry"],
             occupancy=annot_attrs.get("occupancy", None),
             load_components=annot_attrs.get("components", None),
