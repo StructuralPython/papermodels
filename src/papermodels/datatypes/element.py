@@ -1062,6 +1062,8 @@ def get_geometry_intersections(
             i_tag = i_attrs["tag"]
             j_tag = j_attrs["tag"]
             j_extent_poly = j_attrs["extent_polygon"]
+            if "WT0.0" in (i_tag, j_tag):
+                print(i_tag, j_tag)
             if i_page != j_page:
                 continue
             if j_rank > i_rank:  # When i transfers to j
@@ -1084,6 +1086,8 @@ def get_geometry_intersections(
                     extent_intersection = True
                 else:
                     intersection = geom_ops.get_intersection(i_geom, j_geom, j_tag)
+                    if "WT0.0" in (j_tag, i_tag):
+                        print(intersection, i_geom, j_geom, i_tag, j_tag)
 
                 if intersection is None:
                     continue
@@ -1118,7 +1122,7 @@ def get_geometry_intersections(
                     )
                 ):
                     intersection = geom_ops.get_intersection(
-                        j_geom, i_geom, i_tag, j_extent_poly
+                        j_geom, i_geom, j_tag, j_extent_poly
                     )
                 else:
                     intersection = geom_ops.get_intersection(i_geom, j_geom, j_tag)
@@ -1128,7 +1132,7 @@ def get_geometry_intersections(
 
                 intersections_above.append(
                     Intersection(
-                        *intersection, other_reaction_type=i_attrs["reaction_type"]
+                        *intersection, other_reaction_type=j_attrs["reaction_type"]
                     )
                 )
 
