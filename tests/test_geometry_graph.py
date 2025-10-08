@@ -56,6 +56,15 @@ def load_collector_extents():
     return graph
 
 
+@fixture()
+def load_collector_extents_walls():
+    graph = GeometryGraph.from_pdf_file(
+        TEST_DATA / "collector_extents_walls.pdf",
+        scale=QUARTER_INCH_SCALE,
+    )
+    return graph
+
+
 def test_load_frame_collectors_transfers(load_frame_collectors_transfers):
     assert load_frame_collectors_transfers
 
@@ -91,6 +100,10 @@ def test_load_collector_extents(load_collector_extents):
 
 def test_load_resi_dormers(load_resi_dormers):
     assert load_resi_dormers
+
+
+def test_load_collector_extent_walls(load_collector_extents_walls):
+    assert load_collector_extents_walls
 
 
 def test_resi_dormers_array(load_resi_dormers):
@@ -138,3 +151,19 @@ def test_plot_connectivity(load_collector_extents, capsys):
         graph.plot_connectivity()  # Should write bytes to stdout
         captured = capsys.readouterr()
         assert captured.out is not None
+
+
+def test_intersections_below_above(load_collector_extents_walls):
+    graph_walls = load_collector_extents_walls
+
+    j0 = graph_walls.nodes["J0.0"]["element"]
+    j0_below_tags = [ib.other_tag for ib in j0.intersections_below]
+    wt0 = graph_walls.nodes["WT0.0"]["element"]
+    wt0_above_tags = [ib.other_tag for ib in wt0.intersections_above]
+    db0 = graph_walls.nodes["DB0.0"]["element"]
+    db0_above_tags = [ib.other_tag for ib in db0.intersections_above]
+
+    assert "WT0.0" in j0_below_tags
+    assert "DB0.0" in j0_below_tags
+    assert "J0.0" in wt0_above_tags
+    assert "J0.0" in db0_above_tags
