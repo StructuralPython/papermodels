@@ -1040,6 +1040,7 @@ def get_geometry_intersections(
     """
     Returns a dictionary of
     """
+    print("HERE")
     annots = list(tagged_annotations.keys())
     intersected_annotations = tagged_annotations.copy()
     for i_annot in annots:
@@ -1059,6 +1060,8 @@ def get_geometry_intersections(
             j_page = j_annot.page
             i_geom = i_attrs["geometry"]
             j_geom = j_attrs["geometry"]
+            if i_geom.is_empty or j_geom.is_empty:
+                continue
             i_tag = i_attrs["tag"]
             j_tag = j_attrs["tag"]
             j_extent_poly = j_attrs["extent_polygon"]
@@ -1073,11 +1076,13 @@ def get_geometry_intersections(
                 # Use the extent polygon to find intersections (if it exists)
                 extent_intersection = False
                 if (
-                    i_extent_poly is not None
+                    i_rank == 0
+                    and i_extent_poly is not None
                     and check_eligible_collector_extent_polygon_intersection(
                         j_geom.geom_type, j_attrs["reaction_type"]
                     )
                 ):
+                    print(f"{i_tag=} | {j_tag=} | {i_geom=} | {j_geom=}")
                     intersection = geom_ops.get_intersection(
                         i_geom, j_geom, j_tag, i_extent_poly
                     )

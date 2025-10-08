@@ -44,16 +44,17 @@ def get_intersection(
         # of the linear polygon support so that, down the line, it becomes easy
         # to calculate the extents from the intersecting region
         intersecting_region = i_extent.intersection(below)
-        inter_centerline = get_rectangle_centerline(intersecting_region)
-        support_centerline = get_rectangle_centerline(below)
-        # Project the intersecting region centerline onto the support centerline
-        _, projected_a = ops.nearest_points(
-            Point(inter_centerline.coords[0]), support_centerline
-        )
-        _, projected_b = ops.nearest_points(
-            Point(inter_centerline.coords[1]), support_centerline
-        )
-        intersecting_region = LineString([projected_a, projected_b])
+        if not intersecting_region.is_empty:
+            inter_centerline = get_rectangle_centerline(intersecting_region)
+            support_centerline = get_rectangle_centerline(below)
+            # Project the intersecting region centerline onto the support centerline
+            _, projected_a = ops.nearest_points(
+                Point(inter_centerline.coords[0]), support_centerline
+            )
+            _, projected_b = ops.nearest_points(
+                Point(inter_centerline.coords[1]), support_centerline
+            )
+            intersecting_region = LineString([projected_a, projected_b])
     elif i_extent and j_type == "LineString":
         intersecting_region = i_extent.intersection(below)
     elif i_type == "LineString" and j_type == "Polygon":
