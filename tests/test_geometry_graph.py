@@ -10,6 +10,7 @@ import numpy as np
 import numpy.testing as npt
 from pytest import fixture
 import pytest
+from pytest_check.context_manager import check
 from shapely import Polygon, box, Point
 import pathlib
 import fixtures
@@ -19,7 +20,6 @@ EIGHTTH_INCH_SCALE = Decimal(1) / Decimal(72) * Decimal(8)
 QUARTER_INCH_SCALE = Decimal(1) / Decimal(72) * Decimal(4)
 
 TEST_DATA = pathlib.Path(__file__).parent / "test_data"
-
 
 @fixture()
 def load_frame_collectors_transfers():
@@ -64,6 +64,14 @@ def load_collector_extents_walls():
     )
     return graph
 
+@fixture()
+def load_intersections():
+    graph = GeometryGraph.from_pdf_file(
+        TEST_DATA / "intersections.pdf",
+        scale=QUARTER_INCH_SCALE,
+    )
+    return graph
+
 
 def test_load_frame_collectors_transfers(load_frame_collectors_transfers):
     assert load_frame_collectors_transfers
@@ -104,6 +112,10 @@ def test_load_resi_dormers(load_resi_dormers):
 
 def test_load_collector_extent_walls(load_collector_extents_walls):
     assert load_collector_extents_walls
+
+
+def test_load_intersections(load_intersections):
+    assert load_intersections
 
 
 def test_resi_dormers_array(load_resi_dormers):
@@ -153,7 +165,8 @@ def test_plot_connectivity(load_collector_extents, capsys):
         assert captured.out is not None
 
 
-def test_intersections_below_above(load_collector_extents_walls):
+def test_intersections_below_above(load_collector_extents_walls, load_intersections):
+    graph_inters = load_intersections
     graph_walls = load_collector_extents_walls
 
     j0 = graph_walls.nodes["J0.0"]["element"]
@@ -163,7 +176,70 @@ def test_intersections_below_above(load_collector_extents_walls):
     db0 = graph_walls.nodes["DB0.0"]["element"]
     db0_above_tags = [ib.other_tag for ib in db0.intersections_above]
 
-    assert "WT0.0" in j0_below_tags
-    assert "DB0.0" in j0_below_tags
-    assert "J0.0" in wt0_above_tags
-    assert "J0.0" in db0_above_tags
+    with check:
+        assert "WT0.0" in j0_below_tags
+    with check:
+        assert "DB0.0" in j0_below_tags
+    with check:
+        assert "J0.0" in wt0_above_tags
+    with check:
+        assert "J0.0" in db0_above_tags
+
+    j0 = graph_inters.nodes['J0.0']['element']
+    j0_below_tags = [ib.other_tag for ib in j0.intersections_below]
+
+    j1 = graph_inters.nodes['J0.1']['element']
+    j1_below_tags = [ib.other_tag for ib in j1.intersections_below]
+
+    wt0 = graph_inters.nodes['WT0.0']['element']
+    wt0_below_tags = [ib.other_tag for ib in wt0.intersections_below]
+    wt0_above_tags = [ib.other_tag for ib in wt0.intersections_above]
+
+    db0 = graph_inters.nodes['DB0.0']['element']
+    db0_below_tags = [ib.other_tag for ib in db0.intersections_below]
+    db0_above_tags = [ib.other_tag for ib in db0.intersections_above]
+
+    db1 = graph_inters.nodes['DB0.1']['element']
+    db1_below_tags = [ib.other_tag for ib in db1.intersections_below]
+    db1_above_tags = [ib.other_tag for ib in db1.intersections_above]
+
+    ct0 = graph_inters.nodes['CT0.0']['element']
+    ct0_above_tags = [ib.other_tag for ib in ct0.intersections_above]
+
+    ct1 = graph_inters.nodes['CT0.1']['element']
+    ct1_above_tags = [ib.other_tag for ib in ct1.intersections_above]
+
+    ct2 = graph_inters.nodes['CT0.2']['element']
+    ct2_above_tags = [ib.other_tag for ib in ct2.intersections_above]
+
+    with check:
+        assert "DB0.0" in j0_below_tags
+    with check:
+        assert "DB0.1" in j0_below_tags
+    with check:
+        assert "DB0.0" in j1_below_tags
+    with check:
+        assert "WT0.0" in j1_below_tags
+    with check:
+        assert "CT0.2" in db1_below_tags
+    with check:
+        assert "CT0.3" in db1_below_tags
+    with check:
+        assert "CT0.0" in db0_below_tags
+    with check:
+        assert "CT0.1" in db0_below_tags
+    with check:
+        assert "J0.1" in wt0_above_tags
+    with check:
+        assert "J0.0" in db1_above_tags
+    with check:
+        assert "J0.1" in db0_above_tags
+    with check:
+        assert "J0.0" in db0_above_tags
+    with check:
+        assert "DB0.0" in ct0_above_tags
+    with check:
+        assert "DB0.0" in ct1_above_tags
+    with check:
+        assert "DB0.1" in ct2_above_tags
+
