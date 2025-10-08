@@ -21,6 +21,7 @@ QUARTER_INCH_SCALE = Decimal(1) / Decimal(72) * Decimal(4)
 
 TEST_DATA = pathlib.Path(__file__).parent / "test_data"
 
+
 @fixture()
 def load_frame_collectors_transfers():
     graph = GeometryGraph.from_pdf_file(
@@ -63,6 +64,7 @@ def load_collector_extents_walls():
         scale=QUARTER_INCH_SCALE,
     )
     return graph
+
 
 @fixture()
 def load_intersections():
@@ -185,31 +187,31 @@ def test_intersections_below_above(load_collector_extents_walls, load_intersecti
     with check:
         assert "J0.0" in db0_above_tags
 
-    j0 = graph_inters.nodes['J0.0']['element']
+    j0 = graph_inters.nodes["J0.0"]["element"]
     j0_below_tags = [ib.other_tag for ib in j0.intersections_below]
 
-    j1 = graph_inters.nodes['J0.1']['element']
+    j1 = graph_inters.nodes["J0.1"]["element"]
     j1_below_tags = [ib.other_tag for ib in j1.intersections_below]
 
-    wt0 = graph_inters.nodes['WT0.0']['element']
+    wt0 = graph_inters.nodes["WT0.0"]["element"]
     wt0_below_tags = [ib.other_tag for ib in wt0.intersections_below]
     wt0_above_tags = [ib.other_tag for ib in wt0.intersections_above]
 
-    db0 = graph_inters.nodes['DB0.0']['element']
+    db0 = graph_inters.nodes["DB0.0"]["element"]
     db0_below_tags = [ib.other_tag for ib in db0.intersections_below]
     db0_above_tags = [ib.other_tag for ib in db0.intersections_above]
 
-    db1 = graph_inters.nodes['DB0.1']['element']
+    db1 = graph_inters.nodes["DB0.1"]["element"]
     db1_below_tags = [ib.other_tag for ib in db1.intersections_below]
     db1_above_tags = [ib.other_tag for ib in db1.intersections_above]
 
-    ct0 = graph_inters.nodes['CT0.0']['element']
+    ct0 = graph_inters.nodes["CT0.0"]["element"]
     ct0_above_tags = [ib.other_tag for ib in ct0.intersections_above]
 
-    ct1 = graph_inters.nodes['CT0.1']['element']
+    ct1 = graph_inters.nodes["CT0.1"]["element"]
     ct1_above_tags = [ib.other_tag for ib in ct1.intersections_above]
 
-    ct2 = graph_inters.nodes['CT0.2']['element']
+    ct2 = graph_inters.nodes["CT0.2"]["element"]
     ct2_above_tags = [ib.other_tag for ib in ct2.intersections_above]
 
     with check:
@@ -242,4 +244,3 @@ def test_intersections_below_above(load_collector_extents_walls, load_intersecti
         assert "DB0.0" in ct1_above_tags
     with check:
         assert "DB0.1" in ct2_above_tags
-
