@@ -30,7 +30,7 @@ jobs:
         uv sync --no-install-package pygraphviz
     - name: Test black formatted
       run: |
-        uv run black src --check
+        uv run --no-sync black src --check 
     - name: Test with pytest
       run: |
         pytest
