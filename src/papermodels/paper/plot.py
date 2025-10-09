@@ -77,7 +77,7 @@ def plot_annotations(
                 Polygon(
                     xy=xy.T,
                     closed=True,
-                    linestyle=annot.line_type,
+                    # linestyle=annot.line_type,
                     linewidth=float(annot.line_weight),
                     ec=tuple(float(elem) for elem in annot.line_color),
                     fc=face_color,
@@ -92,7 +92,7 @@ def plot_annotations(
             ax.plot(
                 xy[0],
                 xy[1],
-                linestyle=annot.line_type,
+                # linestyle=annot.line_type,
                 linewidth=float(annot.line_weight),
                 color=tuple(float(elem) for elem in annot.line_color),
                 alpha=float(annot.line_opacity),

@@ -1040,7 +1040,6 @@ def get_geometry_intersections(
     """
     Returns a dictionary of
     """
-    print("HERE")
     annots = list(tagged_annotations.keys())
     intersected_annotations = tagged_annotations.copy()
     for i_annot in annots:
@@ -1082,7 +1081,6 @@ def get_geometry_intersections(
                         j_geom.geom_type, j_attrs["reaction_type"]
                     )
                 ):
-                    print(f"{i_tag=} | {j_tag=} | {i_geom=} | {j_geom=}")
                     intersection = geom_ops.get_intersection(
                         i_geom, j_geom, j_tag, i_extent_poly
                     )
