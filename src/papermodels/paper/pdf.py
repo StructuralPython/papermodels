@@ -200,7 +200,7 @@ def pike_annotation_to_pm_annotation(
     # Currently the tests use PDF files created with a mixture
     # of two softwares (Bluebeam Revu and Qoppa PDF Studio)
     # Activating the line_type breaks the test suite because
-    # some entities are not recognized in the legend anymore 
+    # some entities are not recognized in the legend anymore
     # because of small differences in the linetype
     line_type = None
 
