@@ -74,22 +74,22 @@ class GeometryGraph(nx.DiGraph):
         return [
             node_name for node_name in self.nodes if list(self.predecessors(node_name))
         ]
-    
+
     @property
     def orphaned_elements(self):
         return [
-            node_name for node_name in self.nodes if
-                (
-                    (len(list(self.successors(node_name))) < 2)
-                    and self.nodes[node_name]['element'].geometry.geom_type == "LineString"
-                )
-            or
-                (
-                    (len(list(self.successors(node_name))) < 1)
-                    and self.nodes[node_name]['element'].geometry.geom_type == "Polygon"
-                )
+            node_name
+            for node_name in self.nodes
+            if (
+                (len(list(self.successors(node_name))) < 2)
+                and self.nodes[node_name]["element"].geometry.geom_type == "LineString"
+            )
+            or (
+                (len(list(self.successors(node_name))) < 1)
+                and self.nodes[node_name]["element"].geometry.geom_type == "Polygon"
+            )
         ]
-    
+
     @property
     def contiguous_elements(self):
         orphans = self.orphaned_elements
@@ -326,7 +326,8 @@ class GeometryGraph(nx.DiGraph):
         sorted_nodes = nx.topological_sort(self)
         orphaned_nodes = self.orphaned_elements
         for node in sorted_nodes:
-            if node in orphaned_nodes: continue
+            if node in orphaned_nodes:
+                continue
             node_attrs = self.nodes[node]
             element: Element = node_attrs["element"]
             dependents = list(self.successors(node))
@@ -461,7 +462,8 @@ class GeometryGraph(nx.DiGraph):
         orphaned_nodes = self.orphaned_elements
         transfer_elements = self.transfer_elements
         for node in transfer_elements:
-            if node in orphaned_nodes: continue
+            if node in orphaned_nodes:
+                continue
             element = self.nodes[node]["element"]
             element_tag = element.tag
             predecessors = list(self.predecessors(node))
@@ -602,6 +604,7 @@ class GeometryGraph(nx.DiGraph):
             function
         """
         collectors = self.collector_elements
+
         for node in collectors:
             node_attrs = self.nodes[node]
             node_element: Element = node_attrs["element"]
