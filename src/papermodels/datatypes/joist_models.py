@@ -217,7 +217,7 @@ class CollectorTribModel:
                             )
                     elif joist_orientation == "horizontal":
                         overlap_region = ld.get_overlap_coords(
-                            pa0[1], pa1[1], pb0[1], pb1[1]
+                            pa0[1], pa1[1], pb1[1], pb0[1]
                         )
                         if overlap_region is not None:
                             overlap_poly = box(

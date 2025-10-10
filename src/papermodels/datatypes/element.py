@@ -280,7 +280,7 @@ class Element:
                     self.trib_area,
                     extent_polygon=self.extent_polygon,
                 )
-            except AssertionError as e:
+            except (AssertionError, ValueError) as e:
                 # raise e
                 raise AssertionError(
                     f"No intersection within joist extents: {self.tag=}"
