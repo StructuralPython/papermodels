@@ -243,9 +243,13 @@ class CollectorTribModel:
                     revised_poly_overlaps.append(overlap_poly)
                 else:
                     revised_poly_overlaps += split_polys
+            sorted_poly_overlaps = sorted(
+                revised_poly_overlaps,
+                key=lambda x: (x.centroid.coords[0][0], x.centroid.coords[0][1]),
+            )
 
             joist_prototype_geometries = []
-            for overlap_poly in revised_poly_overlaps:
+            for overlap_poly in sorted_poly_overlaps:
                 overlap_poly: Polygon
                 overlap_edge_points = list(
                     zip(overlap_poly.exterior.coords, overlap_poly.exterior.coords[1:])
@@ -262,17 +266,13 @@ class CollectorTribModel:
                             intersection_point=edge_ls.centroid,
                         )
                         # We only need to hit one edge of the overlap so we can break here
-                        print(self.element.tag)
-                        from IPython.display import display
-
-                        display(GeometryCollection([new_joist, overlap_poly]))
                         break
                 joist_prototype_geometries.append(new_joist)
 
             # 7. Create an Element for each new joist prototype geometries
             subelements = []
             sorted_joist_geoms = joist_prototype_geometries
-            sorted_poly_overlaps = revised_poly_overlaps
+            # sorted_poly_overlaps = revised_poly_overlaps
             # sorted_joist_geoms = sorted(
             #     joist_prototype_geometries,
             #     key=lambda x: (x.coords[0][0], x.coords[0][1]),

@@ -459,11 +459,8 @@ class GeometryGraph(nx.DiGraph):
 
     def add_intersection_indexes_above(self):
         sorted_nodes = nx.topological_sort(self)
-        orphaned_nodes = self.orphaned_elements
         transfer_elements = self.transfer_elements
         for node in transfer_elements:
-            if node in orphaned_nodes:
-                continue
             element = self.nodes[node]["element"]
             element_tag = element.tag
             predecessors = list(self.predecessors(node))

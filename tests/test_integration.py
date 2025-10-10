@@ -184,6 +184,7 @@ def test_collector_extent_creates_loaded_elements(
         ]
     )
     with check:
+        print(les['WT0.3'])
         assert les["WT0.3"].model()["loads"][
             "distributed_loads"
         ]  # There are loads present on the intermediate support
