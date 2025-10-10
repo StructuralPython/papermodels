@@ -149,7 +149,6 @@ class CollectorTribModel:
             support_centroids = [
                 support_geom.centroid for support_geom in support_geoms
             ]
-
             if joist_orientation == "horizontal":
                 start_support = min(support_centroids, key=lambda x: x.coords[0][0])
                 end_support = max(support_centroids, key=lambda x: x.coords[0][0])
@@ -216,8 +215,14 @@ class CollectorTribModel:
                                 overlap_region[0], pa0[1], overlap_region[1], pb1[1]
                             )
                     elif joist_orientation == "horizontal":
+                        a_sort = sorted([pa0, pa1], key=lambda x: x[1])
+                        b_sort = sorted([pb0, pb1], key=lambda x: x[1])
+                        pa0 = a_sort[0]
+                        pa1 = a_sort[1]
+                        pb0 = b_sort[0]
+                        pb1 = b_sort[1]
                         overlap_region = ld.get_overlap_coords(
-                            pa0[1], pa1[1], pb1[1], pb0[1]
+                            pa0[1], pa1[1], pb0[1], pb1[1]
                         )
                         if overlap_region is not None:
                             overlap_poly = box(
@@ -281,6 +286,7 @@ class CollectorTribModel:
             #     revised_poly_overlaps,
             #     key=lambda x: (x.centroid.coords[0][0], x.centroid.coords[0][1]),
             # )
+
             for idx, joist_geom in enumerate(sorted_joist_geoms):
                 intersections = []
                 total_new_subs = len(joist_prototype_geometries)
