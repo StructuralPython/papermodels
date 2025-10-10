@@ -460,15 +460,15 @@ wheels = [
 
 [[package]]
 name = "load-distribution"
-version = "0.1.5"
+version = "0.1.6"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "numpy" },
     { name = "shapely" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/2e/b8/1f6ca326eb396dc21112b9093d19c6a6000b8512ae073458c4f5a8db0d23/load_distribution-0.1.5.tar.gz", hash = "sha256:c31cb93b1ef030c51cbbca5148696bae13e7079230c2a6ed49e5f5a4bb2b69fa", size = 15859 }
+sdist = { url = "https://files.pythonhosted.org/packages/00/02/d05f4e0783a460abf46240c2f87ce55b3a0337d7d1fbbcf4c25440c02df8/load_distribution-0.1.6.tar.gz", hash = "sha256:07bc896e6fce9b50e3148117db4ecae6487a12730cfb249cdb2362706f93e9fe", size = 15908 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/07/09/5e960e6a2b622f5142d40623791c48c02503554a3a310f6e33a77492d3be/load_distribution-0.1.5-py3-none-any.whl", hash = "sha256:b4eaafcb9388cc3f94ab60914d61b9f7f27c71767abad2f605c8e548b5b3d9db", size = 17226 },
+    { url = "https://files.pythonhosted.org/packages/89/c3/b67e372dad34e78ce22787fcb9d67ab4bac6f56f840a88e059702f9af7b0/load_distribution-0.1.6-py3-none-any.whl", hash = "sha256:922ba394d544c93d7f57ea0d3a20ab0d76058b34552e89c80770f3971b4e262e", size = 17275 },
 ]
 
 [[package]]
@@ -730,7 +730,7 @@ wheels = [
 
 [[package]]
 name = "papermodels"
-version = "0.15.0"
+version = "0.15.1"
 source = { editable = "." }
 dependencies = [
     { name = "colour" },
@@ -767,7 +767,7 @@ dev = [
 requires-dist = [
     { name = "colour" },
     { name = "ezdxf" },
-    { name = "load-distribution", specifier = ">=0.1.5" },
+    { name = "load-distribution", specifier = ">=0.1.6" },
     { name = "matplotlib" },
     { name = "networkx" },
     { name = "numpy" },

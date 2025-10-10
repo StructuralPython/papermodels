@@ -200,9 +200,11 @@ class CollectorTribModel:
                     intermediate_support_lines.append(support_line)
 
             # 3. Generate overlap regions
+
             overlap_polys = []
             for start_support in start_supports:
                 for end_support in end_supports:
+                    overlap_poly = None
                     pa0, pa1 = start_support.coords
                     pb0, pb1 = end_support.coords
                     if joist_orientation == "vertical":
@@ -215,15 +217,15 @@ class CollectorTribModel:
                             )
                     elif joist_orientation == "horizontal":
                         overlap_region = ld.get_overlap_coords(
-                            pa0[1], pa1[1], pb0[1], pb1[1]
+                            pa0[1], pa1[1], pb1[1], pb0[1]
                         )
                         if overlap_region is not None:
                             overlap_poly = box(
                                 pa0[0], overlap_region[0], pb1[0], overlap_region[1]
                             )
-
-                    overlap_within_extent = ext_poly.intersection(overlap_poly)
-                    overlap_polys.append(overlap_within_extent)
+                    if overlap_poly is not None:
+                        overlap_within_extent = ext_poly.intersection(overlap_poly)
+                        overlap_polys.append(overlap_within_extent)
 
             # 5. Do overlap polys intersect with intermediate supports?
             #    if so, break the support as required.
@@ -241,9 +243,13 @@ class CollectorTribModel:
                     revised_poly_overlaps.append(overlap_poly)
                 else:
                     revised_poly_overlaps += split_polys
+            sorted_poly_overlaps = sorted(
+                revised_poly_overlaps,
+                key=lambda x: (x.centroid.coords[0][0], x.centroid.coords[0][1]),
+            )
 
             joist_prototype_geometries = []
-            for overlap_poly in revised_poly_overlaps:
+            for overlap_poly in sorted_poly_overlaps:
                 overlap_poly: Polygon
                 overlap_edge_points = list(
                     zip(overlap_poly.exterior.coords, overlap_poly.exterior.coords[1:])
@@ -265,14 +271,16 @@ class CollectorTribModel:
 
             # 7. Create an Element for each new joist prototype geometries
             subelements = []
-            sorted_joist_geoms = sorted(
-                joist_prototype_geometries,
-                key=lambda x: (x.coords[0][0], x.coords[0][1]),
-            )
-            sorted_poly_overlaps = sorted(
-                revised_poly_overlaps,
-                key=lambda x: (x.centroid.coords[0][0], x.centroid.coords[0][1]),
-            )
+            sorted_joist_geoms = joist_prototype_geometries
+            # sorted_poly_overlaps = revised_poly_overlaps
+            # sorted_joist_geoms = sorted(
+            #     joist_prototype_geometries,
+            #     key=lambda x: (x.coords[0][0], x.coords[0][1]),
+            # )
+            # sorted_poly_overlaps = sorted(
+            #     revised_poly_overlaps,
+            #     key=lambda x: (x.centroid.coords[0][0], x.centroid.coords[0][1]),
+            # )
             for idx, joist_geom in enumerate(sorted_joist_geoms):
                 intersections = []
                 total_new_subs = len(joist_prototype_geometries)

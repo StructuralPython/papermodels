@@ -75,6 +75,26 @@ class GeometryGraph(nx.DiGraph):
             node_name for node_name in self.nodes if list(self.predecessors(node_name))
         ]
 
+    @property
+    def orphaned_elements(self):
+        return [
+            node_name
+            for node_name in self.nodes
+            if (
+                (len(list(self.successors(node_name))) < 2)
+                and self.nodes[node_name]["element"].geometry.geom_type == "LineString"
+            )
+            or (
+                (len(list(self.successors(node_name))) < 1)
+                and self.nodes[node_name]["element"].geometry.geom_type == "Polygon"
+            )
+        ]
+
+    @property
+    def contiguous_elements(self):
+        orphans = self.orphaned_elements
+        return [node_name for node_name in self.nodes if node_name not in orphans]
+
     @classmethod
     def from_elements(
         cls,
@@ -140,8 +160,10 @@ class GeometryGraph(nx.DiGraph):
         """
         Trims cantilevers if they are within the tolerance
         """
-        node_names = self.transfer_elements
-        for node_name in node_names:
+        transfer_nodes = self.transfer_elements
+        contiguous_nodes = self.contiguous_elements
+
+        for node_name in set(transfer_nodes) & set(contiguous_nodes):
             node = self.nodes[node_name]
             element = node["element"]
             new_element = trim_cantilevers(
@@ -302,7 +324,10 @@ class GeometryGraph(nx.DiGraph):
 
     def add_intersection_indexes_below(self):
         sorted_nodes = nx.topological_sort(self)
+        orphaned_nodes = self.orphaned_elements
         for node in sorted_nodes:
+            if node in orphaned_nodes:
+                continue
             node_attrs = self.nodes[node]
             element: Element = node_attrs["element"]
             dependents = list(self.successors(node))
@@ -434,10 +459,7 @@ class GeometryGraph(nx.DiGraph):
 
     def add_intersection_indexes_above(self):
         sorted_nodes = nx.topological_sort(self)
-        transfer_elements = [
-            node for node in sorted_nodes if list(self.predecessors(node))
-        ]
-
+        transfer_elements = self.transfer_elements
         for node in transfer_elements:
             element = self.nodes[node]["element"]
             element_tag = element.tag
@@ -579,6 +601,7 @@ class GeometryGraph(nx.DiGraph):
             function
         """
         collectors = self.collector_elements
+
         for node in collectors:
             node_attrs = self.nodes[node]
             node_element: Element = node_attrs["element"]
