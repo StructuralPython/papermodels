@@ -29,6 +29,15 @@ def load_sketch_to_scale():
 
 
 @fixture()
+def load_trib_areas_basic():
+    graph = GeometryGraph.from_pdf_file(
+        TEST_DATA / "trib-areas-basic.pdf",
+        scale=QUARTER_INCH_SCALE,
+    )
+    return graph
+
+
+@fixture()
 def load_collector_extents():
     graph = GeometryGraph.from_pdf_file(
         TEST_DATA / "collector_extents.pdf",
@@ -74,6 +83,13 @@ def collector_extents_to_trib_loaded_elements(load_collector_extents):
 def horiz_extents_to_array_loaded_elements(load_horiz_extents):
     graph = load_horiz_extents
     graph.assign_collector_behaviour(JoistArrayModel)
+    les = graph.create_loaded_elements()
+    return les
+
+
+@fixture()
+def trib_areas_basic_loaded_elements(load_trib_areas_basic):
+    graph = load_trib_areas_basic
     les = graph.create_loaded_elements()
     return les
 
@@ -266,3 +282,16 @@ def test_horiz_extents_joist_extents(horiz_extents_to_array_loaded_elements):
     pls = db0["loads"]["point_loads"]
     assert pls[0]["location"] == 7.932
     assert pls[-1]["location"] == 3.236
+
+
+def test_trib_areas_basic_loads(trib_areas_basic_loaded_elements):
+    les = trib_areas_basic_loaded_elements
+    dl = les["FB0.0"].model()["loads"]["distributed_loads"]
+    assert dl[0]["start_loc"] == -0.144
+    assert dl[0]["end_loc"] == 20.358
+    assert dl[1]["start_loc"] == 8.143
+    assert dl[1]["end_loc"] == 10.123
+    assert dl[2]["start_loc"] == 10.123
+    assert dl[2]["end_loc"] == 10.132
+    assert dl[3]["start_loc"] == 10.132
+    assert dl[3]["end_loc"] == 12.113

@@ -23,7 +23,7 @@ dependencies = [
     "tomli-w",
     "ezdxf",
     "textalloc>=1.2.1",
-    "load-distribution>=0.1.6",
+    "load-distribution>=0.1.7",
 ]
 
 
