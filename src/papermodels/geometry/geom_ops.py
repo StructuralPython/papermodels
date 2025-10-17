@@ -39,7 +39,7 @@ def get_intersection(
     i_type = above.geom_type
     j_type = below.geom_type
     i_extent = above_extent_polygon
-    overlap_region = None # Overlap region is like the "raw" intersecting region
+    overlap_region = None  # Overlap region is like the "raw" intersecting region
     if i_extent and j_type == "Polygon":
         # Goal: calculate the intersecting region as being along the centerline
         # of the linear polygon support so that, down the line, it becomes easy
@@ -71,7 +71,7 @@ def get_intersection(
     else:
         intersecting_region = above.intersection(below)
         if intersecting_region.length != 0.0:
-            overlap_region = intersecting_region # We do not want a point overlap
+            overlap_region = intersecting_region  # We do not want a point overlap
     if intersecting_region.is_empty:
         return None
     all_linestrings = i_type == j_type == "LineString"
@@ -214,7 +214,7 @@ def get_projected_support_centroid(
     """
     Returns a point that represents the centroid of the polygon point support
     projected onto the vector of the frame_element_geometry. The purpose of this function
-    is to effectively "snap" the frame_element_geometry to the centroids of the its polygon 
+    is to effectively "snap" the frame_element_geometry to the centroids of the its polygon
     point supports.
 
     This effect is desireable when papermodels is used to create "design spans" where

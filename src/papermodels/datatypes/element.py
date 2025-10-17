@@ -49,7 +49,6 @@ class Intersection(NamedTuple):
     other_extents: Optional[tuple] = None
 
 
-
 class Correspondent(NamedTuple):
     """
     A class to represent the correspondence of two Polygons
@@ -587,15 +586,35 @@ class LoadedElement(Element):
                 start_coord,
                 [intersection[0] for intersection in self.intersections_below],
             )
-            overlap_regions = [intersection.other_overlap for intersection in self.intersections_below]
+            terminus_supports = [
+                any(
+                    [
+                        ib.other_geometry.contains(coords_a),
+                        ib.other_geometry.contains(coords_b),
+                    ]
+                )
+                for ib in self.intersections_below
+            ]
+            overlap_regions = [
+                intersection.other_overlap for intersection in self.intersections_below
+            ]
             supports_acc = []
             for idx, loc in enumerate(support_locations):
                 overlap_region = overlap_regions[idx]
+                terminus_support = (
+                    terminus_supports[idx] if overlap_region is not None else None
+                )
                 overlap_length = 0.0
                 if overlap_region is not None:
                     overlap_length = overlap_region.length
 
-                supports_acc.append({"location": round(loc, 3), "overlap_length": round(overlap_length, 3)})
+                supports_acc.append(
+                    {
+                        "location": round(loc, 3),
+                        "overlap_length": round(overlap_length, 3),
+                        "terminus": terminus_support,
+                    }
+                )
 
             # for idx, support_location in enumerate(support_locations):
             #     fixity = "roller"
@@ -1301,6 +1320,7 @@ def trim_cantilevers(
             Intersection(
                 intersecting_region=new_geometry.intersection(ib.other_geometry),
                 other_tag=ib.other_tag,
+                other_overlap=ib.other_overlap,
                 other_geometry=ib.other_geometry,
                 other_reaction_type=ib.other_reaction_type,
                 other_extents=ib.other_extents,
