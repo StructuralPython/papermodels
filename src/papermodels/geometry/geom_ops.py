@@ -61,10 +61,23 @@ def get_intersection(
         intersecting_region = i_extent.intersection(below)
         overlap_region = intersecting_region
     elif i_type == "LineString" and j_type == "Polygon":
-        intersecting_region = above.intersection(below.exterior)
+        # intersecting_region = above.intersection(below.exterior)
+        start, end = Point(above.coords[0]), Point(above.coords[1])
+        if below.contains(start):
+            intersecting_region = start
+        elif below.contains(end):
+            intersecting_region = end
+        else:
+            intersecting_region = above.intersection(below.exterior)
         overlap_region = above.intersection(below)
     elif i_type == "Polygon" and j_type == "LineString":
-        intersecting_region = below.intersection(above.exterior)
+        start, end = Point(below.coords[0]), Point(below.coords[1])
+        if above.contains(start):
+            intersecting_region = start
+        elif above.contains(end):
+            intersecting_region = end
+        else:
+            intersecting_region = below.intersection(above.exterior)
         overlap_region = below.intersection(above)
         if intersecting_region.is_empty:
             intersecting_region = below.intersection(above)
