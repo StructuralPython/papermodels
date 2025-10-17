@@ -43,10 +43,11 @@ class Intersection(NamedTuple):
     intersecting_region: Point | LineString
     other_geometry: Union[LineString, Polygon]
     other_tag: str
+    other_overlap: Optional[LineString | Polygon] = None
     other_index: Optional[int] = None
     other_reaction_type: str = "point"
     other_extents: Optional[tuple] = None
-    other_overlap: Optional[LineString | Polygon] = None
+
 
 
 class Correspondent(NamedTuple):
@@ -586,14 +587,23 @@ class LoadedElement(Element):
                 start_coord,
                 [intersection[0] for intersection in self.intersections_below],
             )
+            overlap_regions = [intersection.other_overlap for intersection in self.intersections_below]
             supports_acc = []
-            for idx, support_location in enumerate(support_locations):
-                fixity = "roller"
-                if idx == 0:
-                    fixity = "pin"
-                supports_acc.append(
-                    {"location": round(support_location, precision), "fixity": fixity}
-                )
+            for idx, loc in enumerate(support_locations):
+                overlap_region = overlap_regions[idx]
+                overlap_length = 0.0
+                if overlap_region is not None:
+                    overlap_length = overlap_region.length
+
+                supports_acc.append({"location": round(loc, 3), "overlap_length": round(overlap_length, 3)})
+
+            # for idx, support_location in enumerate(support_locations):
+            #     fixity = "roller"
+            #     if idx == 0:
+            #         fixity = "pin"
+            #     supports_acc.append(
+            #         {"location": round(support_location, precision), "fixity": fixity}
+            #     )
             return sorted(supports_acc, key=lambda x: x["location"])
         else:
             return []

@@ -156,6 +156,9 @@ def test_joists_loaded_sketch_to_scale(sketch_to_scale_to_trib_loaded_elements):
         assert fb1_3["loads"]["distributed_loads"][0]["start_loc"] == 0.446
         assert fb1_3["loads"]["distributed_loads"][0]["end_loc"] == 10.785
 
+        j1_1 = les['J1.1'].model()
+        assert j1_1['element_geometry']['supports'][1]['overlap_length'] == 0.392
+
 
 def test_collector_extent_loads(load_collector_extents):
     assert load_collector_extents

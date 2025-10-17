@@ -207,6 +207,35 @@ def clean_polygon_supports(
     return cleaned_supports
 
 
+def get_projected_support_centroid(
+    frame_element_geometry: LineString,
+    polygon_point_support: Polygon,
+) -> Point:
+    """
+    Returns a point that represents the centroid of the polygon point support
+    projected onto the vector of the frame_element_geometry. The purpose of this function
+    is to effectively "snap" the frame_element_geometry to the centroids of the its polygon 
+    point supports.
+
+    This effect is desireable when papermodels is used to create "design spans" where
+    the frame elements are intended to span from center-of-support to center-of-support.
+    """
+    fg = frame_element_geometry
+    magnitude_max = 3 * fg.length
+    direction_vector = get_direction_vector(fg).flatten()
+    orig_joist_origin, orig_joist_end = get_start_end_nodes(fg)
+    # rfg = revised_frame_geometry
+    rfg_start = project_node(orig_joist_origin, -direction_vector, magnitude_max / 2)
+    rfg_end = project_node(orig_joist_end, direction_vector, magnitude_max / 2)
+    rfg = LineString([rfg_start, rfg_end])
+    centroid = polygon_point_support.centroid
+    distance = rfg.project(centroid)
+    projected_centroid = rfg.interpolate(distance)
+    if not polygon_point_support.contains(projected_centroid):
+        raise GeometryError("Projected support centroid is outside of the polygon.")
+    return projected_centroid
+
+
 def get_joist_extents(
     joist_prototype: LineString,
     joist_supports: list[LineString],

@@ -296,7 +296,9 @@ class CollectorTribModel:
                 trib_area = sorted_poly_overlaps[idx]
                 assert joist_geom.intersects(trib_area)
                 for support_geom in support_geoms:
+                    support_overlap = None
                     if support_geom.geom_type == "Polygon":
+                        support_overlap = joist_geom.intersection(support_geom)
                         # support_line = geom_ops.clean_polygon_supports([support_geom], joist_geom)
                         support_line = geom_ops.get_rectangle_centerline(support_geom)
                     elif support_geom.geom_type == "LineString":
@@ -313,6 +315,7 @@ class CollectorTribModel:
                         intersecting_region=intersecting_region,
                         other_geometry=support_geom,
                         other_tag=support_lines[support_line],
+                        other_overlap=support_overlap,
                         other_reaction_type=(
                             "linear" if support_geom.geom_type == "Polygon" else "point"
                         ),
