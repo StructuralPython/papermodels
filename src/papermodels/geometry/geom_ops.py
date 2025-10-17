@@ -31,7 +31,7 @@ def get_intersection(
     below: Geometry,
     below_tag: str,
     above_extent_polygon: Optional[Polygon] = None,
-) -> Optional[tuple[IntersectingGeometry, Geometry, str]]:
+) -> Optional[tuple[IntersectingGeometry, Geometry, str, Optional[Geometry]]]:
     """
     Returns the details of the intersection
     """
@@ -39,11 +39,13 @@ def get_intersection(
     i_type = above.geom_type
     j_type = below.geom_type
     i_extent = above_extent_polygon
+    overlap_region = None # Overlap region is like the "raw" intersecting region
     if i_extent and j_type == "Polygon":
         # Goal: calculate the intersecting region as being along the centerline
         # of the linear polygon support so that, down the line, it becomes easy
         # to calculate the extents from the intersecting region
         intersecting_region = i_extent.intersection(below)
+        overlap_region = intersecting_region
         if not intersecting_region.is_empty:
             inter_centerline = get_rectangle_centerline(intersecting_region)
             support_centerline = get_rectangle_centerline(below)
@@ -57,19 +59,24 @@ def get_intersection(
             intersecting_region = LineString([projected_a, projected_b])
     elif i_extent and j_type == "LineString":
         intersecting_region = i_extent.intersection(below)
+        overlap_region = intersecting_region
     elif i_type == "LineString" and j_type == "Polygon":
         intersecting_region = above.intersection(below.exterior)
+        overlap_region = above.intersection(below)
     elif i_type == "Polygon" and j_type == "LineString":
         intersecting_region = below.intersection(above.exterior)
+        overlap_region = below.intersection(above)
         if intersecting_region.is_empty:
             intersecting_region = below.intersection(above)
     else:
         intersecting_region = above.intersection(below)
+        if intersecting_region.length != 0.0:
+            overlap_region = intersecting_region # We do not want a point overlap
     if intersecting_region.is_empty:
         return None
     all_linestrings = i_type == j_type == "LineString"
     if intersecting_region.geom_type == "Point" and all_linestrings:
-        return (intersecting_region, below, below_tag)
+        return (intersecting_region, below, below_tag, overlap_region)
     elif (
         intersecting_region.geom_type == "MultiPoint"
     ):  # Line enters and exits a polygon boundary
@@ -77,22 +84,22 @@ def get_intersection(
             i_type == "LineString" and j_type == "Polygon"
         ):
             point = intersecting_region.centroid
-            return (point, below, below_tag)
+            return (point, below, below_tag, overlap_region)
         else:
             raise ValueError(
                 "Could not get intersecting region for MultiPoint. Should not see this error.\n"
                 f"{above.wkt=} | {below.wkt=}"
             )
     elif intersecting_region.geom_type == "LineString":
-        return (intersecting_region, below, below_tag)
+        return (intersecting_region, below, below_tag, overlap_region)
     elif (
         intersecting_region.geom_type == "Point"
     ):  # LineString and Polygon intersection @ boundary
-        return (intersecting_region, below, below_tag)
+        return (intersecting_region, below, below_tag, overlap_region)
     elif (
         intersecting_region.geom_type == "Polygon"
     ):  # Polygon point/line load intersecting with another polygon
-        return (intersecting_region, below, below_tag)
+        return (intersecting_region, below, below_tag, overlap_region)
     else:
         return None
 

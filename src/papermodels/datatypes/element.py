@@ -46,6 +46,7 @@ class Intersection(NamedTuple):
     other_index: Optional[int] = None
     other_reaction_type: str = "point"
     other_extents: Optional[tuple] = None
+    other_overlap: Optional[LineString | Polygon] = None
 
 
 class Correspondent(NamedTuple):
