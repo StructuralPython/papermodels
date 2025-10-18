@@ -7,7 +7,12 @@ import networkx as nx
 import hashlib
 import json
 
-from papermodels.datatypes.element import Element, LoadedElement, trim_cantilevers
+from papermodels.datatypes.element import (
+    Element,
+    LoadedElement,
+    trim_cantilevers,
+    align_frames_to_centroids,
+)
 from shapely import Point, LineString, Polygon
 from ..geometry import geom_ops as geom
 from ..datatypes.element import (
@@ -149,12 +154,26 @@ class GeometryGraph(nx.DiGraph):
         if do_not_process:
             return g
 
+        g.align_frames_to_centroids()
         g.trim_cantilevers()
         g.remove_excess_correspondent_load_paths()
         g.add_intersection_indexes_below()
         g.add_intersection_indexes_above()
 
         return g
+
+    def align_frames_to_centroids(self):
+        """
+        Aligns the ends of frame elements so that they start and end on the centroids
+        of posts and walls (centerlines).
+        """
+        contiguous_nodes = self.contiguous_elements
+
+        for node_name in contiguous_nodes:
+            node = self.nodes[node_name]
+            element = node["element"]
+            new_element = align_frames_to_centroids(element)
+            node["element"] = new_element
 
     def trim_cantilevers(self):
         """

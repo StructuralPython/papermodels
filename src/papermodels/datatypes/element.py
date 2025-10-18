@@ -1332,6 +1332,63 @@ def trim_cantilevers(
     return new_element
 
 
+def align_frames_to_centroids(element: Element):
+    """
+    Mutates the geometry in node elements so that any cantilevers which are
+    below self.cantilever_rel_tol or self.cantilever_abs_tol are removed from
+    the geometry and the geometry spans exactly from support to support.
+    """
+    new_element = deepcopy(element)
+    geometry = element.geometry
+    if geometry.geom_type != "LineString":
+        return new_element
+    start_point, end_point = geometry.coords
+    start_point, end_point = Point(start_point), Point(end_point)
+    start_support = None
+    end_support = None
+    new_start_point = None
+    new_end_point = None
+    if geometry.geom_type == "LineString":
+        new_intersections = []
+
+        for ib in new_element.intersections_below:
+            ib: Intersection
+            support_geom = ib.other_geometry
+            support_reaction_type = ib.other_reaction_type
+            intersecting_region = ib.intersecting_region
+            if support_geom.contains(start_point):
+                start_support = support_geom
+            if support_geom.contains(end_point):
+                end_support = support_geom
+            if support_geom.geom_type == "Polygon" and support_reaction_type == "point":
+                intersecting_region = geom_ops.get_projected_support_centroid(
+                    geometry, support_geom
+                )
+                if support_geom == start_support:
+                    new_start_point = intersecting_region
+                elif support_geom == end_support:
+                    new_end_point = intersecting_region
+
+            new_intersection = Intersection(
+                intersecting_region,
+                ib.other_geometry,
+                ib.other_tag,
+                other_overlap=None,
+                other_index=ib.other_index,
+                other_reaction_type=ib.other_reaction_type,
+                other_extents=ib.other_extents,
+            )
+            new_intersections.append(new_intersection)
+        if new_start_point is None:
+            new_start_point = start_point
+        if new_end_point is None:
+            new_end_point = end_point
+        new_geom = LineString([new_start_point, new_end_point])
+        new_element.intersections_below = new_intersections
+        new_element.geometry = new_geom
+    return new_element
+
+
 def filter_correspondents(
     tagged_annotations: dict[Annotation, dict],
 ) -> dict[Annotation, dict]:
