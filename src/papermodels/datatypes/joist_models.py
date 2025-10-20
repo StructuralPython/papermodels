@@ -470,6 +470,9 @@ class JoistArrayModel:
         self.joist_trib_areas = [
             self.generate_trib_area(idx) for idx, _ in enumerate(self.joist_locations)
         ]
+        from IPython.display import display
+        print(self.element.tag)
+        display(GeometryCollection(self.joist_geoms + self.joist_supports))
 
     # def __repr__(self):
     #     return class_representation(self)

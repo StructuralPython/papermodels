@@ -283,6 +283,9 @@ class Element:
                 )
             except (AssertionError, ValueError) as e:
                 # raise e
+                print(self.tag, len(support_geoms))
+                from IPython.display import display
+                display(GeometryCollection([self.geometry] + support_geoms))
                 raise AssertionError(
                     f"No intersection within joist extents: {self.tag=}"
                 )
@@ -1364,11 +1367,15 @@ def align_frames_to_centroids(element: Element):
                 intersecting_region = geom_ops.get_projected_support_centroid(
                     geometry, support_geom
                 )
-                if support_geom == start_support:
-                    new_start_point = intersecting_region
-                elif support_geom == end_support:
-                    new_end_point = intersecting_region
+            elif support_geom.geom_type == "Polygon" and support_reaction_type == "linear":
+                intersecting_region = geom_ops.get_projected_support_centerline(
+                    geometry,support_geom
+                )
 
+            if support_geom == start_support:
+                new_start_point = intersecting_region
+            elif support_geom == end_support:
+                new_end_point = intersecting_region
             new_intersection = Intersection(
                 intersecting_region,
                 ib.other_geometry,

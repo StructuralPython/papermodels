@@ -237,7 +237,7 @@ def get_projected_support_centroid(
     magnitude_max = 3 * fg.length
     direction_vector = get_direction_vector(fg).flatten()
     orig_joist_origin, orig_joist_end = get_start_end_nodes(fg)
-    # rfg = revised_frame_geometry
+    # rfg -> revised_frame_geometry
     rfg_start = project_node(orig_joist_origin, -direction_vector, magnitude_max / 2)
     rfg_end = project_node(orig_joist_end, direction_vector, magnitude_max / 2)
     rfg = LineString([rfg_start, rfg_end])
@@ -247,6 +247,31 @@ def get_projected_support_centroid(
     if not polygon_point_support.contains(projected_centroid):
         raise GeometryError("Projected support centroid is outside of the polygon.")
     return projected_centroid
+
+
+def get_projected_support_centerline(
+    frame_element_geometry: LineString,
+    polygon_linear_support: Polygon,
+) -> Point:
+    """
+    Returns a point that represents the either the direct intersection of the frame_element_geometry
+    with the centerline or, if no intersection is present, the projection of the nearest end coordinate
+    to the centerline onto the center line. The purpose of this function
+    is to effectively "snap" the frame_element_geometry to the centroids of the its polygon
+    linear supports.
+
+    This effect is desireable when papermodels is used to create "design spans" where
+    the frame elements are intended to span from center-of-support to center-of-support.
+    """
+    fg = frame_element_geometry
+    centerline = get_rectangle_centerline(polygon_linear_support)
+    if fg.intersects(centerline):
+        intersection_point = fg.intersection(centerline)
+    else:
+        intersection_point, fg_start = ops.nearest_points(centerline, fg)
+    if not centerline.intersects(intersection_point):
+        raise GeometryError(f"Projected support centroid is outside of the polygon: {centerline=} | {intersection_point=}.")
+    return intersection_point
 
 
 def get_joist_extents(
