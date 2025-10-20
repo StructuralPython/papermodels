@@ -558,6 +558,8 @@ class JoistArrayModel:
             kwargs=e.kwargs,
             extent_polygon=e.extent_polygon,
         )
+        if new_element.tag == "J4.0":
+            print(f"{new_element.subelements[0].intersections_below=}")
         return new_element
 
     def generate_joist_geom(self, index: int):
@@ -624,15 +626,24 @@ class JoistArrayModel:
             end_b = support_b_loc = self._extents[-1][1]
 
         if self._cantilevers["A"]:
+            print("DOIN A")
             end_a = geom_ops.project_node(
                 support_a_loc, -self.vector_parallel, self._cantilevers["A"]
             )
         if self._cantilevers["B"]:
+            print("DOIN B")
             end_b = geom_ops.project_node(
                 support_b_loc, self.vector_parallel, self._cantilevers["B"]
             )
         joist_geom = LineString([end_a, end_b])
-
+        if self.element.tag == "J4.0":
+            print(f"{joist_geom.intersects(self._supports[0])=}")
+            from IPython.display import display
+            print(f"{joist_geom.intersection(self._supports[1])=}")
+            display(GeometryCollection([joist_geom, self._supports[1]]))
+            print(f"{self._supports[1]=} | {joist_geom=}")
+            print(f"{self._extents=}")
+            # print(f"{joist_geom.wkt=}")
         return joist_geom
 
     def get_extent_edge(self, edge: str = "start"):
