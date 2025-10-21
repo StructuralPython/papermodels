@@ -44,7 +44,7 @@ def get_intersection(
         # Goal: calculate the intersecting region as being along the centerline
         # of the linear polygon support so that, down the line, it becomes easy
         # to calculate the extents from the intersecting region
-        intersecting_region = i_extent.intersection(below, 1e-3)
+        intersecting_region = i_extent.intersection(below, grid_size=1e-3)
         overlap_region = intersecting_region
         if not intersecting_region.is_empty:
             inter_centerline = get_rectangle_centerline(intersecting_region)
@@ -58,7 +58,7 @@ def get_intersection(
             )
             intersecting_region = LineString([projected_a, projected_b])
     elif i_extent and j_type == "LineString":
-        intersecting_region = i_extent.intersection(below, 1e-3)
+        intersecting_region = i_extent.intersection(below, grid_size=1e-3)
         overlap_region = intersecting_region
     elif i_type == "LineString" and j_type == "Polygon":
         # intersecting_region = above.intersection(below.exterior)
@@ -68,8 +68,8 @@ def get_intersection(
         elif below.contains(end):
             intersecting_region = end
         else:
-            intersecting_region = above.intersection(below.exterior, 1e-3)
-        overlap_region = above.intersection(below, 1e-3)
+            intersecting_region = above.intersection(below.exterior, grid_size=1e-3)
+        overlap_region = above.intersection(below, grid_size=1e-3)
     elif i_type == "Polygon" and j_type == "LineString":
         start, end = Point(below.coords[0]), Point(below.coords[1])
         if above.contains(start):
@@ -77,12 +77,12 @@ def get_intersection(
         elif above.contains(end):
             intersecting_region = end
         else:
-            intersecting_region = below.intersection(above.exterior, 1e-3)
-        overlap_region = below.intersection(above, 1e-3)
+            intersecting_region = below.intersection(above.exterior, grid_size=1e-3)
+        overlap_region = below.intersection(above, grid_size=1e-3)
         if intersecting_region.is_empty:
-            intersecting_region = below.intersection(above, 1e-3)
+            intersecting_region = below.intersection(above, grid_size=1e-3)
     else:
-        intersecting_region = above.intersection(below, 1e-3)
+        intersecting_region = above.intersection(below, grid_size=1e-3)
         if intersecting_region.length != 0.0:
             overlap_region = intersecting_region  # We do not want a point overlap
     if intersecting_region.is_empty:
