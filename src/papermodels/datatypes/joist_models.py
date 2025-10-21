@@ -290,7 +290,7 @@ class CollectorTribModel:
             #     revised_poly_overlaps,
             #     key=lambda x: (x.centroid.coords[0][0], x.centroid.coords[0][1]),
             # )
-
+            print(f"New iter: {self.element.tag}")
             for idx, joist_geom in enumerate(sorted_joist_geoms):
                 intersections = []
                 total_new_subs = len(joist_prototype_geometries)
@@ -301,6 +301,8 @@ class CollectorTribModel:
                 assert joist_geom.intersects(trib_area)
                 for support_geom in support_geoms:
                     support_overlap = None
+                    from IPython.display import display
+                    display(GeometryCollection([support_geom, joist_geom]))
                     if support_geom.geom_type == "Polygon":
                         support_overlap = joist_geom.intersection(support_geom)
                         # support_line = geom_ops.clean_polygon_supports([support_geom], joist_geom)
@@ -308,9 +310,13 @@ class CollectorTribModel:
                     elif support_geom.geom_type == "LineString":
                         support_line = support_geom
                     tag = support_lines[support_line]
-                    support_intersection = joist_geom.intersection(support_line)
+                    # HERE: Previous behaviour was to intersect with the centerline but that is no longer a requirement
+                    # Joist geom needs to be rebuilt to ensure it hits the wall centerline
+                    support_intersection = joist_geom.intersection(support_geom, grid_size=1e-3)
+                    geom_ops.get_projected_support_centerline(joist_geom, )
+                    # support_intersection = joist_geom.intersection(support_line, grid_size=1e-3)
                     # intersecting_region = trib_area.intersection(support_line)
-                    intersecting_region = support_line.intersection(joist_geom)
+                    intersecting_region = support_line.intersection(joist_geom, grid_size=1e-3)
                     if support_intersection.is_empty:
                         continue
                     # if intersecting_region.is_empty:
@@ -325,6 +331,8 @@ class CollectorTribModel:
                         ),
                     )
                     intersections.append(intersection)
+                print(subelement_tag)
+                print(intersections)
                 subelement = Element(
                     geometry=joist_geom,
                     tag=subelement_tag,
