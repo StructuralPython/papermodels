@@ -265,8 +265,6 @@ class CollectorTribModel:
                 )
                 for pi, pj in overlap_edge_points:
                     edge_ls = LineString([pi, pj])
-                    print(f"{start_edge=}")
-                    print(f"{edge_ls=}")
                     if geom_ops.check_2d_linestring_parallel(
                         edge_ls, start_edge, tol=0.01
                     ):

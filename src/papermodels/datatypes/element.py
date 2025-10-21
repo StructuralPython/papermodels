@@ -31,7 +31,7 @@ ELEMENT_ATTRS = {
     "correspondents_below",
     "page_label",
     "reaction_type",
-    "extent_polygon",
+    "extent_line",
 }
 
 
@@ -289,10 +289,6 @@ class Element:
                 )
             except (AssertionError, ValueError) as e:
                 # raise e
-                print(self.tag, len(support_geoms))
-                from IPython.display import display
-
-                display(GeometryCollection([self.geometry] + support_geoms))
                 raise AssertionError(
                     f"No intersection within joist extents: {self.tag=}"
                 )
