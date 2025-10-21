@@ -127,28 +127,14 @@ class CollectorTribModel:
             )
             for edge_points in poly_edge_points:
                 edge = LineString(edge_points)
-                print("New iter")
-                from IPython.display import display
-
-                display(
-                    GeometryCollection([edge, LineString([start_point, end_point])])
-                )
-
-                print(
-                    f"{(start_point, end_point)=} | {edge=} | {edge.intersects(geom)=}"
-                )
                 if edge.intersects(geom) and (
                     start_point.distance(edge) < end_point.distance(edge)
                 ):
-                    print("Start")
                     start_edge = edge
                 elif edge.intersects(geom) and (
                     end_point.distance(edge) < start_point.distance(edge)
                 ):
-                    print("End")
                     end_edge = edge
-                else:
-                    print("Else")
             # Either the start or end edge should work since
             # orthogonality is assumed.
 
@@ -490,10 +476,6 @@ class JoistArrayModel:
         self.joist_trib_areas = [
             self.generate_trib_area(idx) for idx, _ in enumerate(self.joist_locations)
         ]
-        from IPython.display import display
-
-        print(self.element.tag)
-        display(GeometryCollection(self.joist_geoms + self.joist_supports))
 
     # def __repr__(self):
     #     return class_representation(self)

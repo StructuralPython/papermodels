@@ -741,9 +741,6 @@ def sort_supports(
     docstring for get_start_end_nodes for more explanation of the +ve vector direction.
     """
     all_supports = MultiLineString(supports)
-    from IPython.display import display
-
-    # Do not set a grid_size=1e-3 here; I don't know why but it seems to break everything?
     joist_intersections = joist_prototype.intersection(all_supports, grid_size=1e-3)
     assert joist_intersections.geom_type != "Point"
     assert not joist_intersections.is_empty
