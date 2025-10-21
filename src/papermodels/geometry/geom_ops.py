@@ -270,7 +270,9 @@ def get_projected_support_centerline(
     else:
         intersection_point, fg_start = ops.nearest_points(centerline, fg)
     if not centerline.intersects(intersection_point):
-        raise GeometryError(f"Projected support centroid is outside of the polygon: {centerline=} | {intersection_point=}.")
+        raise GeometryError(
+            f"Projected support centroid is outside of the polygon: {centerline=} | {intersection_point=}."
+        )
     return intersection_point
 
 
@@ -742,14 +744,16 @@ def sort_supports(
     from IPython.display import display
 
     # Do not set a grid_size=1e-3 here; I don't know why but it seems to break everything?
-    joist_intersections = joist_prototype.intersection(all_supports)
+    joist_intersections = joist_prototype.intersection(all_supports, grid_size=1e-3)
     assert joist_intersections.geom_type != "Point"
     assert not joist_intersections.is_empty
     ordered_intersections = order_nodes_positive(joist_intersections.geoms)
     ordered_supports = []
     for point in ordered_intersections:
         for linestring in supports:
-            if linestring.buffer(1e-6).intersects(point):
+            if linestring.buffer(1e-3).intersects(
+                point
+            ):  # If using 1e-3 grid size, use 1e-3 buffer
                 ordered_supports.append(linestring)
     return ordered_supports
 

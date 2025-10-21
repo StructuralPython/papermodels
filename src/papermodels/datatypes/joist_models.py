@@ -101,7 +101,7 @@ class CollectorTribModel:
                 trib_area=trib_area,
                 reaction_type="linear",
                 kwargs=e.kwargs,
-                extent_polygon=e.extent_polygon,
+                extent_line=e.extent_line,
             )
         else:
             ext_poly = e.extent_polygon
@@ -127,10 +127,28 @@ class CollectorTribModel:
             )
             for edge_points in poly_edge_points:
                 edge = LineString(edge_points)
-                if edge.intersects(start_point):
+                print("New iter")
+                from IPython.display import display
+
+                display(
+                    GeometryCollection([edge, LineString([start_point, end_point])])
+                )
+
+                print(
+                    f"{(start_point, end_point)=} | {edge=} | {edge.intersects(geom)=}"
+                )
+                if edge.intersects(geom) and (
+                    start_point.distance(edge) < end_point.distance(edge)
+                ):
+                    print("Start")
                     start_edge = edge
-                elif edge.intersects(end_point):
+                elif edge.intersects(geom) and (
+                    end_point.distance(edge) < start_point.distance(edge)
+                ):
+                    print("End")
                     end_edge = edge
+                else:
+                    print("Else")
             # Either the start or end edge should work since
             # orthogonality is assumed.
 
@@ -261,6 +279,8 @@ class CollectorTribModel:
                 )
                 for pi, pj in overlap_edge_points:
                     edge_ls = LineString([pi, pj])
+                    print(f"{start_edge=}")
+                    print(f"{edge_ls=}")
                     if geom_ops.check_2d_linestring_parallel(
                         edge_ls, start_edge, tol=0.01
                     ):
@@ -354,7 +374,7 @@ class CollectorTribModel:
                 trib_area=e.trib_area,
                 reaction_type="linear",
                 kwargs=e.kwargs,
-                extent_polygon=e.extent_polygon,
+                extent_line=e.extent_line,
             )
         return collector_element
 
@@ -471,6 +491,7 @@ class JoistArrayModel:
             self.generate_trib_area(idx) for idx, _ in enumerate(self.joist_locations)
         ]
         from IPython.display import display
+
         print(self.element.tag)
         display(GeometryCollection(self.joist_geoms + self.joist_supports))
 
@@ -556,7 +577,7 @@ class JoistArrayModel:
             trib_area=e.trib_area,
             reaction_type="linear",
             kwargs=e.kwargs,
-            extent_polygon=e.extent_polygon,
+            extent_line=e.extent_line,
         )
         if new_element.tag == "J4.0":
             print(f"{new_element.subelements[0].intersections_below=}")
@@ -639,6 +660,7 @@ class JoistArrayModel:
         if self.element.tag == "J4.0":
             print(f"{joist_geom.intersects(self._supports[0])=}")
             from IPython.display import display
+
             print(f"{joist_geom.intersection(self._supports[1])=}")
             display(GeometryCollection([joist_geom, self._supports[1]]))
             print(f"{self._supports[1]=} | {joist_geom=}")

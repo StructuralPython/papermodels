@@ -112,7 +112,13 @@ class Element:
     trib_area: Optional[Polygon] = None
     reaction_type: str = "point"
     kwargs: Optional[dict] = None
-    extent_polygon: Optional[Polygon] = None
+    extent_line: Optional[LineString] = None
+
+    @property
+    def extent_polygon(self):
+        if self.extent_line is not None and self.geometry.geom_type == "LineString":
+            return geom_ops.create_extent_polygon(self.geometry, self.extent_line)
+        return None
 
     def __post_init__(self):
         if self.geometry.geom_type == "LineString" and len(self.geometry.coords) != 2:
@@ -216,7 +222,7 @@ class Element:
                 reaction_type=annot_attrs.get("reaction_type", "point"),
                 trib_area=matching_trib_poly,
                 kwargs=available_kwargs,
-                extent_polygon=annot_attrs["extent_polygon"],
+                extent_line=annot_attrs["extent_line"],
             )
             elements.append(element)
         return elements
@@ -271,10 +277,10 @@ class Element:
             for idx, poly_support_geom in enumerate(support_geoms):
                 clean_support_geom = support_geoms[idx]
                 cleaned_supports_map.update({clean_support_geom: poly_support_geom})
-            try:
                 ordered_support_geoms = geom_ops.sort_supports(
                     self.geometry, support_geoms
                 )
+            try:
                 extents = geom_ops.get_joist_extents(
                     self.geometry,
                     ordered_support_geoms,
@@ -285,6 +291,7 @@ class Element:
                 # raise e
                 print(self.tag, len(support_geoms))
                 from IPython.display import display
+
                 display(GeometryCollection([self.geometry] + support_geoms))
                 raise AssertionError(
                     f"No intersection within joist extents: {self.tag=}"
@@ -1079,7 +1086,9 @@ def get_geometry_intersections(
         i_attrs = intersected_annotations[i_annot]
         i_rank = i_attrs["rank"]
         i_page = i_annot.page
-        i_extent_poly = i_attrs["extent_polygon"]
+        i_geom = i_attrs["geometry"]
+        i_extent_line = i_attrs["extent_line"]
+        i_extent_poly = geom_ops.create_extent_polygon(i_geom, i_extent_line)
         i_attrs.setdefault("intersections_below", [])
         i_attrs.setdefault("intersections_above", [])
         for j_annot in annots:
@@ -1090,7 +1099,6 @@ def get_geometry_intersections(
                 print(j_annot, j_attrs)
                 raise ValueError
             j_page = j_annot.page
-            i_geom = i_attrs["geometry"]
             j_geom = j_attrs["geometry"]
             if i_geom.is_empty or j_geom.is_empty:
                 continue
@@ -1367,9 +1375,12 @@ def align_frames_to_centroids(element: Element):
                 intersecting_region = geom_ops.get_projected_support_centroid(
                     geometry, support_geom
                 )
-            elif support_geom.geom_type == "Polygon" and support_reaction_type == "linear":
+            elif (
+                support_geom.geom_type == "Polygon"
+                and support_reaction_type == "linear"
+            ):
                 intersecting_region = geom_ops.get_projected_support_centerline(
-                    geometry,support_geom
+                    geometry, support_geom
                 )
 
             if support_geom == start_support:

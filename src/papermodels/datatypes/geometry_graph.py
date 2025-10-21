@@ -1197,6 +1197,5 @@ def correlate_extents(
     for idx, matched_extent in enumerate(matched_extents):
         annot = element_annot_keys[idx]
         element_geom = element_geoms[idx]
-        extent_polygon = geom.create_extent_polygon(element_geom, matched_extent)
-        element_annots_copy[annot]["extent_polygon"] = extent_polygon
+        element_annots_copy[annot]["extent_line"] = matched_extent
     return element_annots_copy
