@@ -167,9 +167,12 @@ class GeometryGraph(nx.DiGraph):
         Aligns the ends of frame elements so that they start and end on the centroids
         of posts and walls (centerlines).
         """
+        # Only execute on transfer elements because collector elements will be modified
+        # when collector behaviour is assigned to them.
+        transfer_nodes = self.transfer_elements
         contiguous_nodes = self.contiguous_elements
 
-        for node_name in contiguous_nodes:
+        for node_name in set(transfer_nodes) & set(contiguous_nodes):
             node = self.nodes[node_name]
             element = node["element"]
             new_element = align_frames_to_centroids(element)
@@ -179,6 +182,8 @@ class GeometryGraph(nx.DiGraph):
         """
         Trims cantilevers if they are within the tolerance
         """
+        # Only execute on transfer elements because collector elements will be modified
+        # when collector behaviour is assigned to them.
         transfer_nodes = self.transfer_elements
         contiguous_nodes = self.contiguous_elements
 

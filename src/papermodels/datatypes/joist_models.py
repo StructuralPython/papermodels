@@ -16,7 +16,12 @@ from shapely import (
 )
 import shapely.ops as ops
 
-from papermodels.datatypes.element import Element, Intersection, trim_cantilevers
+from papermodels.datatypes.element import (
+    Element,
+    Intersection,
+    trim_cantilevers,
+    align_frames_to_centroids,
+)
 from papermodels.geometry import geom_ops
 import load_distribution as ld
 
@@ -281,16 +286,6 @@ class CollectorTribModel:
             # 7. Create an Element for each new joist prototype geometries
             subelements = []
             sorted_joist_geoms = joist_prototype_geometries
-            # sorted_poly_overlaps = revised_poly_overlaps
-            # sorted_joist_geoms = sorted(
-            #     joist_prototype_geometries,
-            #     key=lambda x: (x.coords[0][0], x.coords[0][1]),
-            # )
-            # sorted_poly_overlaps = sorted(
-            #     revised_poly_overlaps,
-            #     key=lambda x: (x.centroid.coords[0][0], x.centroid.coords[0][1]),
-            # )
-            print(f"New iter: {self.element.tag}")
             for idx, joist_geom in enumerate(sorted_joist_geoms):
                 intersections = []
                 total_new_subs = len(joist_prototype_geometries)
@@ -301,38 +296,39 @@ class CollectorTribModel:
                 assert joist_geom.intersects(trib_area)
                 for support_geom in support_geoms:
                     support_overlap = None
-                    from IPython.display import display
-                    display(GeometryCollection([support_geom, joist_geom]))
+                    support_intersection = joist_geom.intersection(
+                        support_geom, grid_size=1e-3
+                    )
+                    if not support_intersection:
+                        continue
                     if support_geom.geom_type == "Polygon":
-                        support_overlap = joist_geom.intersection(support_geom)
-                        # support_line = geom_ops.clean_polygon_supports([support_geom], joist_geom)
-                        support_line = geom_ops.get_rectangle_centerline(support_geom)
+                        support_overlap = support_intersection
+                        support_line = geom_ops.get_rectangle_centerline(
+                            support_geom
+                        )  # geom_ops.clean_polygon_supports([support_geom], joist_geom)[0]
+                        intersecting_region = support_geom.exterior.intersection(
+                            joist_geom, grid_size=1e-3
+                        )
                     elif support_geom.geom_type == "LineString":
                         support_line = support_geom
+                        intersecting_region = support_intersection
+
                     tag = support_lines[support_line]
                     # HERE: Previous behaviour was to intersect with the centerline but that is no longer a requirement
                     # Joist geom needs to be rebuilt to ensure it hits the wall centerline
-                    support_intersection = joist_geom.intersection(support_geom, grid_size=1e-3)
-                    geom_ops.get_projected_support_centerline(joist_geom, )
-                    # support_intersection = joist_geom.intersection(support_line, grid_size=1e-3)
-                    # intersecting_region = trib_area.intersection(support_line)
-                    intersecting_region = support_line.intersection(joist_geom, grid_size=1e-3)
-                    if support_intersection.is_empty:
-                        continue
+
                     # if intersecting_region.is_empty:
                     #     continue
                     intersection = Intersection(
                         intersecting_region=intersecting_region,
                         other_geometry=support_geom,
-                        other_tag=support_lines[support_line],
+                        other_tag=tag,
                         other_overlap=support_overlap,
                         other_reaction_type=(
                             "linear" if support_geom.geom_type == "Polygon" else "point"
                         ),
                     )
                     intersections.append(intersection)
-                print(subelement_tag)
-                print(intersections)
                 subelement = Element(
                     geometry=joist_geom,
                     tag=subelement_tag,
@@ -349,7 +345,8 @@ class CollectorTribModel:
                     kwargs=e.kwargs,
                     # extent_polygon=e.extent_polygon,
                 )
-                subelements.append(subelement)
+                aligned_subelement = align_frames_to_centroids(subelement)
+                subelements.append(aligned_subelement)
 
             # 8. Return subelements
             collector_element = Element(
