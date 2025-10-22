@@ -742,9 +742,6 @@ def sort_supports(
     """
     all_supports = MultiLineString(supports)
     joist_intersections = joist_prototype.intersection(all_supports, grid_size=1e-3)
-    from IPython.display import display
-
-    display(GeometryCollection([all_supports, joist_prototype]))
     assert joist_intersections.geom_type != "Point"
     assert not joist_intersections.is_empty
     ordered_intersections = order_nodes_positive(joist_intersections.geoms)
