@@ -80,6 +80,14 @@ def collector_extents_to_trib_loaded_elements(load_collector_extents):
 
 
 @fixture()
+def collector_extents_to_array_loaded_elements(load_collector_extents):
+    graph = load_collector_extents
+    graph.assign_collector_behaviour(JoistArrayModel)
+    les = graph.create_loaded_elements()
+    return les
+
+
+@fixture()
 def horiz_extents_to_array_loaded_elements(load_horiz_extents):
     graph = load_horiz_extents
     graph.assign_collector_behaviour(JoistArrayModel)
@@ -253,6 +261,12 @@ def test_collector_extent_creates_loaded_elements(
             les["FB0.0"].model()["loads"]["distributed_loads"][1]["transfer_source"]
             == "SJ0.0-3"
         )
+
+
+def test_collector_extents_creates_array_loaded_elements(collector_extents_to_array_loaded_elements):
+    les = collector_extents_to_array_loaded_elements
+    assert les
+
 
 
 def test_wall_point_load_locations(sketch_to_scale_to_array_loaded_elements):
