@@ -402,29 +402,17 @@ class JoistArrayModel:
         self.element = element
         self.joist_supports = []
         for ib in element.intersections_below:
+            if not ib.other_geometry.intersects(self.joist_prototype):
+                # This condition can exist when extent lines are used
+                continue
             if ib.other_geometry.geom_type == "Polygon":
-                try:
-                    support = geom_ops.clean_polygon_supports(
-                        [ib.other_geometry], self.joist_prototype
-                    )
-                    self.joist_supports.extend(support)
-                    continue
-                except ValueError:
-                    support = geom_ops.get_rectangle_centerline(ib.other_geometry)
+                support = geom_ops.clean_polygon_supports(
+                    [ib.other_geometry], self.joist_prototype
+                )
+                self.joist_supports.extend(support)
             else:
                 support = ib.other_geometry
-
-            self.joist_supports.append(support)
-
-        # try:
-        #     self.joist_supports = geom_ops.clean_polygon_supports(
-        #         [ib.other_geometry for ib in element.intersections_below],
-        #         self.joist_prototype,
-        #     )
-        # except AssertionError:
-        #     raise AssertionError(
-        #         f"No intersection at cleaned_support: {element.tag=}. Is geometry right on the edge of the support?"
-        #     )
+                self.joist_supports.append(support)
 
         self.joist_support_tags = [ib.other_tag for ib in element.intersections_below]
         self.id = element.tag
@@ -547,7 +535,8 @@ class JoistArrayModel:
                 kwargs=self.elem_kwargs,
                 # extent_polygon=self.extent_polygon,
             )
-            subelements.append(subelement)
+            aligned_subelement = align_frames_to_centroids(subelement)
+            subelements.append(aligned_subelement)
         new_element = Element(
             e.geometry,
             tag=e.tag,
