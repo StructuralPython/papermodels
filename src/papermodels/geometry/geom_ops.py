@@ -455,10 +455,28 @@ def get_cantilever_segments(
     If 'abs_tol' is given, then 'rel_tol' is ignored
     """
     joist_interior_region = convex_hull(
-        MultiLineString([geom for geom in ordered_supports])
+        GeometryCollection([geom for geom in ordered_supports])
     )
-    joist_interior = joist_interior_region & joist_prototype
+    # NOTE (2025-10-27): An attempt was made to replace 'ordered_supports' with a list of the intersection
+    # points of the joist_prototype. The idea being that it is only teh intersection points that defined
+    # the support system of cantilevers. However, this proved to carry several unintended consequences to
+    # how the geometry interacted such as when a beam intersected with both a wall and a column. It created
+    # a strange polygon which was not desired. One solution to this might be to add rules such that the
+    # beam cannot intersect a linear reaction element but this creates a problem for when we want to have
+    # that rule not apply. It just creates an error, which could be caught, but is not useful.
+    # Thus, I went back to the original implementation of using the actual support lines. This allowed
+    # all tests to pass again without creating geometry errors.
+
+    # The below commented code is an artifact of the above attempt which is preserved here as a reminder of that
+    # implementation in the event it proves to have an advantage over the current one.
+    # - CMF
+
+    # if joist_interior_region.geom_type == "LineString":
+    #     joist_interior_region = joist_interior_region.buffer(1, cap_style="flat")
+
+    joist_interior = joist_interior_region.intersection(joist_prototype, grid_size=1e-3)
     joist_interior_length = joist_interior.length
+
     cantilevers = (
         ops.split(joist_prototype, joist_interior_region) - joist_interior_region
     )
@@ -497,19 +515,27 @@ def get_cantilever_segments(
     if split_a.distance(ordered_supports[0]) < split_a.distance(ordered_supports[-1]):
         cantilever_segments = {
             "A": split_a.length,
-            "A_intersection": ordered_supports[0] & joist_prototype,
+            "A_intersection": ordered_supports[0].intersection(
+                joist_prototype, grid_size=1e-3
+            ),
             "A_orig": a_orig,
             "B": split_b.length,
-            "B_intersection": ordered_supports[-1] & joist_prototype,
+            "B_intersection": ordered_supports[-1].intersection(
+                joist_prototype, grid_size=1e-3
+            ),
             "B_orig": b_orig,
         }
     else:
         cantilever_segments = {
             "A": split_b.length,
-            "A_intersection": ordered_supports[-1] & joist_prototype,
+            "A_intersection": ordered_supports[-1].intersection(
+                joist_prototype, grid_size=1e-3
+            ),
             "A_orig": b_orig,
             "B": split_a.length,
-            "B_intersection": ordered_supports[0] & joist_prototype,
+            "B_intersection": ordered_supports[0].intersection(
+                joist_prototype, grid_size=1e-3
+            ),
             "B_orig": a_orig,
         }
     return cantilever_segments

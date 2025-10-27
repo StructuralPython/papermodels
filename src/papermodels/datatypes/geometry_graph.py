@@ -171,8 +171,12 @@ class GeometryGraph(nx.DiGraph):
         # when collector behaviour is assigned to them.
         transfer_nodes = self.transfer_elements
         contiguous_nodes = self.contiguous_elements
+        nodes_to_align = set(transfer_nodes) & set(contiguous_nodes)
+        sorted_nodes = nx.topological_sort(self)
 
-        for node_name in set(transfer_nodes) & set(contiguous_nodes):
+        for node_name in sorted_nodes:
+            if node_name not in nodes_to_align:
+                continue
             node = self.nodes[node_name]
             element = node["element"]
             new_element = align_frames_to_centroids(element)

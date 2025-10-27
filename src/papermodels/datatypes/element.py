@@ -1311,6 +1311,14 @@ def trim_cantilevers(
         cantilevers = geom_ops.get_cantilever_segments(
             ordered_geom, support_geoms, rel_tol=rel_tol, abs_tol=abs_tol
         )
+        # ordered_geom = LineString(
+        #     geom_ops.order_nodes_positive(
+        #         [Point(geometry.coords[0]), Point(geometry.coords[-1])]
+        #     )
+        # )
+        # cantilevers = geom_ops.get_cantilever_segments(
+        #     ordered_geom, intersection_points, rel_tol=rel_tol, abs_tol=abs_tol
+        # )
         start_point, end_point = Point(ordered_geom.coords[0]), Point(
             ordered_geom.coords[-1]
         )
@@ -1321,7 +1329,8 @@ def trim_cantilevers(
         new_geometry = LineString([start_point, end_point])  # type: ignore
         new_element.geometry = new_geometry
         intersection_checks = [
-            new_geometry.intersects(support_geom) for support_geom in support_geoms
+            new_geometry.intersects(ib.other_geometry)
+            for ib in element.intersections_below
         ]
         new_intersections_below = [
             Intersection(
@@ -1368,6 +1377,7 @@ def align_frames_to_centroids(element: Element):
             if support_geom.contains(end_point):
                 end_support = support_geom
             if support_geom.geom_type == "Polygon" and support_reaction_type == "point":
+                # intersecting_region = support_geom.centroid
                 intersecting_region = geom_ops.get_projected_support_centroid(
                     geometry, support_geom
                 )
