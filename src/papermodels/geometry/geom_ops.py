@@ -16,6 +16,7 @@ from shapely import (
     union,
     GeometryCollection,
     set_precision,
+    intersection_all,
 )
 import shapely.ops as ops
 import shapely.affinity as aff
@@ -282,7 +283,7 @@ def get_joist_extents(
     trib_area: Optional[Polygon] = None,
     extent_polygon: Optional[Polygon] = None,
     eps: float = 1e-6,
-) -> dict[str, tuple[Point, Point]]:
+) -> list[tuple[Point, Point]]:
     """
     Returns the extents for the supports "A" and "B". Each extent is represented by a tuple of
     Point objects which represent the "i" (start) and "j" (end) locations on the supports
@@ -342,8 +343,9 @@ def get_joist_extents(
 
     left_coords = []
     right_coords = []
+    support_intersection = intersection_all(joist_supports)
     for joist_support in joist_supports:
-        joist_support = joist_support.intersection(box(*supports_bbox))
+        joist_support = joist_support.intersection(box(*supports_bbox), grid_size=1e-3)
 
         start_coord, end_coord = joist_support.coords
         start_coord, end_coord = Point(start_coord), Point(end_coord)
@@ -354,6 +356,7 @@ def get_joist_extents(
         end_coord_rotation = cross_product_2d(
             joist_vector, np.array(end_coord.coords[0]) - orig_joist_origin
         )
+
         if start_coord_rotation == 0.0:
             if end_coord_rotation > 0.0:
                 right_coords.append(start_coord)
@@ -376,10 +379,13 @@ def get_joist_extents(
             left_coords.append(end_coord)
             right_coords.append(start_coord)
 
-    closest_left_coord = min(
+    left_coords.append(support_intersection)
+    right_coords.append(support_intersection)
+
+    closest_left_coord = min_with_none(
         left_coords, key=lambda x: x.distance(extended_joist_prototype)
     )
-    closest_right_coord = min(
+    closest_right_coord = min_with_none(
         right_coords, key=lambda x: x.distance(extended_joist_prototype)
     )
     closest_left_distance = set_precision(closest_left_coord, grid_size=1e-3).distance(
@@ -440,6 +446,21 @@ def get_joist_extents(
         # Do not "sort_nodes_positive" on these nodes. They are in the correct order.
         extents.append((left_extent, right_extent))
     return extents
+
+
+def intersecting_support_extents(
+    joist_prototype: LineString, supports: list[LineString]
+) -> list[tuple[LineString, LineString]]:
+    """
+    Returns a joist extent taking into account the self-intersection of the supports.
+    """
+    support_intersections = intersection_all(supports)
+    joist_and_supports = supports.copy()
+    joist_and_supports = [joist_prototype] + joist_and_supports
+    joist_intersections = []
+    for support in supports:
+        joist_intersections.append(joist_prototype.intersection(support))
+    return joist_intersections
 
 
 def get_cantilever_segments(
@@ -1085,6 +1106,14 @@ def get_vector_angle(v1, v2) -> float:
 
 def cross_product_2d(v1, v2):
     return v1[0] * v2[1] - v2[0] * v1[1]
+
+
+def min_with_none(x: list, key=None):
+    """
+    Returns min but ignoring None
+    """
+    cleaned = [y for y in x if y is not None]
+    return min(cleaned, key=key)
 
 
 def create_linestring(points: list[tuple]) -> LineString:

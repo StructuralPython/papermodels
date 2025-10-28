@@ -461,11 +461,10 @@ class JoistArrayModel:
             self.generate_joist_geom(idx) for idx, _ in enumerate(self.joist_locations)
         ]
         self.joist_trib_widths = [
-            self.get_joist_trib_widths(idx)
-            for idx, _ in enumerate(self.joist_locations)
+            self.get_joist_trib_widths(idx) for idx, _ in enumerate(self.joist_geoms)
         ]
         self.joist_trib_areas = [
-            self.generate_trib_area(idx) for idx, _ in enumerate(self.joist_locations)
+            self.generate_trib_area(idx) for idx, _ in enumerate(self.joist_geoms)
         ]
 
     # def __repr__(self):
@@ -509,6 +508,8 @@ class JoistArrayModel:
         e = self.element
         subelements = []
         for idx, joist_geom in enumerate(self.joist_geoms):
+            if joist_geom is None:
+                continue
             trib_area = self.joist_trib_areas[idx]
             sub_id = f"{self.id}-{idx}"
             intersections_below = []
@@ -604,8 +605,8 @@ class JoistArrayModel:
             sorted_supports = geom_ops.sort_supports(
                 ray_a | ray_b, intersecting_supports
             )
-            support_a_loc = ray_a.intersection(sorted_supports[0])
-            support_b_loc = ray_b.intersection(sorted_supports[-1])
+            support_a_loc = ray_a.intersection(sorted_supports[0], grid_size=1e-3)
+            support_b_loc = ray_b.intersection(sorted_supports[-1], grid_size=1e-3)
 
             end_a = support_a_loc
             end_b = support_b_loc
@@ -626,7 +627,19 @@ class JoistArrayModel:
             end_b = geom_ops.project_node(
                 support_b_loc, self.vector_parallel, self._cantilevers["B"]
             )
-        joist_geom = LineString([end_a, end_b])
+        joist_geom = set_precision(LineString([end_a, end_b]), grid_size=1e-3)
+        # With diagonal supports, it is possible the the new geom sliiiightly misses the supports. WTF. Why?
+        # This is a hack to fix that...
+        if not all([joist_geom.intersects(support) for support in self._supports]):
+            end_a = geom_ops.project_node(
+                end_a, -self.vector_parallel, self._cantilever_tolerance / 2
+            )
+            end_b = geom_ops.project_node(
+                end_b, self.vector_parallel, self._cantilever_tolerance / 2
+            )
+            joist_geom = LineString([end_a, end_b])
+        if joist_geom.length <= self._cantilever_tolerance:
+            return None
         return joist_geom
 
     def get_extent_edge(self, edge: str = "start"):
@@ -672,6 +685,8 @@ class JoistArrayModel:
         given 'trib_widths'
         """
         joist = self.joist_geoms[index]
+        if joist is None:
+            return None
         trib_widths = self.joist_trib_widths[index]
         i_node, j_node = joist.boundary.geoms  # Point, Point
         trib_left, trib_right = trib_widths  # float, float
