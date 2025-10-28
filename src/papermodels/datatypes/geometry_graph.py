@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Optional
+from typing import Optional, TypeAlias, Callable
 from copy import deepcopy
 from decimal import Decimal
 import pathlib
@@ -37,6 +37,23 @@ from rich.progress import track
 from rich import print
 import numpy.typing as npt
 
+Rule: TypeAlias = Callable
+
+def TRANSFER_LINES_CANNOT_INTERSECT_WITH_LINEAR_POLYGONS(e: Element, inter: Intersection):
+    return not (
+        (
+            e.rank > 0 
+            and e.geometry.geom_type == "LineString" 
+            and inter.other_geometry.geom_type == "Polygon" 
+            and inter.other_reaction_type=="linear"
+        ) or (
+        e.rank > 0
+        and e.geometry.geom_type == "Polygon"
+        and e.reaction_type == "linear"
+        and inter.other_geometry.geom_type == "LineString"
+        )
+    )
+    
 
 class GeometryGraph(nx.DiGraph):
     """
@@ -107,6 +124,9 @@ class GeometryGraph(nx.DiGraph):
         do_not_process: bool = False,
         cantilever_rel_tol: float = 2e-2,
         cantilever_abs_tol: Optional[float] = None,
+        intersection_rules: Optional[list[Rule | callable]] = [
+            TRANSFER_LINES_CANNOT_INTERSECT_WITH_LINEAR_POLYGONS
+        ],
     ) -> GeometryGraph:
         """
         Returns a GeometryGraph (networkx.DiGraph) based upon the intersections and correspondents
@@ -116,6 +136,8 @@ class GeometryGraph(nx.DiGraph):
             cantilever_rel_tol=cantilever_rel_tol, cantilever_abs_tol=cantilever_abs_tol
         )
         elements_copy = deepcopy(elements)
+        if intersection_rules is None:
+            intersection_rules = []
         for element in elements_copy:
             hash = hashlib.sha256(str(element).encode()).hexdigest()
             start_coord = None
@@ -137,9 +159,16 @@ class GeometryGraph(nx.DiGraph):
                     j_tag = correspondent.other_tag
                     g.add_edge(element.tag, j_tag, edge_type="correspondent")
             if element.intersections_below is not None:
+                filtered_intersections = []
                 for intersection in element.intersections_below:
-                    j_tag = intersection.other_tag
-                    g.add_edge(element.tag, j_tag, edge_type="intersection")
+                    passes_intersection_rules = []
+                    for intersection_rule in intersection_rules:
+                        passes_intersection_rules.append(intersection_rule(element, intersection))
+                    if all(passes_intersection_rules):
+                        j_tag = intersection.other_tag
+                        g.add_edge(element.tag, j_tag, edge_type="intersection")
+                        filtered_intersections.append(intersection)
+                element.intersections_below = filtered_intersections
             if element.tag in g.collector_elements:
                 for correspondent in element.correspondents_above:
                     j_tag = correspondent.other_tag
