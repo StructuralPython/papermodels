@@ -29,7 +29,7 @@ from ..paper.annotations import (
     assign_page_id_to_annotations,
     annotation_to_shapely,
 )
-from ..paper.plot import plot_annotations
+from ..paper.plot import plot_annotations, plot_elements
 from ..paper import pdf
 from ..paper import dxf
 from ..datatypes.exceptions import AnnotationError
@@ -39,21 +39,25 @@ import numpy.typing as npt
 
 Rule: TypeAlias = Callable
 
-def TRANSFER_LINES_CANNOT_INTERSECT_WITH_LINEAR_POLYGONS(e: Element, inter: Intersection):
+
+def TRANSFER_LINES_CANNOT_INTERSECT_WITH_LINEAR_POLYGONS(
+    e: Element, inter: Intersection
+):
     return not (
         (
-            e.rank > 0 
-            and e.geometry.geom_type == "LineString" 
-            and inter.other_geometry.geom_type == "Polygon" 
-            and inter.other_reaction_type=="linear"
-        ) or (
-        e.rank > 0
-        and e.geometry.geom_type == "Polygon"
-        and e.reaction_type == "linear"
-        and inter.other_geometry.geom_type == "LineString"
+            e.rank > 0
+            and e.geometry.geom_type == "LineString"
+            and inter.other_geometry.geom_type == "Polygon"
+            and inter.other_reaction_type == "linear"
+        )
+        or (
+            e.rank > 0
+            and e.geometry.geom_type == "Polygon"
+            and e.reaction_type == "linear"
+            and inter.other_geometry.geom_type == "LineString"
         )
     )
-    
+
 
 class GeometryGraph(nx.DiGraph):
     """
@@ -163,7 +167,9 @@ class GeometryGraph(nx.DiGraph):
                 for intersection in element.intersections_below:
                     passes_intersection_rules = []
                     for intersection_rule in intersection_rules:
-                        passes_intersection_rules.append(intersection_rule(element, intersection))
+                        passes_intersection_rules.append(
+                            intersection_rule(element, intersection)
+                        )
                     if all(passes_intersection_rules):
                         j_tag = intersection.other_tag
                         g.add_edge(element.tag, j_tag, edge_type="intersection")
@@ -1088,6 +1094,29 @@ class GeometryGraph(nx.DiGraph):
             if annot.page == page_idx and annot not in self.legend_entries
         }
         return plot_annotations(annots, figsize, dpi, plot_tags=True)
+
+    def plot_elements(
+        self,
+        plane_id: int,
+        figsize: tuple[float, float] = (8, 8),
+        dpi: int = 150,
+        plot_trib_areas: bool = False,
+        plot_extent_polygons: bool = False,
+        plot_tags: bool = False,
+    ):
+        """
+        Plots all elements in the graph that are on 'page_idx'
+        """
+        elements = [self.nodes[node_name]["element"] for node_name in self.nodes.keys()]
+        elements_on_page = [e for e in elements if e.plane_id == plane_id]
+        return plot_elements(
+            elements_on_page,
+            figsize,
+            dpi,
+            plot_trib_areas=plot_trib_areas,
+            plot_extent_polygons=plot_extent_polygons,
+            plot_tags=plot_tags,
+        )
 
     def create_loaded_elements(self) -> dict[str, LoadedElement]:
         """
