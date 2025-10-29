@@ -72,8 +72,7 @@ class GeometryGraph(nx.DiGraph):
     def __init__(
         self,
         do_not_process: bool = False,
-        cantilever_rel_tol: float = 2e-2,
-        cantilever_abs_tol: Optional[float] = None,
+        cantilever_abs_tol: Optional[float] = 0.2,
     ):
         super().__init__()
         self.do_not_process = do_not_process
@@ -83,7 +82,6 @@ class GeometryGraph(nx.DiGraph):
         self.raw_annotations = None
         self.legend_entries = None
         self.pdf_path = None
-        self.cantilever_rel_tol: float = cantilever_rel_tol
         self.cantilever_abs_tol: Optional[float] = cantilever_abs_tol
 
     @property
@@ -126,8 +124,7 @@ class GeometryGraph(nx.DiGraph):
         cls,
         elements: list[Element],
         do_not_process: bool = False,
-        cantilever_rel_tol: float = 2e-2,
-        cantilever_abs_tol: Optional[float] = None,
+        cantilever_abs_tol: Optional[float] = 0.02,
         intersection_rules: Optional[list[Rule | callable]] = [
             TRANSFER_LINES_CANNOT_INTERSECT_WITH_LINEAR_POLYGONS
         ],
@@ -136,9 +133,7 @@ class GeometryGraph(nx.DiGraph):
         Returns a GeometryGraph (networkx.DiGraph) based upon the intersections and correspondents
         of the 'elements'.
         """
-        g = cls(
-            cantilever_rel_tol=cantilever_rel_tol, cantilever_abs_tol=cantilever_abs_tol
-        )
+        g = cls(cantilever_abs_tol=cantilever_abs_tol)
         elements_copy = deepcopy(elements)
         if intersection_rules is None:
             intersection_rules = []
@@ -229,9 +224,7 @@ class GeometryGraph(nx.DiGraph):
         for node_name in set(transfer_nodes) & set(contiguous_nodes):
             node = self.nodes[node_name]
             element = node["element"]
-            new_element = trim_cantilevers(
-                element, self.cantilever_rel_tol, self.cantilever_abs_tol
-            )
+            new_element = trim_cantilevers(element, abs_tol=self.cantilever_abs_tol)
             node["element"] = new_element
 
     def remove_excess_correspondent_load_paths(self):
@@ -690,7 +683,12 @@ class GeometryGraph(nx.DiGraph):
                 # are drawn. Unconnected elements have no precedents therefore they are (currently)
                 # being categorized as collectors. However, I think incompatible geometries
                 # should simply be ignored and not included as part of the processing.
-                callable_instance = element_constructor(node_element, *args, **kwargs)
+                callable_instance = element_constructor(
+                    node_element,
+                    cantilever_tolerance=self.cantilever_abs_tol,
+                    *args,
+                    **kwargs,
+                )
                 new_elem = callable_instance()
                 node_attrs["element"] = new_elem
         self.add_intersection_indexes_below()
@@ -856,8 +854,7 @@ class GeometryGraph(nx.DiGraph):
         pdf_filepath: pathlib.Path | str,
         legend_identifier: str = "legend",
         scale: Optional[Decimal] = None,
-        cantilever_rel_tol: float = 2e-2,
-        cantilever_abs_tol: Optional[float] = None,
+        cantilever_abs_tol: Optional[float] = 0.02,
         debug: bool = False,
         progress: bool = False,
         do_not_process: bool = False,
@@ -903,7 +900,6 @@ class GeometryGraph(nx.DiGraph):
             legend_identifier,
             scale=scale,
             do_not_process=do_not_process,
-            cantilever_rel_tol=cantilever_rel_tol,
             cantilever_abs_tol=cantilever_abs_tol,
         )
         graph.pdf_path = pathlib.Path(pdf_filepath).resolve()
@@ -915,8 +911,7 @@ class GeometryGraph(nx.DiGraph):
         annotations: list[Annotation],
         legend_identifier: str = "legend",
         scale: Optional[Decimal] = None,
-        cantilever_rel_tol: float = 2e-2,
-        cantilever_abs_tol: Optional[float] = None,
+        cantilever_abs_tol: Optional[float] = 0.02,
         # area_load_properties: Optional[dict] = None,
         # trib_area_properties: Optional[dict] = None,
         debug: bool = False,
@@ -1029,7 +1024,6 @@ class GeometryGraph(nx.DiGraph):
         )
         graph = cls.from_elements(
             elements,
-            cantilever_rel_tol=cantilever_rel_tol,
             cantilever_abs_tol=cantilever_abs_tol,
             do_not_process=do_not_process,
         )

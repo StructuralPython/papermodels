@@ -1288,12 +1288,10 @@ def get_geometry_correspondents(
     return corresponding_annotations
 
 
-def trim_cantilevers(
-    element: Element, rel_tol: float = 2e-2, abs_tol: Optional[float] = None
-):
+def trim_cantilevers(element: Element, abs_tol: Optional[float] = 0.02):
     """
     Mutates the geometry in node elements so that any cantilevers which are
-    below self.cantilever_rel_tol or self.cantilever_abs_tol are removed from
+    below self.cantilever_abs_tol are removed from
     the geometry and the geometry spans exactly from support to support.
     """
     new_element = deepcopy(element)
@@ -1308,7 +1306,7 @@ def trim_cantilevers(
             )
         )
         cantilevers = geom_ops.get_cantilever_segments(
-            ordered_geom, support_geoms, rel_tol=rel_tol, abs_tol=abs_tol
+            ordered_geom, support_geoms, abs_tol=abs_tol
         )
         # ordered_geom = LineString(
         #     geom_ops.order_nodes_positive(
@@ -1350,7 +1348,7 @@ def trim_cantilevers(
 def align_frames_to_centroids(element: Element):
     """
     Mutates the geometry in node elements so that any cantilevers which are
-    below self.cantilever_rel_tol or self.cantilever_abs_tol are removed from
+    below self.cantilever_abs_tol are removed from
     the geometry and the geometry spans exactly from support to support.
     """
     new_element = deepcopy(element)
@@ -1365,7 +1363,6 @@ def align_frames_to_centroids(element: Element):
     new_end_point = None
     if geometry.geom_type == "LineString":
         new_intersections = []
-
         for ib in new_element.intersections_below:
             ib: Intersection
             support_geom = ib.other_geometry

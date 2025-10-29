@@ -35,7 +35,7 @@ class CollectorTribModel:
     trib_width: float = 1.0
     reaction_type: str = "linear"
     use_subelements: bool = False
-    support_tolerance: float = 1e-2
+    cantilever_tolerance: float = 1e-2
 
     def __post_init__(self):
         if self.element.extent_polygon is not None:
@@ -47,6 +47,9 @@ class CollectorTribModel:
 
         Assumptions:
         - The supports are assumed to be orthogonal
+        - IF EXTENT LINES ARE USED, then cantilevers are not supported
+            (joist prototypes with extent lines using this model will
+            have their cantilevers trimmed off...currently).
         - The loading is consistent for all joists within the spread
         - The joist represents a one-of-many similar elements within
             the spread and the spread thus represents a linear reaction
@@ -168,7 +171,7 @@ class CollectorTribModel:
                     if math.isclose(
                         start_support.coords[0][0],
                         support_line.coords[0][0],
-                        rel_tol=self.support_tolerance,
+                        abs_tol=self.cantilever_tolerance,
                     )
                 ]
                 end_supports = [
@@ -177,7 +180,7 @@ class CollectorTribModel:
                     if math.isclose(
                         end_support.coords[0][0],
                         support_line.coords[0][0],
-                        rel_tol=self.support_tolerance,
+                        abs_tol=self.cantilever_tolerance,
                     )
                 ]
             elif joist_orientation == "vertical":
@@ -189,7 +192,7 @@ class CollectorTribModel:
                     if math.isclose(
                         start_support.coords[0][1],
                         support_line.coords[0][1],
-                        rel_tol=self.support_tolerance,
+                        abs_tol=self.cantilever_tolerance,
                     )
                 ]
                 end_supports = [
@@ -198,7 +201,7 @@ class CollectorTribModel:
                     if math.isclose(
                         end_support.coords[0][1],
                         support_line.coords[0][1],
-                        rel_tol=self.support_tolerance,
+                        abs_tol=self.cantilever_tolerance,
                     )
                 ]
 
@@ -280,9 +283,10 @@ class CollectorTribModel:
                             joist_orientation,
                             intersection_point=edge_ls.centroid,
                         )
+                        trimmed_joist = new_joist.intersection(overlap_poly)
                         # We only need to hit one edge of the overlap so we can break here
                         break
-                joist_prototype_geometries.append(new_joist)
+                joist_prototype_geometries.append(trimmed_joist)
 
             # 7. Create an Element for each new joist prototype geometries
             subelements = []
@@ -395,14 +399,14 @@ class JoistArrayModel:
         initial_offset: float | int = 0.0,
         joist_at_start: bool = True,
         joist_at_end: bool = False,
-        cantilever_tolerance: float = 1e-2,
+        cantilever_tolerance: float = 1e-1,
     ):
         self.joist_prototype = LineString(
             geom_ops.get_start_end_nodes(element.geometry)
         )
         self.element = element
         self.extent_polygon = element.extent_polygon
-        self.joist_supports = []
+        self.joist_supports = {}
         for ib in element.intersections_below:
             if (
                 not ib.other_geometry.intersects(self.joist_prototype)
@@ -414,10 +418,13 @@ class JoistArrayModel:
                 support = geom_ops.clean_polygon_supports(
                     [ib.other_geometry], self.joist_prototype, self.extent_polygon
                 )
-                self.joist_supports.extend(support)
+                self.joist_supports.update({support[0]: ib.other_reaction_type})
             else:
                 support = ib.other_geometry
-                self.joist_supports.append(support)
+                self.joist_supports.update({support: ib.other_reaction_type})
+        self._supports = geom_ops.sort_supports(
+            self.joist_prototype, list(self.joist_supports.keys())
+        )
         self.joist_support_tags = [ib.other_tag for ib in element.intersections_below]
         self.id = element.tag
         self.plane_id = element.plane_id
@@ -432,7 +439,7 @@ class JoistArrayModel:
         try:
             self._extents = geom_ops.get_joist_extents(
                 self.joist_prototype,
-                self.joist_supports,
+                self._supports,
                 trib_area=None,
                 extent_polygon=self.extent_polygon,
             )
@@ -443,7 +450,6 @@ class JoistArrayModel:
             raise AssertionError(
                 f"No intersection within joist extents: {element.tag=}"
             )
-        self._supports = self.joist_supports
         self._cantilevers = geom_ops.get_cantilever_segments(
             self.joist_prototype, self._supports, abs_tol=0
         )
@@ -523,7 +529,10 @@ class JoistArrayModel:
                 )
                 if intersection_attrs is None:
                     continue
-                intersection_below = Intersection(*intersection_attrs)
+                other_reaction_type = self.joist_supports[support_geom]
+                intersection_below = Intersection(
+                    *intersection_attrs, other_reaction_type=other_reaction_type
+                )
                 intersections_below.append(intersection_below)
             subelement = Element(
                 joist_geom,
@@ -539,8 +548,7 @@ class JoistArrayModel:
                 kwargs=self.elem_kwargs,
                 # extent_polygon=self.extent_polygon,
             )
-            aligned_subelement = align_frames_to_centroids(subelement)
-            subelements.append(aligned_subelement)
+            subelements.append(subelement)
         new_element = Element(
             e.geometry,
             tag=e.tag,
@@ -622,7 +630,7 @@ class JoistArrayModel:
                 return None
             support_a_loc = ray_a.intersection(sorted_supports[0], grid_size=1e-3)
             support_b_loc = ray_b.intersection(sorted_supports[-1], grid_size=1e-3)
-
+            print(self.element.tag, "Support locs: ", support_a_loc, support_b_loc)
             end_a = support_a_loc
             end_b = support_b_loc
         # These clauses req'd to deal with floating point error possible
@@ -634,11 +642,15 @@ class JoistArrayModel:
             end_a = support_a_loc = self._extents[0][1]
             end_b = support_b_loc = self._extents[-1][1]
 
-        if self._cantilevers["A"]:
+        cant_a = self._cantilevers["A"]
+        cant_b = self._cantilevers["B"]
+        if cant_a and cant_a >= self._cantilever_tolerance:
+            print(self.element.tag, "extending A")
             end_a = geom_ops.project_node(
                 support_a_loc, -self.vector_parallel, self._cantilevers["A"]
             )
-        if self._cantilevers["B"]:
+        if cant_b and cant_b >= self._cantilever_tolerance:
+            print(cant_b, self._cantilever_tolerance, "extending B")
             end_b = geom_ops.project_node(
                 support_b_loc, self.vector_parallel, self._cantilevers["B"]
             )

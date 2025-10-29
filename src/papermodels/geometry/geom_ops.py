@@ -199,6 +199,9 @@ def clean_polygon_supports(
             if sum(support_intersections) == 1:  # Intersects on one edge only
                 intersecting_line_index = int(support_intersections.nonzero()[0][0])
                 support_line = support_lines[intersecting_line_index]
+                center_line = get_rectangle_centerline(support_geom)
+                if joist_prototype.intersects(center_line):
+                    support_line = center_line
                 # Ensure there are no missing intersections on the support line
                 assert support_line.intersects(joist_prototype)
             elif sum(support_intersections) == 0 and not extent_polygon:
