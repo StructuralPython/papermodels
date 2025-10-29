@@ -587,6 +587,12 @@ class LoadedElement(Element):
             coords_a, coords_b = Point(coords_a), Point(coords_b)
             ordered_coords = geom_ops.order_nodes_positive([coords_a, coords_b])
             start_coord = ordered_coords[0]
+            for ib in self.intersections_below:
+                region = ib.intersecting_region
+                if region.geom_type == "LineString":
+                    coords_a, coords_b = region.coords
+                    coords_a, coords_b = Point(coords_a), Point(coords_b)
+                    # if ib.other_geometry
             support_locations = geom_ops.get_local_intersection_ordinates(
                 start_coord,
                 [intersection[0] for intersection in self.intersections_below],
@@ -1331,7 +1337,7 @@ def trim_cantilevers(element: Element, abs_tol: Optional[float] = 0.02):
         ]
         new_intersections_below = [
             Intersection(
-                intersecting_region=new_geometry.intersection(ib.other_geometry),
+                intersecting_region=ib.intersecting_region,
                 other_tag=ib.other_tag,
                 other_overlap=ib.other_overlap,
                 other_geometry=ib.other_geometry,
@@ -1372,11 +1378,13 @@ def align_frames_to_centroids(element: Element):
                 start_support = support_geom
             if support_geom.contains(end_point):
                 end_support = support_geom
+            overlap_region = ib.other_overlap
             if support_geom.geom_type == "Polygon" and support_reaction_type == "point":
                 # intersecting_region = support_geom.centroid
                 intersecting_region = geom_ops.get_projected_support_centroid(
                     geometry, support_geom
                 )
+                overlap_region = support_geom.intersection(geometry)
             elif (
                 support_geom.geom_type == "Polygon"
                 and support_reaction_type == "linear"
@@ -1384,6 +1392,7 @@ def align_frames_to_centroids(element: Element):
                 intersecting_region = geom_ops.get_projected_support_centerline(
                     geometry, support_geom
                 )
+                overlap_region = support_geom.intersection(geometry)
 
             if support_geom == start_support:
                 new_start_point = intersecting_region
@@ -1393,7 +1402,7 @@ def align_frames_to_centroids(element: Element):
                 intersecting_region,
                 ib.other_geometry,
                 ib.other_tag,
-                other_overlap=None,
+                other_overlap=overlap_region,
                 other_index=ib.other_index,
                 other_reaction_type=ib.other_reaction_type,
                 other_extents=ib.other_extents,
