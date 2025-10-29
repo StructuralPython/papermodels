@@ -299,6 +299,8 @@ def test_horiz_extents_joist_extents(horiz_extents_to_array_loaded_elements):
     pls = db0["loads"]["point_loads"]
     assert pls[0]["location"] == 7.83
     assert pls[-1]["location"] == 3.134
+    assert db0['element_geometry']['supports'][0]['location'] == 0.0
+    assert db0['element_geometry']['supports'][1]['location'] == 11.609 
 
 
 def test_trib_areas_basic_loads(trib_areas_basic_loaded_elements):
