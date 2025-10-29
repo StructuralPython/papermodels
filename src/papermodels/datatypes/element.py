@@ -31,7 +31,7 @@ ELEMENT_ATTRS = {
     "correspondents_below",
     "page_label",
     "reaction_type",
-    "extent_polygon",
+    "extent_line",
 }
 
 
@@ -43,6 +43,7 @@ class Intersection(NamedTuple):
     intersecting_region: Point | LineString
     other_geometry: Union[LineString, Polygon]
     other_tag: str
+    other_overlap: Optional[LineString | Polygon] = None
     other_index: Optional[int] = None
     other_reaction_type: str = "point"
     other_extents: Optional[tuple] = None
@@ -111,7 +112,13 @@ class Element:
     trib_area: Optional[Polygon] = None
     reaction_type: str = "point"
     kwargs: Optional[dict] = None
-    extent_polygon: Optional[Polygon] = None
+    extent_line: Optional[LineString] = None
+
+    @property
+    def extent_polygon(self):
+        if self.extent_line is not None and self.geometry.geom_type == "LineString":
+            return geom_ops.create_extent_polygon(self.geometry, self.extent_line)
+        return None
 
     def __post_init__(self):
         if self.geometry.geom_type == "LineString" and len(self.geometry.coords) != 2:
@@ -215,7 +222,7 @@ class Element:
                 reaction_type=annot_attrs.get("reaction_type", "point"),
                 trib_area=matching_trib_poly,
                 kwargs=available_kwargs,
-                extent_polygon=annot_attrs["extent_polygon"],
+                extent_line=annot_attrs["extent_line"],
             )
             elements.append(element)
         return elements
@@ -270,10 +277,10 @@ class Element:
             for idx, poly_support_geom in enumerate(support_geoms):
                 clean_support_geom = support_geoms[idx]
                 cleaned_supports_map.update({clean_support_geom: poly_support_geom})
-            try:
                 ordered_support_geoms = geom_ops.sort_supports(
                     self.geometry, support_geoms
                 )
+            try:
                 extents = geom_ops.get_joist_extents(
                     self.geometry,
                     ordered_support_geoms,
@@ -281,7 +288,6 @@ class Element:
                     extent_polygon=self.extent_polygon,
                 )
             except (AssertionError, ValueError) as e:
-                # raise e
                 raise AssertionError(
                     f"No intersection within joist extents: {self.tag=}"
                 )
@@ -581,18 +587,53 @@ class LoadedElement(Element):
             coords_a, coords_b = Point(coords_a), Point(coords_b)
             ordered_coords = geom_ops.order_nodes_positive([coords_a, coords_b])
             start_coord = ordered_coords[0]
+            for ib in self.intersections_below:
+                region = ib.intersecting_region
+                if region.geom_type == "LineString":
+                    coords_a, coords_b = region.coords
+                    coords_a, coords_b = Point(coords_a), Point(coords_b)
+                    # if ib.other_geometry
             support_locations = geom_ops.get_local_intersection_ordinates(
                 start_coord,
                 [intersection[0] for intersection in self.intersections_below],
             )
-            supports_acc = []
-            for idx, support_location in enumerate(support_locations):
-                fixity = "roller"
-                if idx == 0:
-                    fixity = "pin"
-                supports_acc.append(
-                    {"location": round(support_location, precision), "fixity": fixity}
+            terminus_supports = [
+                any(
+                    [
+                        ib.other_geometry.contains(coords_a),
+                        ib.other_geometry.contains(coords_b),
+                    ]
                 )
+                for ib in self.intersections_below
+            ]
+            overlap_regions = [
+                intersection.other_overlap for intersection in self.intersections_below
+            ]
+            supports_acc = []
+            for idx, loc in enumerate(support_locations):
+                overlap_region = overlap_regions[idx]
+                terminus_support = (
+                    terminus_supports[idx] if overlap_region is not None else None
+                )
+                overlap_length = 0.0
+                if overlap_region is not None:
+                    overlap_length = overlap_region.length
+
+                supports_acc.append(
+                    {
+                        "location": round(loc, 3),
+                        "overlap_length": round(overlap_length, 3),
+                        "terminus": terminus_support,
+                    }
+                )
+
+            # for idx, support_location in enumerate(support_locations):
+            #     fixity = "roller"
+            #     if idx == 0:
+            #         fixity = "pin"
+            #     supports_acc.append(
+            #         {"location": round(support_location, precision), "fixity": fixity}
+            #     )
             return sorted(supports_acc, key=lambda x: x["location"])
         else:
             return []
@@ -1046,7 +1087,9 @@ def get_geometry_intersections(
         i_attrs = intersected_annotations[i_annot]
         i_rank = i_attrs["rank"]
         i_page = i_annot.page
-        i_extent_poly = i_attrs["extent_polygon"]
+        i_geom = i_attrs["geometry"]
+        i_extent_line = i_attrs["extent_line"]
+        i_extent_poly = geom_ops.create_extent_polygon(i_geom, i_extent_line)
         i_attrs.setdefault("intersections_below", [])
         i_attrs.setdefault("intersections_above", [])
         for j_annot in annots:
@@ -1057,7 +1100,6 @@ def get_geometry_intersections(
                 print(j_annot, j_attrs)
                 raise ValueError
             j_page = j_annot.page
-            i_geom = i_attrs["geometry"]
             j_geom = j_attrs["geometry"]
             if i_geom.is_empty or j_geom.is_empty:
                 continue
@@ -1252,12 +1294,10 @@ def get_geometry_correspondents(
     return corresponding_annotations
 
 
-def trim_cantilevers(
-    element: Element, rel_tol: float = 2e-2, abs_tol: Optional[float] = None
-):
+def trim_cantilevers(element: Element, abs_tol: Optional[float] = 0.02):
     """
     Mutates the geometry in node elements so that any cantilevers which are
-    below self.cantilever_rel_tol or self.cantilever_abs_tol are removed from
+    below self.cantilever_abs_tol are removed from
     the geometry and the geometry spans exactly from support to support.
     """
     new_element = deepcopy(element)
@@ -1272,8 +1312,16 @@ def trim_cantilevers(
             )
         )
         cantilevers = geom_ops.get_cantilever_segments(
-            ordered_geom, support_geoms, rel_tol=rel_tol, abs_tol=abs_tol
+            ordered_geom, support_geoms, abs_tol=abs_tol
         )
+        # ordered_geom = LineString(
+        #     geom_ops.order_nodes_positive(
+        #         [Point(geometry.coords[0]), Point(geometry.coords[-1])]
+        #     )
+        # )
+        # cantilevers = geom_ops.get_cantilever_segments(
+        #     ordered_geom, intersection_points, rel_tol=rel_tol, abs_tol=abs_tol
+        # )
         start_point, end_point = Point(ordered_geom.coords[0]), Point(
             ordered_geom.coords[-1]
         )
@@ -1284,12 +1332,14 @@ def trim_cantilevers(
         new_geometry = LineString([start_point, end_point])  # type: ignore
         new_element.geometry = new_geometry
         intersection_checks = [
-            new_geometry.intersects(support_geom) for support_geom in support_geoms
+            new_geometry.intersects(ib.other_geometry)
+            for ib in element.intersections_below
         ]
         new_intersections_below = [
             Intersection(
-                intersecting_region=new_geometry.intersection(ib.other_geometry),
+                intersecting_region=ib.intersecting_region,
                 other_tag=ib.other_tag,
+                other_overlap=ib.other_overlap,
                 other_geometry=ib.other_geometry,
                 other_reaction_type=ib.other_reaction_type,
                 other_extents=ib.other_extents,
@@ -1298,6 +1348,73 @@ def trim_cantilevers(
             for ib in element.intersections_below
         ]
         new_element.intersections_below = new_intersections_below
+    return new_element
+
+
+def align_frames_to_centroids(element: Element):
+    """
+    Mutates the geometry in node elements so that any cantilevers which are
+    below self.cantilever_abs_tol are removed from
+    the geometry and the geometry spans exactly from support to support.
+    """
+    new_element = deepcopy(element)
+    geometry = element.geometry
+    if geometry.geom_type != "LineString":
+        return new_element
+    start_point, end_point = geometry.coords
+    start_point, end_point = Point(start_point), Point(end_point)
+    start_support = None
+    end_support = None
+    new_start_point = None
+    new_end_point = None
+    if geometry.geom_type == "LineString":
+        new_intersections = []
+        for ib in new_element.intersections_below:
+            ib: Intersection
+            support_geom = ib.other_geometry
+            support_reaction_type = ib.other_reaction_type
+            intersecting_region = ib.intersecting_region
+            if support_geom.contains(start_point):
+                start_support = support_geom
+            if support_geom.contains(end_point):
+                end_support = support_geom
+            overlap_region = ib.other_overlap
+            if support_geom.geom_type == "Polygon" and support_reaction_type == "point":
+                # intersecting_region = support_geom.centroid
+                intersecting_region = geom_ops.get_projected_support_centroid(
+                    geometry, support_geom
+                )
+                overlap_region = support_geom.intersection(geometry)
+            elif (
+                support_geom.geom_type == "Polygon"
+                and support_reaction_type == "linear"
+            ):
+                intersecting_region = geom_ops.get_projected_support_centerline(
+                    geometry, support_geom
+                )
+                overlap_region = support_geom.intersection(geometry)
+
+            if support_geom == start_support:
+                new_start_point = intersecting_region
+            elif support_geom == end_support:
+                new_end_point = intersecting_region
+            new_intersection = Intersection(
+                intersecting_region,
+                ib.other_geometry,
+                ib.other_tag,
+                other_overlap=overlap_region,
+                other_index=ib.other_index,
+                other_reaction_type=ib.other_reaction_type,
+                other_extents=ib.other_extents,
+            )
+            new_intersections.append(new_intersection)
+        if new_start_point is None:
+            new_start_point = start_point
+        if new_end_point is None:
+            new_end_point = end_point
+        new_geom = LineString([new_start_point, new_end_point])
+        new_element.intersections_below = new_intersections
+        new_element.geometry = new_geom
     return new_element
 
 

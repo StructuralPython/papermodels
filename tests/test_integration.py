@@ -80,6 +80,14 @@ def collector_extents_to_trib_loaded_elements(load_collector_extents):
 
 
 @fixture()
+def collector_extents_to_array_loaded_elements(load_collector_extents):
+    graph = load_collector_extents
+    graph.assign_collector_behaviour(JoistArrayModel)
+    les = graph.create_loaded_elements()
+    return les
+
+
+@fixture()
 def horiz_extents_to_array_loaded_elements(load_horiz_extents):
     graph = load_horiz_extents
     graph.assign_collector_behaviour(JoistArrayModel)
@@ -145,7 +153,7 @@ def test_joists_loaded_sketch_to_scale(sketch_to_scale_to_trib_loaded_elements):
     j40_joist = les["J4.0"].model()
     with check:
         assert j40_joist["loads"]["distributed_loads"][0]["occupancy"] == "roof"
-        assert j40_joist["loads"]["distributed_loads"][0]["applied_area"] == 188.505
+        assert j40_joist["loads"]["distributed_loads"][0]["applied_area"] == 188.496
         j40_load = les["WT4.0"].model()["loads"]["distributed_loads"][0]
         assert j40_load["transfer_source"] == "J4.0"
         assert j40_load["start_loc"] == 0.573
@@ -153,8 +161,11 @@ def test_joists_loaded_sketch_to_scale(sketch_to_scale_to_trib_loaded_elements):
 
         # TODO: Update this test with what start and end locs should actually be
         fb1_3 = les["FB1.3"].model()
-        assert fb1_3["loads"]["distributed_loads"][0]["start_loc"] == 0.446
-        assert fb1_3["loads"]["distributed_loads"][0]["end_loc"] == 10.785
+        assert fb1_3["loads"]["distributed_loads"][0]["start_loc"] == 0.433
+        assert fb1_3["loads"]["distributed_loads"][0]["end_loc"] == 10.906
+
+        j1_1 = les["J1.1"].model()
+        assert j1_1["element_geometry"]["supports"][1]["overlap_length"] == 0.392
 
 
 def test_collector_extent_loads(load_collector_extents):
@@ -174,7 +185,6 @@ def test_collector_extent_creates_loaded_elements(
             "SJ0.0-4",
             "SJ0.0-5",
             "SJ0.0-6",
-            "SJ0.0-7",
             "SJ0.1",
             "WT0.0",
             "WT0.1",
@@ -210,10 +220,10 @@ def test_collector_extent_creates_loaded_elements(
         )
     with check:
         assert (
-            les["WT0.1"].model()["loads"]["distributed_loads"][0]["start_loc"] == 2.521
+            les["WT0.1"].model()["loads"]["distributed_loads"][0]["start_loc"] == 2.195
         )
     with check:
-        assert les["WT0.1"].model()["loads"]["distributed_loads"][0]["end_loc"] == 3.858
+        assert les["WT0.1"].model()["loads"]["distributed_loads"][0]["end_loc"] == 3.857
 
     with check:
         assert (
@@ -235,21 +245,28 @@ def test_collector_extent_creates_loaded_elements(
         )  # 0.327
 
     with check:
-        assert les["FB0.0"].model()["loads"]["distributed_loads"][0]["end_loc"] == 0.377
+        assert les["FB0.0"].model()["loads"]["distributed_loads"][0]["end_loc"] == 0.428
 
     with check:
         assert (
-            les["FB0.0"].model()["loads"]["distributed_loads"][1]["start_loc"] == 0.327
+            les["FB0.0"].model()["loads"]["distributed_loads"][1]["start_loc"] == 0.378
         )
 
     with check:
-        assert les["FB0.0"].model()["loads"]["distributed_loads"][1]["end_loc"] == 3.011
+        assert les["FB0.0"].model()["loads"]["distributed_loads"][1]["end_loc"] == 3.062
 
     with check:
         assert (
             les["FB0.0"].model()["loads"]["distributed_loads"][1]["transfer_source"]
             == "SJ0.0-3"
         )
+
+
+def test_collector_extents_creates_array_loaded_elements(
+    collector_extents_to_array_loaded_elements,
+):
+    les = collector_extents_to_array_loaded_elements
+    assert les
 
 
 def test_wall_point_load_locations(sketch_to_scale_to_array_loaded_elements):
@@ -280,8 +297,10 @@ def test_horiz_extents_joist_extents(horiz_extents_to_array_loaded_elements):
     db0 = les["DB0.0"].model()
     db1 = les["DB0.1"].model()
     pls = db0["loads"]["point_loads"]
-    assert pls[0]["location"] == 7.932
-    assert pls[-1]["location"] == 3.236
+    assert pls[0]["location"] == 7.83
+    assert pls[-1]["location"] == 3.134
+    assert db0['element_geometry']['supports'][0]['location'] == 0.0
+    assert db0['element_geometry']['supports'][1]['location'] == 11.609 
 
 
 def test_trib_areas_basic_loads(trib_areas_basic_loaded_elements):

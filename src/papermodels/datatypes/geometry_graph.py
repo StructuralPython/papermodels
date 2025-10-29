@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Optional
+from typing import Optional, TypeAlias, Callable
 from copy import deepcopy
 from decimal import Decimal
 import pathlib
@@ -7,7 +7,12 @@ import networkx as nx
 import hashlib
 import json
 
-from papermodels.datatypes.element import Element, LoadedElement, trim_cantilevers
+from papermodels.datatypes.element import (
+    Element,
+    LoadedElement,
+    trim_cantilevers,
+    align_frames_to_centroids,
+)
 from shapely import Point, LineString, Polygon
 from ..geometry import geom_ops as geom
 from ..datatypes.element import (
@@ -24,13 +29,34 @@ from ..paper.annotations import (
     assign_page_id_to_annotations,
     annotation_to_shapely,
 )
-from ..paper.plot import plot_annotations
+from ..paper.plot import plot_annotations, plot_elements
 from ..paper import pdf
 from ..paper import dxf
 from ..datatypes.exceptions import AnnotationError
 from rich.progress import track
 from rich import print
 import numpy.typing as npt
+
+Rule: TypeAlias = Callable
+
+
+def TRANSFER_LINES_CANNOT_INTERSECT_WITH_LINEAR_POLYGONS(
+    e: Element, inter: Intersection
+):
+    return not (
+        (
+            e.rank > 0
+            and e.geometry.geom_type == "LineString"
+            and inter.other_geometry.geom_type == "Polygon"
+            and inter.other_reaction_type == "linear"
+        )
+        or (
+            e.rank > 0
+            and e.geometry.geom_type == "Polygon"
+            and e.reaction_type == "linear"
+            and inter.other_geometry.geom_type == "LineString"
+        )
+    )
 
 
 class GeometryGraph(nx.DiGraph):
@@ -46,8 +72,7 @@ class GeometryGraph(nx.DiGraph):
     def __init__(
         self,
         do_not_process: bool = False,
-        cantilever_rel_tol: float = 2e-2,
-        cantilever_abs_tol: Optional[float] = None,
+        cantilever_abs_tol: Optional[float] = 0.2,
     ):
         super().__init__()
         self.do_not_process = do_not_process
@@ -57,7 +82,6 @@ class GeometryGraph(nx.DiGraph):
         self.raw_annotations = None
         self.legend_entries = None
         self.pdf_path = None
-        self.cantilever_rel_tol: float = cantilever_rel_tol
         self.cantilever_abs_tol: Optional[float] = cantilever_abs_tol
 
     @property
@@ -100,17 +124,19 @@ class GeometryGraph(nx.DiGraph):
         cls,
         elements: list[Element],
         do_not_process: bool = False,
-        cantilever_rel_tol: float = 2e-2,
-        cantilever_abs_tol: Optional[float] = None,
+        cantilever_abs_tol: Optional[float] = 0.2,
+        intersection_rules: Optional[list[Rule | callable]] = [
+            TRANSFER_LINES_CANNOT_INTERSECT_WITH_LINEAR_POLYGONS
+        ],
     ) -> GeometryGraph:
         """
         Returns a GeometryGraph (networkx.DiGraph) based upon the intersections and correspondents
         of the 'elements'.
         """
-        g = cls(
-            cantilever_rel_tol=cantilever_rel_tol, cantilever_abs_tol=cantilever_abs_tol
-        )
+        g = cls(cantilever_abs_tol=cantilever_abs_tol)
         elements_copy = deepcopy(elements)
+        if intersection_rules is None:
+            intersection_rules = []
         for element in elements_copy:
             hash = hashlib.sha256(str(element).encode()).hexdigest()
             start_coord = None
@@ -132,9 +158,18 @@ class GeometryGraph(nx.DiGraph):
                     j_tag = correspondent.other_tag
                     g.add_edge(element.tag, j_tag, edge_type="correspondent")
             if element.intersections_below is not None:
+                filtered_intersections = []
                 for intersection in element.intersections_below:
-                    j_tag = intersection.other_tag
-                    g.add_edge(element.tag, j_tag, edge_type="intersection")
+                    passes_intersection_rules = []
+                    for intersection_rule in intersection_rules:
+                        passes_intersection_rules.append(
+                            intersection_rule(element, intersection)
+                        )
+                    if all(passes_intersection_rules):
+                        j_tag = intersection.other_tag
+                        g.add_edge(element.tag, j_tag, edge_type="intersection")
+                        filtered_intersections.append(intersection)
+                element.intersections_below = filtered_intersections
             if element.tag in g.collector_elements:
                 for correspondent in element.correspondents_above:
                     j_tag = correspondent.other_tag
@@ -149,6 +184,7 @@ class GeometryGraph(nx.DiGraph):
         if do_not_process:
             return g
 
+        g.align_frames_to_centroids()
         g.trim_cantilevers()
         g.remove_excess_correspondent_load_paths()
         g.add_intersection_indexes_below()
@@ -156,19 +192,39 @@ class GeometryGraph(nx.DiGraph):
 
         return g
 
+    def align_frames_to_centroids(self):
+        """
+        Aligns the ends of frame elements so that they start and end on the centroids
+        of posts and walls (centerlines).
+        """
+        # Only execute on transfer elements because collector elements will be modified
+        # when collector behaviour is assigned to them.
+        transfer_nodes = self.transfer_elements
+        contiguous_nodes = self.contiguous_elements
+        nodes_to_align = set(transfer_nodes) & set(contiguous_nodes)
+        sorted_nodes = nx.topological_sort(self)
+
+        for node_name in sorted_nodes:
+            if node_name not in nodes_to_align:
+                continue
+            node = self.nodes[node_name]
+            element = node["element"]
+            new_element = align_frames_to_centroids(element)
+            node["element"] = new_element
+
     def trim_cantilevers(self):
         """
         Trims cantilevers if they are within the tolerance
         """
+        # Only execute on transfer elements because collector elements will be modified
+        # when collector behaviour is assigned to them.
         transfer_nodes = self.transfer_elements
         contiguous_nodes = self.contiguous_elements
 
         for node_name in set(transfer_nodes) & set(contiguous_nodes):
             node = self.nodes[node_name]
             element = node["element"]
-            new_element = trim_cantilevers(
-                element, self.cantilever_rel_tol, self.cantilever_abs_tol
-            )
+            new_element = trim_cantilevers(element, abs_tol=self.cantilever_abs_tol)
             node["element"] = new_element
 
     def remove_excess_correspondent_load_paths(self):
@@ -346,6 +402,7 @@ class GeometryGraph(nx.DiGraph):
                         intersection.intersecting_region,
                         self.nodes[intersection.other_tag]["element"].geometry,
                         intersection.other_tag,
+                        intersection.other_overlap,
                         0,
                         intersection.other_reaction_type,
                         other_extents=extents,
@@ -407,6 +464,7 @@ class GeometryGraph(nx.DiGraph):
                                     sub_intersection.intersecting_region,
                                     self.nodes[sub_other_tag]["element"].geometry,
                                     sub_intersection.other_tag,
+                                    sub_intersection.other_overlap,
                                     sub_local_index,
                                     other_reaction_type=element.reaction_type,
                                     other_extents=subextents[
@@ -430,6 +488,7 @@ class GeometryGraph(nx.DiGraph):
                                 intersection.intersecting_region,
                                 self.nodes[intersection.other_tag]["element"].geometry,
                                 intersection.other_tag,
+                                intersection.other_overlap,
                                 local_index,
                                 other_reaction_type=intersection.other_reaction_type,
                                 other_extents=extents.get(other_tag, None),
@@ -448,6 +507,7 @@ class GeometryGraph(nx.DiGraph):
                             intersection.intersecting_region,
                             self.nodes[intersection.other_tag]["element"].geometry,
                             intersection.other_tag,
+                            intersection.other_overlap,
                             local_index,
                             other_reaction_type=intersection.other_reaction_type,
                             other_extents=extents.get(other_tag, None),
@@ -500,6 +560,7 @@ class GeometryGraph(nx.DiGraph):
                         intersection.intersecting_region,
                         element.geometry,
                         intersection.other_tag,
+                        intersection.other_overlap,
                         local_index,
                         element_above.reaction_type,
                         other_extents=other_extents,
@@ -517,6 +578,7 @@ class GeometryGraph(nx.DiGraph):
                                         above_inter_below.intersecting_region,
                                         element.geometry,
                                         subelem_above.tag,
+                                        above_inter_below.other_overlap,
                                         above_inter_below.other_index,
                                         subelem_above.reaction_type,
                                         other_extents=other_extents,
@@ -621,7 +683,12 @@ class GeometryGraph(nx.DiGraph):
                 # are drawn. Unconnected elements have no precedents therefore they are (currently)
                 # being categorized as collectors. However, I think incompatible geometries
                 # should simply be ignored and not included as part of the processing.
-                callable_instance = element_constructor(node_element, *args, **kwargs)
+                callable_instance = element_constructor(
+                    node_element,
+                    cantilever_tolerance=self.cantilever_abs_tol,
+                    *args,
+                    **kwargs,
+                )
                 new_elem = callable_instance()
                 node_attrs["element"] = new_elem
         self.add_intersection_indexes_below()
@@ -787,8 +854,7 @@ class GeometryGraph(nx.DiGraph):
         pdf_filepath: pathlib.Path | str,
         legend_identifier: str = "legend",
         scale: Optional[Decimal] = None,
-        cantilever_rel_tol: float = 2e-2,
-        cantilever_abs_tol: Optional[float] = None,
+        cantilever_abs_tol: Optional[float] = 0.2,
         debug: bool = False,
         progress: bool = False,
         do_not_process: bool = False,
@@ -834,7 +900,6 @@ class GeometryGraph(nx.DiGraph):
             legend_identifier,
             scale=scale,
             do_not_process=do_not_process,
-            cantilever_rel_tol=cantilever_rel_tol,
             cantilever_abs_tol=cantilever_abs_tol,
         )
         graph.pdf_path = pathlib.Path(pdf_filepath).resolve()
@@ -846,8 +911,7 @@ class GeometryGraph(nx.DiGraph):
         annotations: list[Annotation],
         legend_identifier: str = "legend",
         scale: Optional[Decimal] = None,
-        cantilever_rel_tol: float = 2e-2,
-        cantilever_abs_tol: Optional[float] = None,
+        cantilever_abs_tol: Optional[float] = 0.02,
         # area_load_properties: Optional[dict] = None,
         # trib_area_properties: Optional[dict] = None,
         debug: bool = False,
@@ -960,7 +1024,6 @@ class GeometryGraph(nx.DiGraph):
         )
         graph = cls.from_elements(
             elements,
-            cantilever_rel_tol=cantilever_rel_tol,
             cantilever_abs_tol=cantilever_abs_tol,
             do_not_process=do_not_process,
         )
@@ -1025,6 +1088,29 @@ class GeometryGraph(nx.DiGraph):
             if annot.page == page_idx and annot not in self.legend_entries
         }
         return plot_annotations(annots, figsize, dpi, plot_tags=True)
+
+    def plot_elements(
+        self,
+        plane_id: int,
+        figsize: tuple[float, float] = (8, 8),
+        dpi: int = 150,
+        plot_trib_areas: bool = False,
+        plot_extent_polygons: bool = False,
+        plot_tags: bool = False,
+    ):
+        """
+        Plots all elements in the graph that are on 'page_idx'
+        """
+        elements = [self.nodes[node_name]["element"] for node_name in self.nodes.keys()]
+        elements_on_page = [e for e in elements if e.plane_id == plane_id]
+        return plot_elements(
+            elements_on_page,
+            figsize,
+            dpi,
+            plot_trib_areas=plot_trib_areas,
+            plot_extent_polygons=plot_extent_polygons,
+            plot_tags=plot_tags,
+        )
 
     def create_loaded_elements(self) -> dict[str, LoadedElement]:
         """
@@ -1172,6 +1258,5 @@ def correlate_extents(
     for idx, matched_extent in enumerate(matched_extents):
         annot = element_annot_keys[idx]
         element_geom = element_geoms[idx]
-        extent_polygon = geom.create_extent_polygon(element_geom, matched_extent)
-        element_annots_copy[annot]["extent_polygon"] = extent_polygon
+        element_annots_copy[annot]["extent_line"] = matched_extent
     return element_annots_copy

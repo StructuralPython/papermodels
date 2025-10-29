@@ -34,7 +34,7 @@ def load_frame_collectors_transfers():
 @fixture()
 def load_resi_dormers():
     graph = GeometryGraph.from_pdf_file(
-        TEST_DATA / "resi_dormers.pdf", scale=QUARTER_INCH_SCALE, cantilever_abs_tol=1.0
+        TEST_DATA / "resi_dormers.pdf", scale=QUARTER_INCH_SCALE, cantilever_abs_tol=0.3
     )
     return graph
 
@@ -141,11 +141,11 @@ def test_resi_dormers_array(load_resi_dormers):
     les = graph.create_loaded_elements()
     assert les["FB0.3"].model()["loads"]["point_loads"]
     fb03_pl = les["FB0.3"].model()["loads"]["point_loads"]
-    assert len(fb03_pl) == 7
+    assert len(fb03_pl) == 6
     rj001 = les["RJ0.0-1"].model()
     rj006 = les["RJ0.0-6"].model()
-    assert rj001["element_attributes"]["length"] == 1.242
-    assert rj006["element_attributes"]["length"] == 5.589
+    assert rj001["element_attributes"]["length"] == 0.969
+    assert rj006["element_attributes"]["length"] == 5.767
 
 
 def test_many_correspondents(load_many_correspondents):

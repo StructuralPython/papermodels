@@ -16,6 +16,7 @@ from shapely import (
     union,
     GeometryCollection,
     set_precision,
+    intersection_all,
 )
 import shapely.ops as ops
 import shapely.affinity as aff
@@ -31,7 +32,7 @@ def get_intersection(
     below: Geometry,
     below_tag: str,
     above_extent_polygon: Optional[Polygon] = None,
-) -> Optional[tuple[IntersectingGeometry, Geometry, str]]:
+) -> Optional[tuple[IntersectingGeometry, Geometry, str, Optional[Geometry]]]:
     """
     Returns the details of the intersection
     """
@@ -39,11 +40,13 @@ def get_intersection(
     i_type = above.geom_type
     j_type = below.geom_type
     i_extent = above_extent_polygon
+    overlap_region = None  # Overlap region is like the "raw" intersecting region
     if i_extent and j_type == "Polygon":
         # Goal: calculate the intersecting region as being along the centerline
         # of the linear polygon support so that, down the line, it becomes easy
         # to calculate the extents from the intersecting region
-        intersecting_region = i_extent.intersection(below)
+        intersecting_region = i_extent.intersection(below, grid_size=1e-3)
+        overlap_region = intersecting_region
         if not intersecting_region.is_empty:
             inter_centerline = get_rectangle_centerline(intersecting_region)
             support_centerline = get_rectangle_centerline(below)
@@ -56,20 +59,38 @@ def get_intersection(
             )
             intersecting_region = LineString([projected_a, projected_b])
     elif i_extent and j_type == "LineString":
-        intersecting_region = i_extent.intersection(below)
+        intersecting_region = i_extent.intersection(below, grid_size=1e-3)
+        overlap_region = intersecting_region
     elif i_type == "LineString" and j_type == "Polygon":
-        intersecting_region = above.intersection(below.exterior)
+        # intersecting_region = above.intersection(below.exterior)
+        start, end = Point(above.coords[0]), Point(above.coords[1])
+        if below.contains(start):
+            intersecting_region = start
+        elif below.contains(end):
+            intersecting_region = end
+        else:
+            intersecting_region = above.intersection(below.exterior, grid_size=1e-3)
+        overlap_region = above.intersection(below, grid_size=1e-3)
     elif i_type == "Polygon" and j_type == "LineString":
-        intersecting_region = below.intersection(above.exterior)
+        start, end = Point(below.coords[0]), Point(below.coords[1])
+        if above.contains(start):
+            intersecting_region = start
+        elif above.contains(end):
+            intersecting_region = end
+        else:
+            intersecting_region = below.intersection(above.exterior, grid_size=1e-3)
+        overlap_region = below.intersection(above, grid_size=1e-3)
         if intersecting_region.is_empty:
-            intersecting_region = below.intersection(above)
+            intersecting_region = below.intersection(above, grid_size=1e-3)
     else:
-        intersecting_region = above.intersection(below)
+        intersecting_region = above.intersection(below, grid_size=1e-3)
+        if intersecting_region.length != 0.0:
+            overlap_region = intersecting_region  # We do not want a point overlap
     if intersecting_region.is_empty:
         return None
     all_linestrings = i_type == j_type == "LineString"
     if intersecting_region.geom_type == "Point" and all_linestrings:
-        return (intersecting_region, below, below_tag)
+        return (intersecting_region, below, below_tag, overlap_region)
     elif (
         intersecting_region.geom_type == "MultiPoint"
     ):  # Line enters and exits a polygon boundary
@@ -77,22 +98,22 @@ def get_intersection(
             i_type == "LineString" and j_type == "Polygon"
         ):
             point = intersecting_region.centroid
-            return (point, below, below_tag)
+            return (point, below, below_tag, overlap_region)
         else:
             raise ValueError(
                 "Could not get intersecting region for MultiPoint. Should not see this error.\n"
                 f"{above.wkt=} | {below.wkt=}"
             )
     elif intersecting_region.geom_type == "LineString":
-        return (intersecting_region, below, below_tag)
+        return (intersecting_region, below, below_tag, overlap_region)
     elif (
         intersecting_region.geom_type == "Point"
     ):  # LineString and Polygon intersection @ boundary
-        return (intersecting_region, below, below_tag)
+        return (intersecting_region, below, below_tag, overlap_region)
     elif (
         intersecting_region.geom_type == "Polygon"
     ):  # Polygon point/line load intersecting with another polygon
-        return (intersecting_region, below, below_tag)
+        return (intersecting_region, below, below_tag, overlap_region)
     else:
         return None
 
@@ -153,7 +174,9 @@ def get_linestring_start_node(ls: LineString) -> Point:
 
 
 def clean_polygon_supports(
-    support_geoms: list[LineString | Polygon], joist_prototype: LineString
+    support_geoms: list[LineString | Polygon],
+    joist_prototype: LineString,
+    extent_polygon: Optional[Polygon] = None,
 ):
     """
     Converts any Polygon in support_geoms into LineStrings. The LineStrings
@@ -176,14 +199,19 @@ def clean_polygon_supports(
             if sum(support_intersections) == 1:  # Intersects on one edge only
                 intersecting_line_index = int(support_intersections.nonzero()[0][0])
                 support_line = support_lines[intersecting_line_index]
+                center_line = get_rectangle_centerline(support_geom)
+                if joist_prototype.intersects(center_line):
+                    support_line = center_line
                 # Ensure there are no missing intersections on the support line
                 assert support_line.intersects(joist_prototype)
-            elif sum(support_intersections) == 0:
+            elif sum(support_intersections) == 0 and not extent_polygon:
                 # assert support_geom.intersects(support_lines).any()
 
                 raise GeometryError(
                     f"The geometry {support_geom.wkt} does not intersect {joist_prototype.wkt}"
                 )
+            elif sum(support_intersections) == 0:
+                support_line = get_rectangle_centerline(support_geom)
             elif sum(support_intersections) == 2:
                 # Ensure there are no missing intersections on the support line
                 # Can sometimes be caused by a joist intersecting with a column
@@ -200,13 +228,69 @@ def clean_polygon_supports(
     return cleaned_supports
 
 
+def get_projected_support_centroid(
+    frame_element_geometry: LineString,
+    polygon_point_support: Polygon,
+) -> Point:
+    """
+    Returns a point that represents the centroid of the polygon point support
+    projected onto the vector of the frame_element_geometry. The purpose of this function
+    is to effectively "snap" the frame_element_geometry to the centroids of the its polygon
+    point supports.
+
+    This effect is desireable when papermodels is used to create "design spans" where
+    the frame elements are intended to span from center-of-support to center-of-support.
+    """
+    fg = frame_element_geometry
+    magnitude_max = 3 * fg.length
+    direction_vector = get_direction_vector(fg).flatten()
+    orig_joist_origin, orig_joist_end = get_start_end_nodes(fg)
+    # rfg -> revised_frame_geometry
+    rfg_start = project_node(orig_joist_origin, -direction_vector, magnitude_max / 2)
+    rfg_end = project_node(orig_joist_end, direction_vector, magnitude_max / 2)
+    rfg = LineString([rfg_start, rfg_end])
+    centroid = polygon_point_support.centroid
+    distance = rfg.project(centroid)
+    projected_centroid = rfg.interpolate(distance)
+    if not polygon_point_support.contains(projected_centroid):
+        raise GeometryError("Projected support centroid is outside of the polygon.")
+    return projected_centroid
+
+
+def get_projected_support_centerline(
+    frame_element_geometry: LineString,
+    polygon_linear_support: Polygon,
+) -> Point:
+    """
+    Returns a point that represents the either the direct intersection of the frame_element_geometry
+    with the centerline or, if no intersection is present, the projection of the nearest end coordinate
+    to the centerline onto the center line. The purpose of this function
+    is to effectively "snap" the frame_element_geometry to the centroids of the its polygon
+    linear supports.
+
+    This effect is desireable when papermodels is used to create "design spans" where
+    the frame elements are intended to span from center-of-support to center-of-support.
+    """
+    fg = frame_element_geometry
+    centerline = get_rectangle_centerline(polygon_linear_support)
+    if fg.intersects(centerline):
+        intersection_point = fg.intersection(centerline)
+    else:
+        intersection_point, fg_start = ops.nearest_points(centerline, fg)
+    if not centerline.intersects(intersection_point):
+        raise GeometryError(
+            f"Projected support centroid is outside of the polygon: {centerline=} | {intersection_point=}."
+        )
+    return intersection_point
+
+
 def get_joist_extents(
     joist_prototype: LineString,
     joist_supports: list[LineString],
     trib_area: Optional[Polygon] = None,
     extent_polygon: Optional[Polygon] = None,
     eps: float = 1e-6,
-) -> dict[str, tuple[Point, Point]]:
+) -> list[tuple[Point, Point]]:
     """
     Returns the extents for the supports "A" and "B". Each extent is represented by a tuple of
     Point objects which represent the "i" (start) and "j" (end) locations on the supports
@@ -266,8 +350,9 @@ def get_joist_extents(
 
     left_coords = []
     right_coords = []
+    support_intersection = intersection_all(joist_supports)
     for joist_support in joist_supports:
-        joist_support = joist_support.intersection(box(*supports_bbox))
+        joist_support = joist_support.intersection(box(*supports_bbox), grid_size=1e-3)
 
         start_coord, end_coord = joist_support.coords
         start_coord, end_coord = Point(start_coord), Point(end_coord)
@@ -278,6 +363,7 @@ def get_joist_extents(
         end_coord_rotation = cross_product_2d(
             joist_vector, np.array(end_coord.coords[0]) - orig_joist_origin
         )
+
         if start_coord_rotation == 0.0:
             if end_coord_rotation > 0.0:
                 right_coords.append(start_coord)
@@ -300,10 +386,13 @@ def get_joist_extents(
             left_coords.append(end_coord)
             right_coords.append(start_coord)
 
-    closest_left_coord = min(
+    left_coords.append(support_intersection)
+    right_coords.append(support_intersection)
+
+    closest_left_coord = min_with_none(
         left_coords, key=lambda x: x.distance(extended_joist_prototype)
     )
-    closest_right_coord = min(
+    closest_right_coord = min_with_none(
         right_coords, key=lambda x: x.distance(extended_joist_prototype)
     )
     closest_left_distance = set_precision(closest_left_coord, grid_size=1e-3).distance(
@@ -366,6 +455,21 @@ def get_joist_extents(
     return extents
 
 
+def intersecting_support_extents(
+    joist_prototype: LineString, supports: list[LineString]
+) -> list[tuple[LineString, LineString]]:
+    """
+    Returns a joist extent taking into account the self-intersection of the supports.
+    """
+    support_intersections = intersection_all(supports)
+    joist_and_supports = supports.copy()
+    joist_and_supports = [joist_prototype] + joist_and_supports
+    joist_intersections = []
+    for support in supports:
+        joist_intersections.append(joist_prototype.intersection(support))
+    return joist_intersections
+
+
 def get_cantilever_segments(
     joist_prototype: LineString,
     ordered_supports: list[LineString],
@@ -379,10 +483,28 @@ def get_cantilever_segments(
     If 'abs_tol' is given, then 'rel_tol' is ignored
     """
     joist_interior_region = convex_hull(
-        MultiLineString([geom for geom in ordered_supports])
+        GeometryCollection([geom for geom in ordered_supports])
     )
-    joist_interior = joist_interior_region & joist_prototype
+    # NOTE (2025-10-27): An attempt was made to replace 'ordered_supports' with a list of the intersection
+    # points of the joist_prototype. The idea being that it is only teh intersection points that defined
+    # the support system of cantilevers. However, this proved to carry several unintended consequences to
+    # how the geometry interacted such as when a beam intersected with both a wall and a column. It created
+    # a strange polygon which was not desired. One solution to this might be to add rules such that the
+    # beam cannot intersect a linear reaction element but this creates a problem for when we want to have
+    # that rule not apply. It just creates an error, which could be caught, but is not useful.
+    # Thus, I went back to the original implementation of using the actual support lines. This allowed
+    # all tests to pass again without creating geometry errors.
+
+    # The below commented code is an artifact of the above attempt which is preserved here as a reminder of that
+    # implementation in the event it proves to have an advantage over the current one.
+    # - CMF
+
+    # if joist_interior_region.geom_type == "LineString":
+    #     joist_interior_region = joist_interior_region.buffer(1, cap_style="flat")
+
+    joist_interior = joist_interior_region.intersection(joist_prototype, grid_size=1e-3)
     joist_interior_length = joist_interior.length
+
     cantilevers = (
         ops.split(joist_prototype, joist_interior_region) - joist_interior_region
     )
@@ -421,19 +543,27 @@ def get_cantilever_segments(
     if split_a.distance(ordered_supports[0]) < split_a.distance(ordered_supports[-1]):
         cantilever_segments = {
             "A": split_a.length,
-            "A_intersection": ordered_supports[0] & joist_prototype,
+            "A_intersection": ordered_supports[0].intersection(
+                joist_prototype, grid_size=1e-3
+            ),
             "A_orig": a_orig,
             "B": split_b.length,
-            "B_intersection": ordered_supports[-1] & joist_prototype,
+            "B_intersection": ordered_supports[-1].intersection(
+                joist_prototype, grid_size=1e-3
+            ),
             "B_orig": b_orig,
         }
     else:
         cantilever_segments = {
             "A": split_b.length,
-            "A_intersection": ordered_supports[-1] & joist_prototype,
+            "A_intersection": ordered_supports[-1].intersection(
+                joist_prototype, grid_size=1e-3
+            ),
             "A_orig": b_orig,
             "B": split_a.length,
-            "B_intersection": ordered_supports[0] & joist_prototype,
+            "B_intersection": ordered_supports[0].intersection(
+                joist_prototype, grid_size=1e-3
+            ),
             "B_orig": a_orig,
         }
     return cantilever_segments
@@ -665,16 +795,16 @@ def sort_supports(
     docstring for get_start_end_nodes for more explanation of the +ve vector direction.
     """
     all_supports = MultiLineString(supports)
-    from IPython.display import display
-
-    joist_intersections = joist_prototype & all_supports
+    joist_intersections = joist_prototype.intersection(all_supports, grid_size=1e-3)
     assert joist_intersections.geom_type != "Point"
     assert not joist_intersections.is_empty
     ordered_intersections = order_nodes_positive(joist_intersections.geoms)
     ordered_supports = []
     for point in ordered_intersections:
         for linestring in supports:
-            if linestring.buffer(1e-6).intersects(point):
+            if linestring.buffer(1e-3).intersects(
+                point
+            ):  # If using 1e-3 grid size, use 1e-3 buffer
                 ordered_supports.append(linestring)
     return ordered_supports
 
@@ -983,6 +1113,14 @@ def get_vector_angle(v1, v2) -> float:
 
 def cross_product_2d(v1, v2):
     return v1[0] * v2[1] - v2[0] * v1[1]
+
+
+def min_with_none(x: list, key=None):
+    """
+    Returns min but ignoring None
+    """
+    cleaned = [y for y in x if y is not None]
+    return min(cleaned, key=key)
 
 
 def create_linestring(points: list[tuple]) -> LineString:

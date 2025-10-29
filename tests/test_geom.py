@@ -1,7 +1,16 @@
-from shapely import Point, LineString, Polygon, Geometry, GeometryCollection, MultiPoint
+from shapely import (
+    Point,
+    LineString,
+    Polygon,
+    Geometry,
+    GeometryCollection,
+    MultiPoint,
+    box,
+)
 from shapely.affinity import translate
 from shapely import wkt
 from math import isclose
+import pytest
 
 from papermodels.geometry import geom_ops
 
@@ -64,3 +73,25 @@ def test_order_nodes_positive():
     assert geom_ops.order_nodes_positive([p4, p3]) == (p3, p4)
     assert geom_ops.order_nodes_positive([p6, p5]) == (p6, p5)
     assert geom_ops.order_nodes_positive([p2, p1]) == (p1, p2)
+
+
+def test_get_projected_support_centroid():
+    with pytest.raises(geom_ops.GeometryError):
+        col = box(5, 5, 6, 6)
+        line = LineString([[4.8, 4.2], [4.8, 6.8]])
+        pt = geom_ops.get_projected_support_centroid(line, col)
+
+    col = box(5, 5, 6, 6)
+    line = LineString([[5.2, 4.2], [5.2, 6.8]])
+    pt = geom_ops.get_projected_support_centroid(line, col)
+    assert pt.coords[0] == (5.2, 5.5)
+
+    col = box(5, 5, 6, 6)
+    line = LineString([[5.2, 4.2], [5.2, 6.8]])
+    pt = geom_ops.get_projected_support_centroid(line, col)
+    assert pt.coords[0] == (5.2, 5.5)
+
+    col = box(5, 5, 6, 6)
+    line = LineString([[3.4, 4], [6.5, 7]])
+    pt = geom_ops.get_projected_support_centroid(line, col)
+    assert pt.coords[0] == (5.234013970983343, 5.77485222998388)
