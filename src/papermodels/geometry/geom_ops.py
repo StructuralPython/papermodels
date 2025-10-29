@@ -174,7 +174,9 @@ def get_linestring_start_node(ls: LineString) -> Point:
 
 
 def clean_polygon_supports(
-    support_geoms: list[LineString | Polygon], joist_prototype: LineString
+    support_geoms: list[LineString | Polygon],
+    joist_prototype: LineString,
+    extent_polygon: Optional[Polygon] = None,
 ):
     """
     Converts any Polygon in support_geoms into LineStrings. The LineStrings
@@ -199,12 +201,14 @@ def clean_polygon_supports(
                 support_line = support_lines[intersecting_line_index]
                 # Ensure there are no missing intersections on the support line
                 assert support_line.intersects(joist_prototype)
-            elif sum(support_intersections) == 0:
+            elif sum(support_intersections) == 0 and not extent_polygon:
                 # assert support_geom.intersects(support_lines).any()
 
                 raise GeometryError(
                     f"The geometry {support_geom.wkt} does not intersect {joist_prototype.wkt}"
                 )
+            elif sum(support_intersections) == 0:
+                support_line = get_rectangle_centerline(support_geom)
             elif sum(support_intersections) == 2:
                 # Ensure there are no missing intersections on the support line
                 # Can sometimes be caused by a joist intersecting with a column

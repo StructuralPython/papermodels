@@ -2,6 +2,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import math
 from typing import Any, Optional
+import warnings
 import numpy as np
 from shapely import (
     LineString,
@@ -400,25 +401,27 @@ class JoistArrayModel:
             geom_ops.get_start_end_nodes(element.geometry)
         )
         self.element = element
+        self.extent_polygon = element.extent_polygon
         self.joist_supports = []
         for ib in element.intersections_below:
-            if not ib.other_geometry.intersects(self.joist_prototype):
+            if (
+                not ib.other_geometry.intersects(self.joist_prototype)
+                and not self.extent_polygon
+            ):
                 # This condition can exist when extent lines are used
                 continue
             if ib.other_geometry.geom_type == "Polygon":
                 support = geom_ops.clean_polygon_supports(
-                    [ib.other_geometry], self.joist_prototype
+                    [ib.other_geometry], self.joist_prototype, self.extent_polygon
                 )
                 self.joist_supports.extend(support)
             else:
                 support = ib.other_geometry
                 self.joist_supports.append(support)
-
         self.joist_support_tags = [ib.other_tag for ib in element.intersections_below]
         self.id = element.tag
         self.plane_id = element.plane_id
         self.elem_kwargs = element.kwargs
-        self.extent_polygon = element.extent_polygon
         self.spacing = (
             spacing  # Need to include this in the legend and thus, the Element
         )
@@ -602,9 +605,21 @@ class JoistArrayModel:
                 for support in self._supports
                 if support.intersects(ray_a | ray_b)
             ]
-            sorted_supports = geom_ops.sort_supports(
-                ray_a | ray_b, intersecting_supports
-            )
+            try:
+                sorted_supports = geom_ops.sort_supports(
+                    ray_a | ray_b, intersecting_supports
+                )
+            except AssertionError:
+                # This condition is hit when a particular joist geometry cannot be
+                # supported upon the supplied supports. It is skipped and a gap in
+                # the joist array will be result. The solution is for the designer
+                # to adjust their support conditions so the joist will not be
+                # skipped.
+                warnings.warn(
+                    f"No geometry generated for a joist with index={index}. Designer to "
+                    "review support conditions and make required adjustments."
+                )
+                return None
             support_a_loc = ray_a.intersection(sorted_supports[0], grid_size=1e-3)
             support_b_loc = ray_b.intersection(sorted_supports[-1], grid_size=1e-3)
 
