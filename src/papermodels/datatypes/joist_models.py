@@ -422,9 +422,23 @@ class JoistArrayModel:
             else:
                 support = ib.other_geometry
                 self.joist_supports.update({support: ib.other_reaction_type})
-        self._supports = geom_ops.sort_supports(
-            self.joist_prototype, list(self.joist_supports.keys())
-        )
+
+        # TODO: FIX THIS HACK THAT SEEMS TO ALTER THE DIRECTION OF SOME CANTILEVERS
+        if self.extent_polygon:
+            support_centroids = [geom.centroid for geom in self.joist_supports.keys()]
+            ordered_centroids = geom_ops.order_nodes_positive(support_centroids)
+            ordered_supports = []
+            for point in ordered_centroids:
+                for support in self.joist_supports.keys():
+                    if point == support.centroid:
+                        ordered_supports.append(support)
+                        break
+            self._supports = ordered_supports
+        else:
+            self._supports = geom_ops.sort_supports(
+                self.joist_prototype, self.joist_supports.keys()
+            )
+
         self.joist_support_tags = [ib.other_tag for ib in element.intersections_below]
         self.id = element.tag
         self.plane_id = element.plane_id
@@ -630,7 +644,6 @@ class JoistArrayModel:
                 return None
             support_a_loc = ray_a.intersection(sorted_supports[0], grid_size=1e-3)
             support_b_loc = ray_b.intersection(sorted_supports[-1], grid_size=1e-3)
-            print(self.element.tag, "Support locs: ", support_a_loc, support_b_loc)
             end_a = support_a_loc
             end_b = support_b_loc
         # These clauses req'd to deal with floating point error possible
@@ -645,24 +658,22 @@ class JoistArrayModel:
         cant_a = self._cantilevers["A"]
         cant_b = self._cantilevers["B"]
         if cant_a and cant_a >= self._cantilever_tolerance:
-            print(self.element.tag, "extending A")
             end_a = geom_ops.project_node(
                 support_a_loc, -self.vector_parallel, self._cantilevers["A"]
             )
         if cant_b and cant_b >= self._cantilever_tolerance:
-            print(cant_b, self._cantilever_tolerance, "extending B")
             end_b = geom_ops.project_node(
                 support_b_loc, self.vector_parallel, self._cantilevers["B"]
             )
         joist_geom = set_precision(LineString([end_a, end_b]), grid_size=1e-3)
         # With diagonal supports, it is possible the the new geom sliiiightly misses the supports. WTF. Why?
-        # This is a hack to fix that...
+        # This is a hack to fix that...TODO: BETTER SOLUTION FOR THIS HACK?
         if not all([joist_geom.intersects(support) for support in self._supports]):
             end_a = geom_ops.project_node(
-                end_a, -self.vector_parallel, self._cantilever_tolerance / 2
+                end_a, -self.vector_parallel, self._cantilever_tolerance / 10
             )
             end_b = geom_ops.project_node(
-                end_b, self.vector_parallel, self._cantilever_tolerance / 2
+                end_b, self.vector_parallel, self._cantilever_tolerance / 10
             )
             joist_geom = LineString([end_a, end_b])
         if joist_geom.length <= self._cantilever_tolerance:

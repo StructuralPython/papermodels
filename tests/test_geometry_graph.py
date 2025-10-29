@@ -145,7 +145,7 @@ def test_resi_dormers_array(load_resi_dormers):
     rj001 = les["RJ0.0-1"].model()
     rj006 = les["RJ0.0-6"].model()
     assert rj001["element_attributes"]["length"] == 0.969
-    assert rj006["element_attributes"]["length"] == 6.007
+    assert rj006["element_attributes"]["length"] == 5.767
 
 
 def test_many_correspondents(load_many_correspondents):

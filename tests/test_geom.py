@@ -1,4 +1,12 @@
-from shapely import Point, LineString, Polygon, Geometry, GeometryCollection, MultiPoint, box
+from shapely import (
+    Point,
+    LineString,
+    Polygon,
+    Geometry,
+    GeometryCollection,
+    MultiPoint,
+    box,
+)
 from shapely.affinity import translate
 from shapely import wkt
 from math import isclose
@@ -84,6 +92,6 @@ def test_get_projected_support_centroid():
     assert pt.coords[0] == (5.2, 5.5)
 
     col = box(5, 5, 6, 6)
-    line = LineString([[3.4, 4], [6.5,7]])
+    line = LineString([[3.4, 4], [6.5, 7]])
     pt = geom_ops.get_projected_support_centroid(line, col)
     assert pt.coords[0] == (5.234013970983343, 5.77485222998388)

@@ -124,7 +124,7 @@ class GeometryGraph(nx.DiGraph):
         cls,
         elements: list[Element],
         do_not_process: bool = False,
-        cantilever_abs_tol: Optional[float] = 0.02,
+        cantilever_abs_tol: Optional[float] = 0.2,
         intersection_rules: Optional[list[Rule | callable]] = [
             TRANSFER_LINES_CANNOT_INTERSECT_WITH_LINEAR_POLYGONS
         ],
@@ -854,7 +854,7 @@ class GeometryGraph(nx.DiGraph):
         pdf_filepath: pathlib.Path | str,
         legend_identifier: str = "legend",
         scale: Optional[Decimal] = None,
-        cantilever_abs_tol: Optional[float] = 0.02,
+        cantilever_abs_tol: Optional[float] = 0.2,
         debug: bool = False,
         progress: bool = False,
         do_not_process: bool = False,
