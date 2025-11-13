@@ -1301,8 +1301,8 @@ def trim_cantilevers(element: Element, abs_tol: Optional[float] = 0.02):
     the geometry and the geometry spans exactly from support to support.
     """
     new_element = deepcopy(element)
-    geometry = element.geometry
-    if geometry.geom_type == "LineString" and not element.extent_polygon:
+    geometry = joist_prototype = element.geometry
+    if geometry.geom_type == "LineString" and element.extent_line is None:
         orig_support_geoms = [ib.other_geometry for ib in element.intersections_below]
         support_geoms = geom_ops.clean_polygon_supports(orig_support_geoms, geometry)
         support_geoms = geom_ops.sort_supports(geometry, support_geoms)
@@ -1325,6 +1325,7 @@ def trim_cantilevers(element: Element, abs_tol: Optional[float] = 0.02):
         start_point, end_point = Point(ordered_geom.coords[0]), Point(
             ordered_geom.coords[-1]
         )
+
         if (cantilevers["A"] == 0.0) and (cantilevers["A"] != cantilevers["A_orig"]):
             start_point = cantilevers["A_intersection"]
         if (cantilevers["B"] == 0.0) and (cantilevers["B"] != cantilevers["B_orig"]):
