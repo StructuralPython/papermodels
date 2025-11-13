@@ -200,10 +200,18 @@ def clean_polygon_supports(
                 intersecting_line_index = int(support_intersections.nonzero()[0][0])
                 support_line = support_lines[intersecting_line_index]
                 center_line = get_rectangle_centerline(support_geom)
+
+                # Ensure the center_line is not parallel with the joist
+                j_vec = get_direction_vector(joist_prototype)
+                s_vec = get_direction_vector(center_line)
+                if np.dot(j_vec, s_vec) == 1.0:
+                    center_line = get_rectangle_centerline(
+                        support_geom, on_long_edge=True
+                    )
+
+                # If the joist intersects, then that is the support we will use
                 if joist_prototype.intersects(center_line):
                     support_line = center_line
-                # Ensure there are no missing intersections on the support line
-                assert support_line.intersects(joist_prototype)
             elif sum(support_intersections) == 0 and not extent_polygon:
                 # assert support_geom.intersects(support_lines).any()
 
@@ -541,29 +549,48 @@ def get_cantilever_segments(
         )
 
     if split_a.distance(ordered_supports[0]) < split_a.distance(ordered_supports[-1]):
+        print(joist_prototype.intersection(ordered_supports[0], grid_size=1e-3))
+        a_intersection = get_intersection(joist_prototype, ordered_supports[0], "")
+        b_intersection = get_intersection(joist_prototype, ordered_supports[-1], "")
+
+        if a_intersection is not None:
+            a_intersect = a_intersection[0]
+        else:
+            a_intersect = None
+
+        if b_intersection is not None:
+            b_intersect = b_intersection[0]
+        else:
+            b_intersect = None
+
         cantilever_segments = {
             "A": split_a.length,
-            "A_intersection": ordered_supports[0].intersection(
-                joist_prototype, grid_size=1e-3
-            ),
+            "A_intersection": a_intersect,
             "A_orig": a_orig,
             "B": split_b.length,
-            "B_intersection": ordered_supports[-1].intersection(
-                joist_prototype, grid_size=1e-3
-            ),
+            "B_intersection": b_intersect,
             "B_orig": b_orig,
         }
     else:
+        b_intersection = get_intersection(joist_prototype, ordered_supports[0], "")
+        a_intersection = get_intersection(joist_prototype, ordered_supports[-1], "")
+
+        if a_intersection is not None:
+            a_intersect = a_intersection[0]
+        else:
+            a_intersect = None
+
+        if b_intersection is not None:
+            b_intersect = b_intersection[0]
+        else:
+            b_intersect = None
+
         cantilever_segments = {
             "A": split_b.length,
-            "A_intersection": ordered_supports[-1].intersection(
-                joist_prototype, grid_size=1e-3
-            ),
+            "A_intersection": a_intersection,
             "A_orig": b_orig,
             "B": split_a.length,
-            "B_intersection": ordered_supports[0].intersection(
-                joist_prototype, grid_size=1e-3
-            ),
+            "B_intersection": b_intersection,
             "B_orig": a_orig,
         }
     return cantilever_segments
