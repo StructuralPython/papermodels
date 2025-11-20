@@ -54,7 +54,7 @@ def update_pdf_annotations(
     """
     pdf_path = pathlib.Path(pdf_path).resolve()
     with pike.open(
-        pdf_path,
+        pdf_path, allow_overwriting_input=True
     ) as pdf_obj:
         for page_idx, page_data in enumerate(pdf_obj.pages):
             rotate = page_data.get("/Rotate", None)
