@@ -71,7 +71,7 @@ class GeometryGraph(nx.DiGraph):
 
     def __init__(
         self,
-        process_gravity_frame: bool = False,
+        process_gravity_frame: bool = True,
         cantilever_abs_tol: Optional[float] = 0.2,
     ):
         super().__init__()
@@ -857,7 +857,7 @@ class GeometryGraph(nx.DiGraph):
         cantilever_abs_tol: Optional[float] = 0.2,
         debug: bool = False,
         progress: bool = False,
-        process_gravity_frame: bool = False,
+        process_gravity_frame: bool = True,
         save_tagged_pdf_file: bool = False,
         tag_pdf_file_mode: str = "append",
         show_skipped: bool = False,
