@@ -676,8 +676,19 @@ class JoistArrayModel:
                 end_b, self.vector_parallel, self._cantilever_tolerance / 10
             )
             joist_geom = LineString([end_a, end_b])
+            if not all([joist_geom.intersects(support) for support in self._supports]):
+                end_a = geom_ops.project_node(
+                    end_a, -self.vector_parallel, self._cantilever_tolerance / 10
+                )
+                end_b = geom_ops.project_node(
+                    end_b, self.vector_parallel, self._cantilever_tolerance / 10
+                )
+                joist_geom = LineString([end_a, end_b])
+
+        # A tolerance check to see if we generated a useably long joist
         if joist_geom.length <= self._cantilever_tolerance:
             return None
+
         return joist_geom
 
     def get_extent_edge(self, edge: str = "start"):

@@ -17,6 +17,7 @@ import math
 import tomli_w
 import json
 
+
 Geometry = Union[LineString, Polygon]
 
 ELEMENT_ATTRS = {
@@ -277,9 +278,17 @@ class Element:
             for idx, poly_support_geom in enumerate(support_geoms):
                 clean_support_geom = support_geoms[idx]
                 cleaned_supports_map.update({clean_support_geom: poly_support_geom})
-                ordered_support_geoms = geom_ops.sort_supports(
-                    self.geometry, support_geoms
+                assert all(
+                    [self.geometry.intersects(support) for support in support_geoms]
                 )
+                try:
+                    ordered_support_geoms = geom_ops.sort_supports(
+                        self.geometry, support_geoms
+                    )
+                except (AssertionError,):
+                    raise geom_ops.GeometryError(
+                        f"Element only has one support: {self.tag=}"
+                    )
             try:
                 extents = geom_ops.get_joist_extents(
                     self.geometry,
@@ -288,7 +297,7 @@ class Element:
                     extent_polygon=self.extent_polygon,
                 )
             except (AssertionError, ValueError) as e:
-                raise AssertionError(
+                raise geom_ops.GeometryError(
                     f"No intersection within joist extents: {self.tag=}"
                 )
             tagged_extents = {}

@@ -821,7 +821,10 @@ def sort_supports(
     docstring for get_start_end_nodes for more explanation of the +ve vector direction.
     """
     all_supports = MultiLineString(supports)
-    joist_intersections = joist_prototype.intersection(all_supports, grid_size=1e-3)
+    # joist_intersections = joist_prototype.intersection(all_supports, grid_size=1e-3)
+    joist_intersections = all_supports.intersection(joist_prototype)
+    if joist_intersections.geom_type == "Point":
+        joist_intersections = all_supports.intersection(joist_prototype, grid_size=1e-3)
     assert joist_intersections.geom_type != "Point"
     assert not joist_intersections.is_empty
     ordered_intersections = order_nodes_positive(joist_intersections.geoms)
