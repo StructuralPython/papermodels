@@ -549,7 +549,6 @@ def get_cantilever_segments(
         )
 
     if split_a.distance(ordered_supports[0]) < split_a.distance(ordered_supports[-1]):
-        print(joist_prototype.intersection(ordered_supports[0], grid_size=1e-3))
         a_intersection = get_intersection(joist_prototype, ordered_supports[0], "")
         b_intersection = get_intersection(joist_prototype, ordered_supports[-1], "")
 
