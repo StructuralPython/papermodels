@@ -53,9 +53,7 @@ def update_pdf_annotations(
     their text field updated with the assigned tag of the structural element.
     """
     pdf_path = pathlib.Path(pdf_path).resolve()
-    with pike.open(
-        pdf_path,
-    ) as pdf_obj:
+    with pike.open(pdf_path, allow_overwriting_input=True) as pdf_obj:
         for page_idx, page_data in enumerate(pdf_obj.pages):
             rotate = page_data.get("/Rotate", None)
             for annot_idx, annot in enumerate(page_data.obj.Annots):
