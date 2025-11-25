@@ -1100,6 +1100,7 @@ class GeometryGraph(nx.DiGraph):
         plot_trib_areas: bool = False,
         plot_extent_polygons: bool = False,
         plot_tags: bool = False,
+        plot_elems_by_tag: Optional[list[str]] = None
     ):
         """
         Plots all elements in the graph that are on 'page_idx'
@@ -1113,6 +1114,7 @@ class GeometryGraph(nx.DiGraph):
             plot_trib_areas=plot_trib_areas,
             plot_extent_polygons=plot_extent_polygons,
             plot_tags=plot_tags,
+            plot_elems_by_tag=plot_elems_by_tag
         )
 
     def create_loaded_elements(self) -> dict[str, LoadedElement]:
