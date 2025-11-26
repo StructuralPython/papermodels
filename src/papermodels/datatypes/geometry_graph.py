@@ -1256,14 +1256,25 @@ def correlate_extents(
     to include an 'extent_polygon' for any element_annots that have been drawn
     with an extent line or polygon.
     """
-    element_geoms = [annot_attrs["geometry"] for annot_attrs in element_annots.values()]
-    element_annot_keys = [annot for annot in element_annots.keys()]
-    extent_geoms = [annot_attrs["geometry"] for annot_attrs in extent_annots.values()]
-
-    matched_extents = geom.find_extent_intersections(element_geoms, extent_geoms)
+    page_ids = set([annot.page for annot in element_annots])
     element_annots_copy = deepcopy(element_annots)
-    for idx, matched_extent in enumerate(matched_extents):
-        annot = element_annot_keys[idx]
-        element_geom = element_geoms[idx]
-        element_annots_copy[annot]["extent_line"] = matched_extent
+    for page_id in page_ids:
+        element_geoms = [
+            annot_attrs["geometry"]
+            for annot, annot_attrs in element_annots.items()
+            if annot.page == page_id
+        ]
+        element_annot_keys = [
+            annot for annot in element_annots.keys() if annot.page == page_id
+        ]
+        extent_geoms = [
+            annot_attrs["geometry"]
+            for annot, annot_attrs in extent_annots.items()
+            if annot.page == page_id
+        ]
+
+        matched_extents = geom.find_extent_intersections(element_geoms, extent_geoms)
+        for idx, matched_extent in enumerate(matched_extents):
+            annot = element_annot_keys[idx]
+            element_annots_copy[annot]["extent_line"] = matched_extent
     return element_annots_copy
