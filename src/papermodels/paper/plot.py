@@ -20,7 +20,7 @@ def plot_elements(
     plot_trib_areas: bool = False,
     plot_extent_polygons: bool = False,
     plot_tags: bool = False,
-    plot_elems_by_tag: Optional[list[str]] = None
+    plot_elems_by_tag: Optional[list[str]] = None,
 ) -> Figure:
     """
     Plots the elements in matplotlib. Size and dpi can be adjusted
@@ -90,12 +90,11 @@ def plot_elements(
             initial_positions_x.append(po["anchor_point"][0])
             initial_positions_y.append(po["anchor_point"][1])
         else:
-            if po['tag'] in plot_elems_by_tag:
+            if po["tag"] in plot_elems_by_tag:
                 highlight_tags = True
                 tags.append(po["tag"])
                 initial_positions_x.append(po["anchor_point"][0])
                 initial_positions_y.append(po["anchor_point"][1])
-            
 
         if po["is_poly"]:
             ax.add_patch(
@@ -172,9 +171,9 @@ def plot_elements(
         min_extent[1] - plot_margin_metric * 0.05,
         max_extent[1] + plot_margin_metric * 0.05,
     )
-    text_color = 'k'
+    text_color = "k"
     if highlight_tags:
-        text_color='r'
+        text_color = "r"
     ta.allocate(
         ax=ax,
         x=initial_positions_x,
@@ -260,7 +259,7 @@ def plot_annotations(
     figsize: int | float | tuple[int | float, int | float] = (17, 11),
     dpi: float = 100,
     plot_tags: bool = False,
-    plot_annots_by_tag: Optional[list[str]] = None
+    plot_annots_by_tag: Optional[list[str]] = None,
 ) -> Figure:
     """
     Plots that annotations, 'annots' in matplotlib. Size and dpi can be adjusted

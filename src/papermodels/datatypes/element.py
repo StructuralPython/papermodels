@@ -277,9 +277,14 @@ class Element:
             for idx, poly_support_geom in enumerate(support_geoms):
                 clean_support_geom = support_geoms[idx]
                 cleaned_supports_map.update({clean_support_geom: poly_support_geom})
-                ordered_support_geoms = geom_ops.sort_supports(
-                    self.geometry, support_geoms
-                )
+                try:
+                    ordered_support_geoms = geom_ops.sort_supports(
+                        self.geometry, support_geoms
+                    )
+                except (AssertionError, ValueError):
+                    raise geom_ops.GeometryError(
+                        f"Element {self.tag} appears to have only one support intersection."
+                    )
             try:
                 extents = geom_ops.get_joist_extents(
                     self.geometry,
@@ -287,7 +292,7 @@ class Element:
                     self.trib_area,
                     extent_polygon=self.extent_polygon,
                 )
-            except (AssertionError, ValueError) as e:
+            except (geom_ops.GeometryError, AssertionError, ValueError) as e:
                 raise AssertionError(
                     f"No intersection within joist extents: {self.tag=}"
                 )
@@ -1311,9 +1316,14 @@ def trim_cantilevers(element: Element, abs_tol: Optional[float] = 0.02):
                 [Point(geometry.coords[0]), Point(geometry.coords[-1])]
             )
         )
-        cantilevers = geom_ops.get_cantilever_segments(
-            ordered_geom, support_geoms, abs_tol=abs_tol
-        )
+        try:
+            cantilevers = geom_ops.get_cantilever_segments(
+                ordered_geom, support_geoms, abs_tol=abs_tol
+            )
+        except (AssertionError, NotImplementedError, ValueError):
+            raise geom_ops.GeometryError(
+                f"Received an unexpected geometry for {element.tag} during cantilever trimming."
+            )
         # ordered_geom = LineString(
         #     geom_ops.order_nodes_positive(
         #         [Point(geometry.coords[0]), Point(geometry.coords[-1])]

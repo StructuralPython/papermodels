@@ -13,7 +13,9 @@ import numpy as np
 
 
 def load_pdf_annotations(
-    pdf_path: pathlib.Path | str, show_skipped: bool = False, show_unimplemented: bool = False
+    pdf_path: pathlib.Path | str,
+    show_skipped: bool = False,
+    show_unimplemented: bool = False,
 ) -> list[Annotation]:
     """
     Returns a lists of pdf annotations keyed by page index.
@@ -30,7 +32,11 @@ def load_pdf_annotations(
                 continue
             for annot_idx, annot in enumerate(page_data.obj.Annots):
                 pm_annot = pike_annotation_to_pm_annotation(
-                    annot, annot_idx, page_num, rotate, display_unimplemented_annots=show_unimplemented
+                    annot,
+                    annot_idx,
+                    page_num,
+                    rotate,
+                    display_unimplemented_annots=show_unimplemented,
                 )
                 if pm_annot is not None:
                     annots_in_pdf.append(pm_annot)
@@ -109,7 +115,11 @@ def compare_annotations(
 
 
 def pike_annotation_to_pm_annotation(
-    annot, annot_idx: int, page_idx: int, rotate: Optional[int] = None, display_unimplemented_annots: bool = False
+    annot,
+    annot_idx: int,
+    page_idx: int,
+    rotate: Optional[int] = None,
+    display_unimplemented_annots: bool = False,
 ) -> Optional[Annotation]:
     """
     Returns either an Annotation object or None. None is returned if:
