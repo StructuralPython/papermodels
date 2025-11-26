@@ -13,7 +13,9 @@ import numpy as np
 
 
 def load_pdf_annotations(
-    pdf_path: pathlib.Path | str, show_skipped: bool = False
+    pdf_path: pathlib.Path | str,
+    show_skipped: bool = False,
+    show_unimplemented: bool = False,
 ) -> list[Annotation]:
     """
     Returns a lists of pdf annotations keyed by page index.
@@ -30,7 +32,11 @@ def load_pdf_annotations(
                 continue
             for annot_idx, annot in enumerate(page_data.obj.Annots):
                 pm_annot = pike_annotation_to_pm_annotation(
-                    annot, annot_idx, page_num, rotate
+                    annot,
+                    annot_idx,
+                    page_num,
+                    rotate,
+                    display_unimplemented_annots=show_unimplemented,
                 )
                 if pm_annot is not None:
                     annots_in_pdf.append(pm_annot)
@@ -109,7 +115,11 @@ def compare_annotations(
 
 
 def pike_annotation_to_pm_annotation(
-    annot, annot_idx: int, page_idx: int, rotate: Optional[int] = None
+    annot,
+    annot_idx: int,
+    page_idx: int,
+    rotate: Optional[int] = None,
+    display_unimplemented_annots: bool = False,
 ) -> Optional[Annotation]:
     """
     Returns either an Annotation object or None. None is returned if:
@@ -159,7 +169,8 @@ def pike_annotation_to_pm_annotation(
         vertices = tuple(annot.get("/L", tuple()))
         annot_type = "Line"
     else:
-        print(f"Cannot read (yet): {annot_type}")
+        if display_unimplemented_annots:
+            print(f"Cannot read (yet): {annot_type}")
         return None
     if rotate == 90:
         vertex_array = geom_ops.vertices_to_array(vertices)

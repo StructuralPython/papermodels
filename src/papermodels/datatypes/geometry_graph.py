@@ -861,6 +861,7 @@ class GeometryGraph(nx.DiGraph):
         save_tagged_pdf_file: bool = False,
         tag_pdf_file_mode: str = "append",
         show_skipped: bool = False,
+        show_unimplemented: bool = False,
     ):
         """
         Returns a GeometryGraph built from that annotations in the provided PDF file
@@ -893,8 +894,12 @@ class GeometryGraph(nx.DiGraph):
         'process_gravity_frame': Processes the geometry for a gravity frame by fully
             resolving in-plane connectivity
         'show_skipped': Shows the skipped annotations that occured during pdf.load_pdf_annotations
+        'show_unimplemented': Shows the annotations that were read but are not implemented in the
+            parser yet.
         """
-        annotations = pdf.load_pdf_annotations(pdf_filepath, show_skipped)
+        annotations = pdf.load_pdf_annotations(
+            pdf_filepath, show_skipped, show_unimplemented
+        )
         graph = cls.from_annotations(
             annotations,
             legend_identifier,
@@ -1097,6 +1102,7 @@ class GeometryGraph(nx.DiGraph):
         plot_trib_areas: bool = False,
         plot_extent_polygons: bool = False,
         plot_tags: bool = False,
+        plot_elems_by_tag: Optional[list[str]] = None,
     ):
         """
         Plots all elements in the graph that are on 'page_idx'
@@ -1110,6 +1116,7 @@ class GeometryGraph(nx.DiGraph):
             plot_trib_areas=plot_trib_areas,
             plot_extent_polygons=plot_extent_polygons,
             plot_tags=plot_tags,
+            plot_elems_by_tag=plot_elems_by_tag,
         )
 
     def create_loaded_elements(self) -> dict[str, LoadedElement]:
