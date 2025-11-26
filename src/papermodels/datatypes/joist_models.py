@@ -643,7 +643,7 @@ class JoistArrayModel:
                 # to adjust their support conditions so the joist will not be
                 # skipped.
                 warnings.warn(
-                    f"No geometry generated for a joist with index={index}. Designer to "
+                    f"No geometry generated on {self.element.tag} for joist index={index}. Designer to "
                     "review support conditions and make required adjustments."
                 )
                 return None
