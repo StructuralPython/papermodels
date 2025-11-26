@@ -298,7 +298,14 @@ class Element:
                 )
             tagged_extents = {}
             for idx, extent in enumerate(extents):
-                support_geom = ordered_support_geoms[idx]
+                try:
+                    support_geom = ordered_support_geoms[idx]
+                except IndexError:
+                    raise geom_ops.GeometryError(
+                        f"Element extents does not match support geoms: {self.tag}\n"
+                        "Do you have overlayed or duplicate supports under this element (e.g. two wall elements drawn over top of each other?)"
+                        f"{extents=} | {ordered_support_geoms=}"
+                    )
                 support_start, support_end = geom_ops.get_start_end_nodes(support_geom)
                 support_tag = support_tags_by_geom[support_geom]
                 extent_start = extent[0].distance(support_start)

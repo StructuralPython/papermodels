@@ -603,7 +603,7 @@ class JoistArrayModel:
                 f"Joist index {index} is beyond the extent of the joist array for {self.id}. "
                 f"Last index is {len(self.joist_locations) - 1} @ {self.joist_locations[-1]}"
             ) from None
-
+        sorted_supports = []
         if index != 0 and index != len(self.joist_locations) - 1:
             new_centroid = geom_ops.project_node(
                 start_centroid, -self.vector_normal, joist_distance  # orig -ve
