@@ -1,6 +1,7 @@
 from copy import deepcopy
 from dataclasses import dataclass
 from typing import Optional, Union, NamedTuple
+import load_distribution as ld
 import numpy as np
 import numpy.typing as npt
 from shapely import Point, LineString, Polygon, GeometryCollection
@@ -11,11 +12,11 @@ from ..paper.annotations import (
     tag_parsed_annotations,
 )
 from ..geometry import geom_ops
-import load_distribution as ld
 import parse
 import math
 import tomli_w
 import json
+
 
 Geometry = Union[LineString, Polygon]
 
@@ -266,25 +267,16 @@ class Element:
                     tagged_extents.update({ib.other_tag: (support_start, support_end)})
         # When we have joist prototypes that have been drawn for all locations
         else:
-            support_tags_by_geom = {
-                geom_ops.clean_polygon_supports([ib.other_geometry], self.geometry)[
-                    0
-                ]: ib.other_tag
+            cleaned_support_geoms_by_tag = {
+                ib.other_tag: geom_ops.clean_polygon_supports(
+                    [ib.other_geometry], self.geometry
+                )[0]
                 for ib in self.intersections_below
             }
-            support_geoms = list(support_tags_by_geom.keys())
-            cleaned_supports_map = {}
-            for idx, poly_support_geom in enumerate(support_geoms):
-                clean_support_geom = support_geoms[idx]
-                cleaned_supports_map.update({clean_support_geom: poly_support_geom})
-                try:
-                    ordered_support_geoms = geom_ops.sort_supports(
-                        self.geometry, support_geoms
-                    )
-                except (AssertionError, ValueError):
-                    raise geom_ops.GeometryError(
-                        f"Element {self.tag} appears to have only one support intersection."
-                    )
+            ordered_tags = self.get_ordered_support_geoms(by="tag")
+            ordered_support_geoms = [
+                cleaned_support_geoms_by_tag[tag] for tag in ordered_tags
+            ]
             try:
                 extents = geom_ops.get_joist_extents(
                     self.geometry,
@@ -293,14 +285,20 @@ class Element:
                     extent_polygon=self.extent_polygon,
                 )
             except (geom_ops.GeometryError, AssertionError, ValueError) as e:
-                raise AssertionError(
-                    f"No intersection within joist extents: {self.tag=}"
+                print(
+                    f"{GeometryCollection(ordered_support_geoms).intersection(self.geometry).wkt=}"
                 )
+                print(f"{self.geometry.wkt=}")
+                # raise AssertionError(
+                #     f"No intersection within joist extents: {self.tag=}"
+                # )
+                print(f"{self.tag=}")
+                raise e
             tagged_extents = {}
             for idx, extent in enumerate(extents):
                 support_geom = ordered_support_geoms[idx]
                 support_start, support_end = geom_ops.get_start_end_nodes(support_geom)
-                support_tag = support_tags_by_geom[support_geom]
+                support_tag = ordered_tags[idx]
                 extent_start = extent[0].distance(support_start)
                 extent_end = extent[1].distance(support_start)
                 if relative:
@@ -419,6 +417,41 @@ class Element:
             )
 
         return intersection_extents | correspondent_extents
+
+    def get_ordered_support_geoms(
+        self, by: str = "geometry"
+    ) -> list[LineString | Polygon]:
+        """
+        Returns the support geoms of self in x-positive order
+
+        'by': {"geometry", "tag", "index"}:
+            when 'geometry', returns the ordered shapely geometry
+            when 'tag', returns the ordered tags
+            when 'index', returns the ordered index positions of the original list
+        """
+        sort_keys = []
+        for idx, intersection_below in enumerate(self.intersections_below):
+            intersection_below: Intersection
+            geometry = intersection_below.other_geometry
+            tag = intersection_below.other_tag
+            inter_region = intersection_below.intersecting_region
+            if inter_region.geom_type == "Point":
+                sort_keys.append((inter_region, geometry, tag, idx))
+            elif inter_region.geom_type in ("Polygon", "LineString"):
+                sort_keys.append((inter_region.centroid, geometry, tag, idx))
+        ordered_support_tups = sorted(
+            sorted(sort_keys, key=lambda x: x[0].coords[0][1]),
+            key=lambda x: x[0].coords[0][0],
+        )
+        # ordered_support_tups = sorted(sort_keys, key=lambda x: x[0].coords[0])
+        if by == "geometry":
+            return [tup[1] for tup in ordered_support_tups]
+        elif by == "tag":
+            return [tup[2] for tup in ordered_support_tups]
+        elif by == "index":
+            return [tup[3] for tup in ordered_support_tups]
+        else:
+            return [tup[1] for tup in ordered_support_tups]
 
 
 def prioritize_correspondents(
@@ -697,6 +730,7 @@ class LoadedElement(Element):
             transfer_type = intersection_above.other_reaction_type
             source_member = intersection_above.other_tag
             reaction_idx = intersection_above.other_index
+            # print(transfer_type, source_member, reaction_idx)
             if reaction_idx is None:
                 raise ValueError(
                     "The .other_index attribute within the .intersections_above list"
@@ -1310,7 +1344,7 @@ def trim_cantilevers(element: Element, abs_tol: Optional[float] = 0.02):
     if geometry.geom_type == "LineString" and element.extent_line is None:
         orig_support_geoms = [ib.other_geometry for ib in element.intersections_below]
         support_geoms = geom_ops.clean_polygon_supports(orig_support_geoms, geometry)
-        support_geoms = geom_ops.sort_supports(geometry, support_geoms)
+        support_geoms = element.get_ordered_support_geoms(by="geometry")
         ordered_geom = LineString(
             geom_ops.order_nodes_positive(
                 [Point(geometry.coords[0]), Point(geometry.coords[-1])]

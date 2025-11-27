@@ -40,7 +40,7 @@ def test_get_joist_extents():
     extents = geom_ops.get_joist_extents(j1, [ls1, ls2])
     assert (
         wkt.dumps(MultiPoint(extents[0] + extents[1]), trim=True, rounding_precision=3)
-        == "MULTIPOINT ((273.716 327.842), (20.981 304.127), (300 56), (50 4))"
+        == "MULTIPOINT ((300 56), (50 4), (273.716 327.842), (20.981 304.127))"
     )
     ls1 = LineString([[0, 0], [0, 100]])
     ls2 = LineString([[50, -20], [50, 80]])

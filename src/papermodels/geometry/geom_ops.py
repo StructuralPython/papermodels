@@ -304,7 +304,7 @@ def get_joist_extents(
     Point objects which represent the "i" (start) and "j" (end) locations on the supports
     given in 'joist_supports' which support the 'joist_prototype'.
 
-    'joist_supports' is a list of LineString where each LineString only has one line segment
+    'joist_supports' is an ORDERED list of LineString where each LineString only has one line segment
         (the relevant line segment which provides the support to 'joist_prototype')
     'trib_area' if passed, the intersection of the trib area and the support geoms
         will be used to determine the extent locations.
@@ -363,7 +363,16 @@ def get_joist_extents(
         joist_support_trim = joist_support.intersection(
             box(*supports_bbox), grid_size=1e-3
         )
-        if not joist_support_trim.geom_type == "LineString":
+        if (
+            not joist_support_trim.geom_type == "LineString"
+            or joist_support_trim.is_empty
+        ):
+            supports_bbox = get_system_bounds(
+                joist_prototype,
+                joist_supports,
+                normal=True,
+                extent_polygon=extent_polygon,
+            )
             raise GeometryError(
                 f"It seems that a support does not fully intersect with the supports bounding box.\n"
                 "Redraw your supports for this element to ensure they are either properly orthogonal to the element "
@@ -453,11 +462,11 @@ def get_joist_extents(
         ),
         grid_size=1e-3,
     )
-    ordered_joist_supports = sort_supports(joist_prototype, joist_supports)
+    # ordered_joist_supports = sort_supports(joist_prototype, joist_supports)
     extents = []
     import shapely.ops as ops
 
-    for support_linestring in ordered_joist_supports:
+    for support_linestring in joist_supports:
         support_linestring = set_precision(support_linestring, grid_size=1e-3)
 
         left_extent = support_linestring.intersection(joist_left)
@@ -830,7 +839,10 @@ def sort_supports(
     docstring for get_start_end_nodes for more explanation of the +ve vector direction.
     """
     all_supports = MultiLineString(supports)
+    for support in supports:
+        intersects = support.intersects(joist_prototype)
     joist_intersections = joist_prototype.intersection(all_supports, grid_size=1e-3)
+    # joist_intersections = all_supports.intersection(joist_prototype)
     if joist_intersections.geom_type == "Point":
         joist_intersections = all_supports.intersection(joist_prototype)
     assert joist_intersections.geom_type != "Point"
@@ -868,7 +880,11 @@ def order_nodes_positive(points: list[Point]) -> tuple[Point]:
     the following range: -pi / 2 < theta <= pi/2. This can also be thought of as a vector
     with a "positive x bias" because such a vector will never point in the -ve x direction.
     """
-    return tuple(sorted(points, key=lambda x: x.coords[0]))
+    return tuple(
+        sorted(
+            sorted(points, key=lambda x: x.coords[0][1]), key=lambda x: x.coords[0][0]
+        )
+    )
 
 
 def relate_point_to_line(point: Point, line: LineString) -> tuple:
