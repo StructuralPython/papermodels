@@ -436,8 +436,8 @@ class Element:
                 sort_keys.append((inter_region, geometry, tag, idx))
             elif inter_region.geom_type in ("Polygon", "LineString"):
                 sort_keys.append((inter_region.centroid, geometry, tag, idx))
-        # ordered_support_tups = sorted(sorted(sort_keys, key=lambda x: x[0].coords[0][1]), key=lambda x: x[0].coords[0][0])
-        ordered_support_tups = sorted(sort_keys, key=lambda x: x[0].coords[0])
+        ordered_support_tups = sorted(sorted(sort_keys, key=lambda x: x[0].coords[0][1]), key=lambda x: x[0].coords[0][0])
+        # ordered_support_tups = sorted(sort_keys, key=lambda x: x[0].coords[0])
         if by == "geometry":
             return [tup[1] for tup in ordered_support_tups]
         elif by == "tag":
