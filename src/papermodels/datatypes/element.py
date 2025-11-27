@@ -17,6 +17,7 @@ import math
 import tomli_w
 import json
 
+
 Geometry = Union[LineString, Polygon]
 
 ELEMENT_ATTRS = {

@@ -657,6 +657,7 @@ class JoistArrayModel:
             or len(intersecting_supports) < 2
         ):
             return None
+
         return joist_geom
 
     def get_extent_edge(self, edge: str = "start"):
