@@ -695,6 +695,7 @@ class JoistArrayModel:
             #     joist_geom = LineString([end_a, end_b])
         if joist_geom.length <= self._cantilever_tolerance:
             return None
+
         return joist_geom
 
     def get_extent_edge(self, edge: str = "start"):

@@ -17,6 +17,7 @@ import math
 import tomli_w
 import json
 
+
 Geometry = Union[LineString, Polygon]
 
 ELEMENT_ATTRS = {
@@ -277,6 +278,9 @@ class Element:
             for idx, poly_support_geom in enumerate(support_geoms):
                 clean_support_geom = support_geoms[idx]
                 cleaned_supports_map.update({clean_support_geom: poly_support_geom})
+                assert all(
+                    [self.geometry.intersects(support) for support in support_geoms]
+                )
                 try:
                     ordered_support_geoms = geom_ops.sort_supports(
                         self.geometry, support_geoms
