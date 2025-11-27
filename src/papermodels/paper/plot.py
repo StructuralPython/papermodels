@@ -19,7 +19,7 @@ def plot_elements(
     dpi: float = 100,
     plot_trib_areas: bool = False,
     plot_extent_polygons: bool = False,
-    plot_tags: bool = False,
+    plot_subelement_tags: bool = False,
     plot_elems_by_tag: Optional[list[str]] = None,
 ) -> Figure:
     """
@@ -84,17 +84,21 @@ def plot_elements(
             max_extent = np.maximum(max_extent, np.max(xy, axis=1))
 
         # For tagging
-
-        if plot_elems_by_tag is None:
-            tags.append(po["tag"])
-            initial_positions_x.append(po["anchor_point"][0])
-            initial_positions_y.append(po["anchor_point"][1])
-        else:
+        if plot_subelement_tags == False and plot_elems_by_tag is None:
+            if "-" not in po["tag"]:
+                tags.append(po["tag"])
+                initial_positions_x.append(po["anchor_point"][0])
+                initial_positions_y.append(po["anchor_point"][1])
+        elif plot_elems_by_tag:
             if po["tag"] in plot_elems_by_tag:
                 highlight_tags = True
                 tags.append(po["tag"])
                 initial_positions_x.append(po["anchor_point"][0])
                 initial_positions_y.append(po["anchor_point"][1])
+        else:
+            tags.append(po["tag"])
+            initial_positions_x.append(po["anchor_point"][0])
+            initial_positions_y.append(po["anchor_point"][1])
 
         if po["is_poly"]:
             ax.add_patch(

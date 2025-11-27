@@ -451,7 +451,7 @@ class GeometryGraph(nx.DiGraph):
                             )
                             if len(sub_sorted_below_ints) < 2:
                                 raise ValueError(
-                                    f"It seems that this element only has one support: {node}"
+                                    f"It seems that this element only has one support: {sub_id}"
                                 )
                             _, sub_other_tags_below = zip(*sub_sorted_below_ints)
                             sub_updated_intersections_below = []
@@ -460,6 +460,8 @@ class GeometryGraph(nx.DiGraph):
                                 sub_local_index = sub_other_tags_below.index(
                                     sub_other_tag
                                 )
+                                if sub_intersection.other_tag not in subextents:
+                                    continue
                                 new_sub_intersection = Intersection(
                                     sub_intersection.intersecting_region,
                                     self.nodes[sub_other_tag]["element"].geometry,
@@ -1101,7 +1103,7 @@ class GeometryGraph(nx.DiGraph):
         dpi: int = 150,
         plot_trib_areas: bool = False,
         plot_extent_polygons: bool = False,
-        plot_tags: bool = False,
+        plot_subelement_tags: bool = False,
         plot_elems_by_tag: Optional[list[str]] = None,
     ):
         """
@@ -1115,7 +1117,7 @@ class GeometryGraph(nx.DiGraph):
             dpi,
             plot_trib_areas=plot_trib_areas,
             plot_extent_polygons=plot_extent_polygons,
-            plot_tags=plot_tags,
+            plot_subelement_tags=plot_subelement_tags,
             plot_elems_by_tag=plot_elems_by_tag,
         )
 
