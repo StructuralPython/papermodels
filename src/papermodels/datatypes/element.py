@@ -285,9 +285,9 @@ class Element:
                     ordered_support_geoms = geom_ops.sort_supports(
                         self.geometry, support_geoms
                     )
-                except (AssertionError,):
+                except (AssertionError, ValueError):
                     raise geom_ops.GeometryError(
-                        f"Element only has one support: {self.tag=}"
+                        f"Element {self.tag} appears to have only one support intersection."
                     )
             try:
                 extents = geom_ops.get_joist_extents(
@@ -296,8 +296,8 @@ class Element:
                     self.trib_area,
                     extent_polygon=self.extent_polygon,
                 )
-            except (AssertionError, ValueError) as e:
-                raise geom_ops.GeometryError(
+            except (geom_ops.GeometryError, AssertionError, ValueError) as e:
+                raise AssertionError(
                     f"No intersection within joist extents: {self.tag=}"
                 )
             tagged_extents = {}
@@ -1320,9 +1320,14 @@ def trim_cantilevers(element: Element, abs_tol: Optional[float] = 0.02):
                 [Point(geometry.coords[0]), Point(geometry.coords[-1])]
             )
         )
-        cantilevers = geom_ops.get_cantilever_segments(
-            ordered_geom, support_geoms, abs_tol=abs_tol
-        )
+        try:
+            cantilevers = geom_ops.get_cantilever_segments(
+                ordered_geom, support_geoms, abs_tol=abs_tol
+            )
+        except (AssertionError, NotImplementedError, ValueError):
+            raise geom_ops.GeometryError(
+                f"Received an unexpected geometry for {element.tag} during cantilever trimming."
+            )
         # ordered_geom = LineString(
         #     geom_ops.order_nodes_positive(
         #         [Point(geometry.coords[0]), Point(geometry.coords[-1])]

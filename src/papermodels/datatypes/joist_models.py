@@ -435,9 +435,14 @@ class JoistArrayModel:
                         break
             self._supports = ordered_supports
         else:
-            self._supports = geom_ops.sort_supports(
-                self.joist_prototype, self.joist_supports.keys()
-            )
+            try:
+                self._supports = geom_ops.sort_supports(
+                    self.joist_prototype, self.joist_supports.keys()
+                )
+            except (AssertionError, ValueError):
+                raise geom_ops.GeometryError(
+                    f"Element {self.element.tag} appears to have only one support intersection:\n{self.element.intersections_below}"
+                )
 
         self.joist_support_tags = [ib.other_tag for ib in element.intersections_below]
         self.id = element.tag
@@ -638,7 +643,7 @@ class JoistArrayModel:
                 # to adjust their support conditions so the joist will not be
                 # skipped.
                 warnings.warn(
-                    f"No geometry generated for a joist with index={index}. Designer to "
+                    f"No geometry generated on {self.element.tag} for joist index={index}. Designer to "
                     "review support conditions and make required adjustments."
                 )
                 return None
@@ -676,16 +681,18 @@ class JoistArrayModel:
                 end_b, self.vector_parallel, self._cantilever_tolerance / 10
             )
             joist_geom = LineString([end_a, end_b])
-            if not all([joist_geom.intersects(support) for support in self._supports]):
-                end_a = geom_ops.project_node(
-                    end_a, -self.vector_parallel, self._cantilever_tolerance / 10
-                )
-                end_b = geom_ops.project_node(
-                    end_b, self.vector_parallel, self._cantilever_tolerance / 10
-                )
-                joist_geom = LineString([end_a, end_b])
+            # TODO:
+            # This will superficially break one of the tests. Do I want to add this in?
 
-        # A tolerance check to see if we generated a useably long joist
+            # if not all([joist_geom.intersects(support) for support in self._supports]):
+            #     print(self.element.tag)
+            #     end_a = geom_ops.project_node(
+            #         end_a, -self.vector_parallel, self._cantilever_tolerance / 10
+            #     )
+            #     end_b = geom_ops.project_node(
+            #         end_b, self.vector_parallel, self._cantilever_tolerance / 10
+            #     )
+            #     joist_geom = LineString([end_a, end_b])
         if joist_geom.length <= self._cantilever_tolerance:
             return None
 
@@ -758,7 +765,8 @@ class JoistArrayModel:
             )
         else:
             trib_area_right = Polygon()
-        return trib_area_left | trib_area_right
+        trib_area = trib_area_left | trib_area_right
+        return trib_area
 
     def show_svg(self, use_ipython_display: bool = True):
         """

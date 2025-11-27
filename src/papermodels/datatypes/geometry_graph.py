@@ -71,11 +71,11 @@ class GeometryGraph(nx.DiGraph):
 
     def __init__(
         self,
-        do_not_process: bool = False,
+        process_gravity_frame: bool = True,
         cantilever_abs_tol: Optional[float] = 0.2,
     ):
         super().__init__()
-        self.do_not_process = do_not_process
+        self.process_gravity_frame = process_gravity_frame
         self.node_hash = None
         self.loading_geometries = None
         self.parsed_annotations = None
@@ -123,7 +123,7 @@ class GeometryGraph(nx.DiGraph):
     def from_elements(
         cls,
         elements: list[Element],
-        do_not_process: bool = False,
+        process_gravity_frame: bool = True,
         cantilever_abs_tol: Optional[float] = 0.2,
         intersection_rules: Optional[list[Rule | callable]] = [
             TRANSFER_LINES_CANNOT_INTERSECT_WITH_LINEAR_POLYGONS
@@ -181,7 +181,7 @@ class GeometryGraph(nx.DiGraph):
         for node in g.transfer_elements:
             g.nodes[node]["element"].element_type = "transfer"
 
-        if do_not_process:
+        if not process_gravity_frame:
             return g
 
         g.align_frames_to_centroids()
@@ -704,7 +704,7 @@ class GeometryGraph(nx.DiGraph):
         polygonize_layers: Optional[list[str]] = None,
         debug: bool = False,
         progress: bool = False,
-        do_not_process: bool = False,
+        process_gravity_frame: bool = True,
         show_skipped: bool = False,
     ):
         """
@@ -719,8 +719,8 @@ class GeometryGraph(nx.DiGraph):
         'debug':  When True, will provide verbose documentation of the annotation parsing
             process to assist in reviewing errors and geometry inconsistencies.
         'progress': When True, a progress bar will be displayed
-        'do_not_process': Reads the file and adds annotations to the graph but does not
-            process the connectivity. Useful for debugging and plotting prior to processing.
+        'process_gravity_frame': Processes the geometry for a gravity frame by fully
+            resolving in-plane connectivity
         'show_skipped': Shows the skipped annotations that occured during pdf.load_pdf_annotations
         """
         if isinstance(legend_table, (str, pathlib.Path)):
@@ -789,7 +789,7 @@ class GeometryGraph(nx.DiGraph):
         elements = Element.from_parsed_annotations(
             structural_element_entries, trib_area_entries
         )
-        graph = cls.from_elements(elements, do_not_process=do_not_process)
+        graph = cls.from_elements(elements, process_gravity_frame=process_gravity_frame)
         graph.parsed_annotations = tag_parsed_annotations(parsed_annotations)
         graph.raw_annotations = tag_parsed_annotations(raw_annotations)
         graph.legend_entries = {}
@@ -857,10 +857,11 @@ class GeometryGraph(nx.DiGraph):
         cantilever_abs_tol: Optional[float] = 0.2,
         debug: bool = False,
         progress: bool = False,
-        do_not_process: bool = False,
+        process_gravity_frame: bool = True,
         save_tagged_pdf_file: bool = False,
         tag_pdf_file_mode: str = "append",
         show_skipped: bool = False,
+        show_unimplemented: bool = False,
     ):
         """
         Returns a GeometryGraph built from that annotations in the provided PDF file
@@ -890,16 +891,20 @@ class GeometryGraph(nx.DiGraph):
         'debug':  When True, will provide verbose documentation of the annotation parsing
             process to assist in reviewing errors and geometry inconsistencies.
         'progress': When True, a progress bar will be displayed
-        'do_not_process': Reads the file and adds annotations to the graph but does not
-            process the connectivity. Useful for debugging and plotting prior to processing.
+        'process_gravity_frame': Processes the geometry for a gravity frame by fully
+            resolving in-plane connectivity
         'show_skipped': Shows the skipped annotations that occured during pdf.load_pdf_annotations
+        'show_unimplemented': Shows the annotations that were read but are not implemented in the
+            parser yet.
         """
-        annotations = pdf.load_pdf_annotations(pdf_filepath, show_skipped)
+        annotations = pdf.load_pdf_annotations(
+            pdf_filepath, show_skipped, show_unimplemented
+        )
         graph = cls.from_annotations(
             annotations,
             legend_identifier,
             scale=scale,
-            do_not_process=do_not_process,
+            process_gravity_frame=process_gravity_frame,
             cantilever_abs_tol=cantilever_abs_tol,
         )
         graph.pdf_path = pathlib.Path(pdf_filepath).resolve()
@@ -916,7 +921,7 @@ class GeometryGraph(nx.DiGraph):
         # trib_area_properties: Optional[dict] = None,
         debug: bool = False,
         progress: bool = False,
-        do_not_process: bool = False,
+        process_gravity_frame: bool = False,
     ):
         """
         Returns a GeometryGraph built from the provided annotations.
@@ -945,8 +950,8 @@ class GeometryGraph(nx.DiGraph):
         'debug':  When True, will provide verbose documentation of the annotation parsing
             process to assist in reviewing errors and geometry inconsistencies.
         'progress': When True, a progress bar will be displayed
-        'do_not_process': Reads teh fille and adds annotations to the graph but does not
-            process connectivity. Useful for debugging.
+        'process_gravity_frame': Processes the geometry for a gravity frame by fully
+            resolving in-plane connectivity
         """
         annots = annotations
         page_ids = sorted(set([annot.page for annot in annots]), reverse=True)
@@ -1025,7 +1030,7 @@ class GeometryGraph(nx.DiGraph):
         graph = cls.from_elements(
             elements,
             cantilever_abs_tol=cantilever_abs_tol,
-            do_not_process=do_not_process,
+            process_gravity_frame=process_gravity_frame,
         )
         graph.parsed_annotations = tag_parsed_annotations(parsed_annotations_acc)
         graph.raw_annotations = tag_parsed_annotations(raw_annotations_acc)
@@ -1097,6 +1102,7 @@ class GeometryGraph(nx.DiGraph):
         plot_trib_areas: bool = False,
         plot_extent_polygons: bool = False,
         plot_tags: bool = False,
+        plot_elems_by_tag: Optional[list[str]] = None,
     ):
         """
         Plots all elements in the graph that are on 'page_idx'
@@ -1110,6 +1116,7 @@ class GeometryGraph(nx.DiGraph):
             plot_trib_areas=plot_trib_areas,
             plot_extent_polygons=plot_extent_polygons,
             plot_tags=plot_tags,
+            plot_elems_by_tag=plot_elems_by_tag,
         )
 
     def create_loaded_elements(self) -> dict[str, LoadedElement]:
@@ -1249,14 +1256,25 @@ def correlate_extents(
     to include an 'extent_polygon' for any element_annots that have been drawn
     with an extent line or polygon.
     """
-    element_geoms = [annot_attrs["geometry"] for annot_attrs in element_annots.values()]
-    element_annot_keys = [annot for annot in element_annots.keys()]
-    extent_geoms = [annot_attrs["geometry"] for annot_attrs in extent_annots.values()]
-
-    matched_extents = geom.find_extent_intersections(element_geoms, extent_geoms)
+    page_ids = set([annot.page for annot in element_annots])
     element_annots_copy = deepcopy(element_annots)
-    for idx, matched_extent in enumerate(matched_extents):
-        annot = element_annot_keys[idx]
-        element_geom = element_geoms[idx]
-        element_annots_copy[annot]["extent_line"] = matched_extent
+    for page_id in page_ids:
+        element_geoms = [
+            annot_attrs["geometry"]
+            for annot, annot_attrs in element_annots.items()
+            if annot.page == page_id
+        ]
+        element_annot_keys = [
+            annot for annot in element_annots.keys() if annot.page == page_id
+        ]
+        extent_geoms = [
+            annot_attrs["geometry"]
+            for annot, annot_attrs in extent_annots.items()
+            if annot.page == page_id
+        ]
+
+        matched_extents = geom.find_extent_intersections(element_geoms, extent_geoms)
+        for idx, matched_extent in enumerate(matched_extents):
+            annot = element_annot_keys[idx]
+            element_annots_copy[annot]["extent_line"] = matched_extent
     return element_annots_copy

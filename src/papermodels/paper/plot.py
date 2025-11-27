@@ -20,6 +20,7 @@ def plot_elements(
     plot_trib_areas: bool = False,
     plot_extent_polygons: bool = False,
     plot_tags: bool = False,
+    plot_elems_by_tag: Optional[list[str]] = None,
 ) -> Figure:
     """
     Plots the elements in matplotlib. Size and dpi can be adjusted
@@ -61,6 +62,7 @@ def plot_elements(
         "extent_face": (0.8, 0.7, 0.0),
         "prototype_line": "yellow",
     }
+    highlight_tags = False
     plot_objs = []
     for element in elements:
         plot_attrs = get_element_plotting_attributes(element, is_subelement=True)
@@ -82,9 +84,17 @@ def plot_elements(
             max_extent = np.maximum(max_extent, np.max(xy, axis=1))
 
         # For tagging
-        initial_positions_x.append(po["anchor_point"][0])
-        initial_positions_y.append(po["anchor_point"][1])
-        tags.append(po["tag"])
+
+        if plot_elems_by_tag is None:
+            tags.append(po["tag"])
+            initial_positions_x.append(po["anchor_point"][0])
+            initial_positions_y.append(po["anchor_point"][1])
+        else:
+            if po["tag"] in plot_elems_by_tag:
+                highlight_tags = True
+                tags.append(po["tag"])
+                initial_positions_x.append(po["anchor_point"][0])
+                initial_positions_y.append(po["anchor_point"][1])
 
         if po["is_poly"]:
             ax.add_patch(
@@ -161,6 +171,9 @@ def plot_elements(
         min_extent[1] - plot_margin_metric * 0.05,
         max_extent[1] + plot_margin_metric * 0.05,
     )
+    text_color = "k"
+    if highlight_tags:
+        text_color = "r"
     ta.allocate(
         ax=ax,
         x=initial_positions_x,
@@ -169,7 +182,7 @@ def plot_elements(
         # x_lines=lines_x,
         # y_lines=lines_y,
         textsize=8,
-        textcolor="k",
+        textcolor=text_color,
         linecolor="k",
         avoid_label_lines_overlap=True,
         avoid_crossing_label_lines=True,
@@ -246,12 +259,15 @@ def plot_annotations(
     figsize: int | float | tuple[int | float, int | float] = (17, 11),
     dpi: float = 100,
     plot_tags: bool = False,
+    plot_annots_by_tag: Optional[list[str]] = None,
 ) -> Figure:
     """
     Plots that annotations, 'annots' in matplotlib. Size and dpi can be adjusted
     to make the plot bigger/smaller. Size is in inches and dpi stands for
     "dots per inch". For a biggish plot, values of size=12, dpi=200 gives
     good results.
+
+
     """
     if isinstance(figsize, (int, float)):
         figsize = (figsize, figsize)

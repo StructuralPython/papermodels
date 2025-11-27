@@ -360,8 +360,16 @@ def get_joist_extents(
     right_coords = []
     support_intersection = intersection_all(joist_supports)
     for joist_support in joist_supports:
-        joist_support = joist_support.intersection(box(*supports_bbox), grid_size=1e-3)
-
+        joist_support_trim = joist_support.intersection(
+            box(*supports_bbox), grid_size=1e-3
+        )
+        if not joist_support_trim.geom_type == "LineString":
+            raise GeometryError(
+                f"It seems that a support does not fully intersect with the supports bounding box.\n"
+                "Redraw your supports for this element to ensure they are either properly orthogonal to the element "
+                "or are very clearly at an angle to the element."
+            )
+        joist_support = joist_support_trim
         start_coord, end_coord = joist_support.coords
         start_coord, end_coord = Point(start_coord), Point(end_coord)
 
@@ -750,7 +758,8 @@ def get_system_bounds(
                 if overlap_poly is not None:
                     if extent_polygon is not None:
                         overlap_poly = extent_polygon.intersection(overlap_poly)
-                    overlap_polys.append(overlap_poly)
+                    if overlap_poly.geom_type == "Polygon":
+                        overlap_polys.append(overlap_poly)
         return MultiPolygon(overlap_polys).bounds
 
 
@@ -821,10 +830,9 @@ def sort_supports(
     docstring for get_start_end_nodes for more explanation of the +ve vector direction.
     """
     all_supports = MultiLineString(supports)
-    # joist_intersections = joist_prototype.intersection(all_supports, grid_size=1e-3)
-    joist_intersections = all_supports.intersection(joist_prototype)
+    joist_intersections = joist_prototype.intersection(all_supports, grid_size=1e-3)
     if joist_intersections.geom_type == "Point":
-        joist_intersections = all_supports.intersection(joist_prototype, grid_size=1e-3)
+        joist_intersections = all_supports.intersection(joist_prototype)
     assert joist_intersections.geom_type != "Point"
     assert not joist_intersections.is_empty
     ordered_intersections = order_nodes_positive(joist_intersections.geoms)
