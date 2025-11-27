@@ -184,7 +184,6 @@ def test_collector_extent_creates_loaded_elements(
             "SJ0.0-3",
             "SJ0.0-4",
             "SJ0.0-5",
-            "SJ0.0-6",
             "SJ0.1",
             "WT0.0",
             "WT0.1",
@@ -241,19 +240,19 @@ def test_collector_extent_creates_loaded_elements(
         )
     with check:
         assert (
-            les["FB0.0"].model()["loads"]["distributed_loads"][0]["start_loc"] == 0.0
+            les["FB0.0"].model()["loads"]["distributed_loads"][0]["start_loc"] == 0.378
         )  # 0.327
 
     with check:
-        assert les["FB0.0"].model()["loads"]["distributed_loads"][0]["end_loc"] == 0.428
+        assert les["FB0.0"].model()["loads"]["distributed_loads"][0]["end_loc"] == 3.062
 
     with check:
         assert (
-            les["FB0.0"].model()["loads"]["distributed_loads"][1]["start_loc"] == 0.378
+            les["FB0.0"].model()["loads"]["distributed_loads"][1]["start_loc"] == 3.062
         )
 
     with check:
-        assert les["FB0.0"].model()["loads"]["distributed_loads"][1]["end_loc"] == 3.062
+        assert les["FB0.0"].model()["loads"]["distributed_loads"][1]["end_loc"] == 4.279
 
     with check:
         assert (

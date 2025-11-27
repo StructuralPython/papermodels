@@ -429,7 +429,6 @@ class JoistArrayModel:
             for tag in ordered_support_tags
         }
         self._supports = list(self.joist_supports.keys())
-        print(f"{self._supports=}")
         self.joist_support_tags = self.element.get_ordered_support_geoms(by="tag")
         self.id = element.tag
         self.plane_id = element.plane_id
@@ -618,11 +617,14 @@ class JoistArrayModel:
                 for support in self._supports
                 if support.intersects(ray_a | ray_b)
             ]
-            support_locs = (ray_a | ray_b).intersection(intersecting_supports, grid_size=1e-3)
-            ordered_intersections = geom_ops.order_nodes_positive(
-                support_locs
+            support_locs = (ray_a | ray_b).intersection(
+                intersecting_supports, grid_size=1e-3
             )
-            support_a_loc, support_b_loc = ordered_intersections[0], ordered_intersections[-1]
+            ordered_intersections = geom_ops.order_nodes_positive(support_locs)
+            support_a_loc, support_b_loc = (
+                ordered_intersections[0],
+                ordered_intersections[-1],
+            )
 
             end_a = support_a_loc
             end_b = support_b_loc
@@ -650,7 +652,10 @@ class JoistArrayModel:
                 support_b_loc, self.vector_parallel, self._cantilevers["B"]
             )
         joist_geom = set_precision(LineString([end_a, end_b]), grid_size=1e-3)
-        if joist_geom.length <= self._cantilever_tolerance or len(intersecting_supports) < 2:
+        if (
+            joist_geom.length <= self._cantilever_tolerance
+            or len(intersecting_supports) < 2
+        ):
             return None
         return joist_geom
 

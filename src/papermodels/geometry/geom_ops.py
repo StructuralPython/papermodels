@@ -304,7 +304,7 @@ def get_joist_extents(
     Point objects which represent the "i" (start) and "j" (end) locations on the supports
     given in 'joist_supports' which support the 'joist_prototype'.
 
-    'joist_supports' is a list of LineString where each LineString only has one line segment
+    'joist_supports' is an ORDERED list of LineString where each LineString only has one line segment
         (the relevant line segment which provides the support to 'joist_prototype')
     'trib_area' if passed, the intersection of the trib area and the support geoms
         will be used to determine the extent locations.
