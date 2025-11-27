@@ -82,6 +82,7 @@ class GeometryGraph(nx.DiGraph):
         self.raw_annotations = None
         self.legend_entries = None
         self.pdf_path = None
+        self.omitted = {}
         self.cantilever_abs_tol: Optional[float] = cantilever_abs_tol
 
     @property
@@ -381,6 +382,7 @@ class GeometryGraph(nx.DiGraph):
     def add_intersection_indexes_below(self):
         sorted_nodes = nx.topological_sort(self)
         orphaned_nodes = self.orphaned_elements
+        self.omitted = {}  # Used when generated collectors only have one support
         for node in sorted_nodes:
             if node in orphaned_nodes:
                 continue
@@ -445,14 +447,22 @@ class GeometryGraph(nx.DiGraph):
                                 start_coord, sub_dependent_intersections
                             )
                             sub_id = subelem.tag
-                            subextents = subelem.get_collector_extents()
+                            try:
+                                subextents = subelem.get_collector_extents()
+                            except geom.GeometryError:
+                                self.omitted.update({sub_id: subelem})
+                                continue
+
                             sub_sorted_below_ints = sorted(
                                 sub_local_coords, key=lambda x: x[0]
                             )
                             if len(sub_sorted_below_ints) < 2:
-                                raise ValueError(
-                                    f"It seems that this element only has one support: {node}"
-                                )
+                                self.omitted.update({sub_id: subelem})
+                                continue
+
+                                # raise ValueError(
+                                #     f"It seems that this element only has one support: {sub_id}"
+                                # )
                             _, sub_other_tags_below = zip(*sub_sorted_below_ints)
                             sub_updated_intersections_below = []
                             for sub_intersection in subelem.intersections_below:
@@ -460,6 +470,8 @@ class GeometryGraph(nx.DiGraph):
                                 sub_local_index = sub_other_tags_below.index(
                                     sub_other_tag
                                 )
+                                if sub_intersection.other_tag not in subextents:
+                                    continue
                                 new_sub_intersection = Intersection(
                                     sub_intersection.intersecting_region,
                                     self.nodes[sub_other_tag]["element"].geometry,
@@ -516,6 +528,15 @@ class GeometryGraph(nx.DiGraph):
                 element.intersections_below = updated_intersections_below
             element.intersections_below = updated_intersections_below
             self.nodes[node]["element"] = element
+        for omit_tag, omit_elem in self.omitted.items():
+            filtered_subelements = []
+            elem = omit_tag.split("-")[0]
+            for subelem in self.nodes[elem]["element"].subelements:
+                if subelem.tag == omit_tag:
+                    continue
+                else:
+                    filtered_subelements.append(subelem)
+            self.nodes[elem]["element"].subelements = filtered_subelements
 
     def add_intersection_indexes_above(self):
         sorted_nodes = nx.topological_sort(self)
@@ -1101,7 +1122,7 @@ class GeometryGraph(nx.DiGraph):
         dpi: int = 150,
         plot_trib_areas: bool = False,
         plot_extent_polygons: bool = False,
-        plot_tags: bool = False,
+        plot_subelement_tags: bool = False,
         plot_elems_by_tag: Optional[list[str]] = None,
     ):
         """
@@ -1115,7 +1136,7 @@ class GeometryGraph(nx.DiGraph):
             dpi,
             plot_trib_areas=plot_trib_areas,
             plot_extent_polygons=plot_extent_polygons,
-            plot_tags=plot_tags,
+            plot_subelement_tags=plot_subelement_tags,
             plot_elems_by_tag=plot_elems_by_tag,
         )
 

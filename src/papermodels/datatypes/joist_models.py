@@ -406,8 +406,9 @@ class JoistArrayModel:
         )
         self.element = element
         self.extent_polygon = element.extent_polygon
-        self.joist_supports = {}
+        self._joist_supports = {}
         for ib in element.intersections_below:
+            tag = ib.other_tag
             if (
                 not ib.other_geometry.intersects(self.joist_prototype)
                 and not self.extent_polygon
@@ -418,33 +419,17 @@ class JoistArrayModel:
                 support = geom_ops.clean_polygon_supports(
                     [ib.other_geometry], self.joist_prototype, self.extent_polygon
                 )
-                self.joist_supports.update({support[0]: ib.other_reaction_type})
+                self._joist_supports.update({tag: (support[0], ib.other_reaction_type)})
             else:
                 support = ib.other_geometry
-                self.joist_supports.update({support: ib.other_reaction_type})
-
-        # TODO: FIX THIS HACK THAT SEEMS TO ALTER THE DIRECTION OF SOME CANTILEVERS
-        if self.extent_polygon:
-            support_centroids = [geom.centroid for geom in self.joist_supports.keys()]
-            ordered_centroids = geom_ops.order_nodes_positive(support_centroids)
-            ordered_supports = []
-            for point in ordered_centroids:
-                for support in self.joist_supports.keys():
-                    if point == support.centroid:
-                        ordered_supports.append(support)
-                        break
-            self._supports = ordered_supports
-        else:
-            try:
-                self._supports = geom_ops.sort_supports(
-                    self.joist_prototype, self.joist_supports.keys()
-                )
-            except (AssertionError, ValueError):
-                raise geom_ops.GeometryError(
-                    f"Element {self.element.tag} appears to have only one support intersection:\n{self.element.intersections_below}"
-                )
-
-        self.joist_support_tags = [ib.other_tag for ib in element.intersections_below]
+                self._joist_supports.update({tag: (support, ib.other_reaction_type)})
+        ordered_support_tags = self.element.get_ordered_support_geoms(by="tag")
+        self.joist_supports = {
+            self._joist_supports[tag][0]: self._joist_supports[tag][1]
+            for tag in ordered_support_tags
+        }
+        self._supports = list(self.joist_supports.keys())
+        self.joist_support_tags = self.element.get_ordered_support_geoms(by="tag")
         self.id = element.tag
         self.plane_id = element.plane_id
         self.elem_kwargs = element.kwargs
@@ -632,23 +617,15 @@ class JoistArrayModel:
                 for support in self._supports
                 if support.intersects(ray_a | ray_b)
             ]
-            try:
-                sorted_supports = geom_ops.sort_supports(
-                    ray_a | ray_b, intersecting_supports
-                )
-            except AssertionError:
-                # This condition is hit when a particular joist geometry cannot be
-                # supported upon the supplied supports. It is skipped and a gap in
-                # the joist array will be result. The solution is for the designer
-                # to adjust their support conditions so the joist will not be
-                # skipped.
-                warnings.warn(
-                    f"No geometry generated on {self.element.tag} for joist index={index}. Designer to "
-                    "review support conditions and make required adjustments."
-                )
-                return None
-            support_a_loc = ray_a.intersection(sorted_supports[0], grid_size=1e-3)
-            support_b_loc = ray_b.intersection(sorted_supports[-1], grid_size=1e-3)
+            support_locs = (ray_a | ray_b).intersection(
+                intersecting_supports, grid_size=1e-3
+            )
+            ordered_intersections = geom_ops.order_nodes_positive(support_locs)
+            support_a_loc, support_b_loc = (
+                ordered_intersections[0],
+                ordered_intersections[-1],
+            )
+
             end_a = support_a_loc
             end_b = support_b_loc
         # These clauses req'd to deal with floating point error possible
@@ -656,9 +633,13 @@ class JoistArrayModel:
         elif index == 0:
             end_a = support_a_loc = self._extents[0][0]
             end_b = support_b_loc = self._extents[-1][0]
+            # stand-in values for so that the variable intersecting_supports exists
+            intersecting_supports = [0, 1]
         elif index == len(self.joist_locations) - 1:
             end_a = support_a_loc = self._extents[0][1]
             end_b = support_b_loc = self._extents[-1][1]
+            # stand-in values for so that the variable intersecting_supports exists
+            intersecting_supports = [0, 1]
 
         cant_a = self._cantilevers["A"]
         cant_b = self._cantilevers["B"]
@@ -671,29 +652,10 @@ class JoistArrayModel:
                 support_b_loc, self.vector_parallel, self._cantilevers["B"]
             )
         joist_geom = set_precision(LineString([end_a, end_b]), grid_size=1e-3)
-        # With diagonal supports, it is possible the the new geom sliiiightly misses the supports. WTF. Why?
-        # This is a hack to fix that...TODO: BETTER SOLUTION FOR THIS HACK?
-        if not all([joist_geom.intersects(support) for support in self._supports]):
-            end_a = geom_ops.project_node(
-                end_a, -self.vector_parallel, self._cantilever_tolerance / 10
-            )
-            end_b = geom_ops.project_node(
-                end_b, self.vector_parallel, self._cantilever_tolerance / 10
-            )
-            joist_geom = LineString([end_a, end_b])
-            # TODO:
-            # This will superficially break one of the tests. Do I want to add this in?
-
-            # if not all([joist_geom.intersects(support) for support in self._supports]):
-            #     print(self.element.tag)
-            #     end_a = geom_ops.project_node(
-            #         end_a, -self.vector_parallel, self._cantilever_tolerance / 10
-            #     )
-            #     end_b = geom_ops.project_node(
-            #         end_b, self.vector_parallel, self._cantilever_tolerance / 10
-            #     )
-            #     joist_geom = LineString([end_a, end_b])
-        if joist_geom.length <= self._cantilever_tolerance:
+        if (
+            joist_geom.length <= self._cantilever_tolerance
+            or len(intersecting_supports) < 2
+        ):
             return None
 
         return joist_geom
