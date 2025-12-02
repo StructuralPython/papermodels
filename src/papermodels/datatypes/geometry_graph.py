@@ -74,7 +74,7 @@ class GeometryGraph(nx.DiGraph):
         self,
         process_gravity_frame: bool = True,
         cantilever_abs_tol: Optional[float] = 0.2,
-        suppress_warnings: bool = False
+        suppress_warnings: bool = False,
     ):
         super().__init__()
         self.process_gravity_frame = process_gravity_frame
@@ -132,13 +132,15 @@ class GeometryGraph(nx.DiGraph):
         intersection_rules: Optional[list[Rule | callable]] = [
             TRANSFER_LINES_CANNOT_INTERSECT_WITH_LINEAR_POLYGONS
         ],
-        suppress_warnings: bool = False
+        suppress_warnings: bool = False,
     ) -> GeometryGraph:
         """
         Returns a GeometryGraph (networkx.DiGraph) based upon the intersections and correspondents
         of the 'elements'.
         """
-        g = cls(cantilever_abs_tol=cantilever_abs_tol, suppress_warnings=suppress_warnings)
+        g = cls(
+            cantilever_abs_tol=cantilever_abs_tol, suppress_warnings=suppress_warnings
+        )
         elements_copy = deepcopy(elements)
         if intersection_rules is None:
             intersection_rules = []
@@ -458,7 +460,9 @@ class GeometryGraph(nx.DiGraph):
                             except geom.GeometryError:
                                 self.omitted.update({sub_id: subelem})
                                 if not self.suppress_warnings:
-                                    warn(f"This element generated a GeometryError: {sub_id}")
+                                    warn(
+                                        f"This element generated a GeometryError: {sub_id}"
+                                    )
                                 continue
 
                             sub_sorted_below_ints = sorted(
@@ -740,7 +744,7 @@ class GeometryGraph(nx.DiGraph):
         progress: bool = False,
         process_gravity_frame: bool = True,
         show_skipped: bool = False,
-        suppress_warnings: bool = False
+        suppress_warnings: bool = False,
     ):
         """
         Returns a GeometryGraph built from the geometric entities (LINE, LWPOLYLINE, INSERT)
@@ -825,7 +829,11 @@ class GeometryGraph(nx.DiGraph):
         elements = Element.from_parsed_annotations(
             structural_element_entries, trib_area_entries
         )
-        graph = cls.from_elements(elements, process_gravity_frame=process_gravity_frame, suppress_warnings=suppress_warnings)
+        graph = cls.from_elements(
+            elements,
+            process_gravity_frame=process_gravity_frame,
+            suppress_warnings=suppress_warnings,
+        )
         graph.parsed_annotations = tag_parsed_annotations(parsed_annotations)
         graph.raw_annotations = tag_parsed_annotations(raw_annotations)
         graph.legend_entries = {}
@@ -898,7 +906,7 @@ class GeometryGraph(nx.DiGraph):
         tag_pdf_file_mode: str = "append",
         show_skipped: bool = False,
         show_unimplemented: bool = False,
-        suppress_warnings: bool = False
+        suppress_warnings: bool = False,
     ):
         """
         Returns a GeometryGraph built from that annotations in the provided PDF file
@@ -944,7 +952,7 @@ class GeometryGraph(nx.DiGraph):
             scale=scale,
             process_gravity_frame=process_gravity_frame,
             cantilever_abs_tol=cantilever_abs_tol,
-            suppress_warnings=suppress_warnings
+            suppress_warnings=suppress_warnings,
         )
         graph.pdf_path = pathlib.Path(pdf_filepath).resolve()
         return graph
@@ -961,7 +969,7 @@ class GeometryGraph(nx.DiGraph):
         debug: bool = False,
         progress: bool = False,
         process_gravity_frame: bool = False,
-        suppress_warnings: bool = False
+        suppress_warnings: bool = False,
     ):
         """
         Returns a GeometryGraph built from the provided annotations.
@@ -1073,7 +1081,7 @@ class GeometryGraph(nx.DiGraph):
             elements,
             cantilever_abs_tol=cantilever_abs_tol,
             process_gravity_frame=process_gravity_frame,
-            suppress_warnings=suppress_warnings
+            suppress_warnings=suppress_warnings,
         )
         graph.parsed_annotations = tag_parsed_annotations(parsed_annotations_acc)
         graph.raw_annotations = tag_parsed_annotations(raw_annotations_acc)
