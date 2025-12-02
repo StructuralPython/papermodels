@@ -6,6 +6,7 @@ import pathlib
 import networkx as nx
 import hashlib
 import json
+from warnings import warn
 
 from papermodels.datatypes.element import (
     Element,
@@ -73,6 +74,7 @@ class GeometryGraph(nx.DiGraph):
         self,
         process_gravity_frame: bool = True,
         cantilever_abs_tol: Optional[float] = 0.2,
+        suppress_warnings: bool = False,
     ):
         super().__init__()
         self.process_gravity_frame = process_gravity_frame
@@ -84,6 +86,7 @@ class GeometryGraph(nx.DiGraph):
         self.pdf_path = None
         self.omitted = {}
         self.cantilever_abs_tol: Optional[float] = cantilever_abs_tol
+        self.suppress_warnings = suppress_warnings
 
     @property
     def collector_elements(self):
@@ -129,12 +132,15 @@ class GeometryGraph(nx.DiGraph):
         intersection_rules: Optional[list[Rule | callable]] = [
             TRANSFER_LINES_CANNOT_INTERSECT_WITH_LINEAR_POLYGONS
         ],
+        suppress_warnings: bool = False,
     ) -> GeometryGraph:
         """
         Returns a GeometryGraph (networkx.DiGraph) based upon the intersections and correspondents
         of the 'elements'.
         """
-        g = cls(cantilever_abs_tol=cantilever_abs_tol)
+        g = cls(
+            cantilever_abs_tol=cantilever_abs_tol, suppress_warnings=suppress_warnings
+        )
         elements_copy = deepcopy(elements)
         if intersection_rules is None:
             intersection_rules = []
@@ -384,11 +390,13 @@ class GeometryGraph(nx.DiGraph):
         orphaned_nodes = self.orphaned_elements
         self.omitted = {}  # Used when generated collectors only have one support
         for node in sorted_nodes:
-            if node in orphaned_nodes:
-                continue
             node_attrs = self.nodes[node]
             element: Element = node_attrs["element"]
             dependents = list(self.successors(node))
+            if node in orphaned_nodes and element.geometry.geom_type == "LineString":
+                if len(dependents) < 2 and not self.suppress_warnings:
+                    warn(f"Orphaned element {element.tag}: only has one support.")
+                continue
             dependent_intersections = get_dependent_intersections(element, dependents)
             dependent_correspondents = get_dependent_correspondents(element, dependents)
             if not dependent_intersections and not dependent_correspondents:
@@ -451,6 +459,10 @@ class GeometryGraph(nx.DiGraph):
                                 subextents = subelem.get_collector_extents()
                             except geom.GeometryError:
                                 self.omitted.update({sub_id: subelem})
+                                if not self.suppress_warnings:
+                                    warn(
+                                        f"This element generated a GeometryError: {sub_id}"
+                                    )
                                 continue
 
                             sub_sorted_below_ints = sorted(
@@ -458,6 +470,11 @@ class GeometryGraph(nx.DiGraph):
                             )
                             if len(sub_sorted_below_ints) < 2:
                                 self.omitted.update({sub_id: subelem})
+                                if not self.suppress_warnings:
+                                    warn(
+                                        f"It seems that this subelement only has one support: {sub_id}\n"
+                                        "This is likely due to a floating point error at the edge of one of the supports.\n"
+                                    )
                                 continue
 
                                 # raise ValueError(
@@ -727,6 +744,7 @@ class GeometryGraph(nx.DiGraph):
         progress: bool = False,
         process_gravity_frame: bool = True,
         show_skipped: bool = False,
+        suppress_warnings: bool = False,
     ):
         """
         Returns a GeometryGraph built from the geometric entities (LINE, LWPOLYLINE, INSERT)
@@ -743,6 +761,7 @@ class GeometryGraph(nx.DiGraph):
         'process_gravity_frame': Processes the geometry for a gravity frame by fully
             resolving in-plane connectivity
         'show_skipped': Shows the skipped annotations that occured during pdf.load_pdf_annotations
+        'suppress_warnings': Do not show user warnings during post-processing
         """
         if isinstance(legend_table, (str, pathlib.Path)):
             legend_table_path = pathlib.Path(legend_table)
@@ -810,7 +829,11 @@ class GeometryGraph(nx.DiGraph):
         elements = Element.from_parsed_annotations(
             structural_element_entries, trib_area_entries
         )
-        graph = cls.from_elements(elements, process_gravity_frame=process_gravity_frame)
+        graph = cls.from_elements(
+            elements,
+            process_gravity_frame=process_gravity_frame,
+            suppress_warnings=suppress_warnings,
+        )
         graph.parsed_annotations = tag_parsed_annotations(parsed_annotations)
         graph.raw_annotations = tag_parsed_annotations(raw_annotations)
         graph.legend_entries = {}
@@ -883,6 +906,7 @@ class GeometryGraph(nx.DiGraph):
         tag_pdf_file_mode: str = "append",
         show_skipped: bool = False,
         show_unimplemented: bool = False,
+        suppress_warnings: bool = False,
     ):
         """
         Returns a GeometryGraph built from that annotations in the provided PDF file
@@ -917,6 +941,7 @@ class GeometryGraph(nx.DiGraph):
         'show_skipped': Shows the skipped annotations that occured during pdf.load_pdf_annotations
         'show_unimplemented': Shows the annotations that were read but are not implemented in the
             parser yet.
+        'suppress_warnings': Do not show user warnings during post-processing
         """
         annotations = pdf.load_pdf_annotations(
             pdf_filepath, show_skipped, show_unimplemented
@@ -927,6 +952,7 @@ class GeometryGraph(nx.DiGraph):
             scale=scale,
             process_gravity_frame=process_gravity_frame,
             cantilever_abs_tol=cantilever_abs_tol,
+            suppress_warnings=suppress_warnings,
         )
         graph.pdf_path = pathlib.Path(pdf_filepath).resolve()
         return graph
@@ -943,6 +969,7 @@ class GeometryGraph(nx.DiGraph):
         debug: bool = False,
         progress: bool = False,
         process_gravity_frame: bool = False,
+        suppress_warnings: bool = False,
     ):
         """
         Returns a GeometryGraph built from the provided annotations.
@@ -973,6 +1000,8 @@ class GeometryGraph(nx.DiGraph):
         'progress': When True, a progress bar will be displayed
         'process_gravity_frame': Processes the geometry for a gravity frame by fully
             resolving in-plane connectivity
+        'suppress_warnings': Do not show user warnings when performing gravity frame
+            post-processing
         """
         annots = annotations
         page_ids = sorted(set([annot.page for annot in annots]), reverse=True)
@@ -1052,6 +1081,7 @@ class GeometryGraph(nx.DiGraph):
             elements,
             cantilever_abs_tol=cantilever_abs_tol,
             process_gravity_frame=process_gravity_frame,
+            suppress_warnings=suppress_warnings,
         )
         graph.parsed_annotations = tag_parsed_annotations(parsed_annotations_acc)
         graph.raw_annotations = tag_parsed_annotations(raw_annotations_acc)
