@@ -667,11 +667,39 @@ class JoistArrayModel:
         'edge': one of {'start', 'end'}
         """
         if edge == "start":
-            node_i = self._extents[0][0]
-            node_j = self._extents[1][0]
+            try:
+                node_i = self._extents[0][0]
+            except IndexError:
+                raise geom_ops.GeometryError(
+                    f"The collector element {self.element.tag} seems to have only one support (at the end of the member).\n"
+                    "Please review the geometry and correct it in your source sketch by ensuring the element extends past"
+                    " the centerline of the supporting element."
+                )
+            try:
+                node_j = self._extents[1][0]
+            except IndexError:
+                raise geom_ops.GeometryError(
+                    f"The collector element {self.element.tag} seems to have only one support (at the start of the member).\n"
+                    "Please review the geometry and correct it in your source sketch by ensuring the element extends past"
+                    " the centerline of the supporting element."
+                )
         elif edge == "end":
-            node_i = self._extents[0][1]
-            node_j = self._extents[1][1]
+            try:
+                node_i = self._extents[0][1]
+            except IndexError:
+                raise geom_ops.GeometryError(
+                    f"The collector element {self.element.tag} seems to have only one support (at the end of the member).\n"
+                    "Please review the geometry and correct it in your source sketch by ensuring the element extends past"
+                    " the centerline of the supporting element."
+                )
+            try:
+                node_j = self._extents[1][1]
+            except IndexError:
+                raise geom_ops.GeometryError(
+                    f"The collector element {self.element.tag} seems to have only one support (at the start of the member).\n"
+                    "Please review the geometry and correct it in your source sketch by ensuring the element extends past"
+                    " the centerline of the supporting element."
+                )
         return LineString([node_i, node_j])
 
     def get_joist_trib_widths(self, index) -> tuple[float, float]:
