@@ -284,7 +284,7 @@ class Element:
                     self.trib_area,
                     extent_polygon=self.extent_polygon,
                 )
-            except (geom_ops.GeometryError, AssertionError, ValueError) as e:
+            except (geom_ops.GeometryError, AssertionError, ValueError, TypeError) as e:
                 print(
                     f"{GeometryCollection(ordered_support_geoms).intersection(self.geometry).wkt=}"
                 )

@@ -243,20 +243,35 @@ def parse_content_stream(stream: str) -> dict[str, list]:
     operators will only have one entry).
     """
     commands = {}
-    operand_with_operator = re.compile(r"[0-9.\s]+[a-zA-Z]+")
-    operators = re.compile(f"[a-zA-Z]+")
-    operands = re.compile(r"[\d.]+")
+    operand_with_operator = re.compile(r"([\d+\s*|\d+\.\d+\s*]*)([A-Za-z]{1,2})\s*")
+    operators_pattern = re.compile(r"[a-zA-Z]+")
+    operands_pattern = re.compile(r"[\d.]+")
+    floats_pattern = re.compile(r"^\d+\.\d+$")
+    integers_pattern = re.compile(r"^\d+$")
 
     matches = operand_with_operator.findall(stream)
     for match in matches:
-        operator = operators.findall(match)[0]
-        operand = operands.findall(match)
+        # operator = operators.findall(match)[0]
+        # operand = operands.findall(match)
+        operands, operator = match
         numerical_operands = []
-        for element in operand:
-            if "." in element:
+        operands_matches = operands_pattern.findall(operands)
+        for element in operands_matches:
+            element = element.strip()
+            float_match = floats_pattern.search(element)
+            integer_match = integers_pattern.search(element)
+            if float_match is not None:
                 elem = Decimal(element)
-            else:
+            elif integer_match is not None:
                 elem = int(element)
+
+            # try:
+            #     elem = Decimal(element)
+            # except Exception as e:
+            #     print(element, type(element), "." in element)
+            #     raise e
+            # else:
+            #     elem = int(element)
             numerical_operands.append(elem)
         commands.update({operator: numerical_operands})
     return commands
