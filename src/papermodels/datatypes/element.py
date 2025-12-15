@@ -727,7 +727,6 @@ class LoadedElement(Element):
             transfer_type = intersection_above.other_reaction_type
             source_member = intersection_above.other_tag
             reaction_idx = intersection_above.other_index
-            # print(transfer_type, source_member, reaction_idx)
             if reaction_idx is None:
                 raise ValueError(
                     "The .other_index attribute within the .intersections_above list"
@@ -1372,7 +1371,6 @@ def trim_cantilevers(element: Element, abs_tol: Optional[float] = 0.02):
         if (cantilevers["B"] == 0.0) and (cantilevers["B"] != cantilevers["B_orig"]):
             end_point = cantilevers["B_intersection"]
         try:
-            print(f"{cantilevers=}")
             new_geometry = LineString([start_point, end_point])  # type: ignore
         except TypeError:
             raise geom_ops.GeometryError(
