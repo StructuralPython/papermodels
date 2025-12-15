@@ -144,8 +144,25 @@ def pike_annotation_to_pm_annotation(
         annot_type = str(annot["/Subj"])
     else:
         return None
-    if annot_type.lower() in ("polygon", "polyline", "circle", "ellipse"):
+    if annot_type.lower() in ("polygon", "polyline"):
         vertices = tuple(annot.get("/Vertices", tuple()))
+    elif annot_type.lower() in ("circle", "ellipse"):
+        annot_type = "Polygon"
+        rect = tuple(annot.get("/Rect", tuple()))
+        x1, y1, x2, y2 = rect
+        h = (x1 + x2) / 2
+        k = (y1 + y2) / 2
+        a = (x2 - x1) / 2
+        b = (y2 - y1) / 2
+        n = 16
+        x_vertices = float(h) + float(a) * np.cos(np.linspace(0, 2*np.pi, n))
+        y_vertices = float(k) + float(b) * np.sin(np.linspace(0, 2*np.pi, n))
+        vertices = []
+        for idx, x_vertex in enumerate(x_vertices):
+            vertices.append(Decimal(x_vertex))
+            y_vertex = y_vertices[idx]
+            vertices.append(Decimal(y_vertex))
+
     elif annot_type.lower() in (
         "rectangle",
         "square",
@@ -262,17 +279,10 @@ def parse_content_stream(stream: str) -> dict[str, list]:
             integer_match = integers_pattern.search(element)
             if float_match is not None:
                 elem = Decimal(element)
+                numerical_operands.append(elem)
             elif integer_match is not None:
                 elem = int(element)
-
-            # try:
-            #     elem = Decimal(element)
-            # except Exception as e:
-            #     print(element, type(element), "." in element)
-            #     raise e
-            # else:
-            #     elem = int(element)
-            numerical_operands.append(elem)
+                numerical_operands.append(elem)
         commands.update({operator: numerical_operands})
     return commands
 
