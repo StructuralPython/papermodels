@@ -381,8 +381,10 @@ class GeometryGraph(nx.DiGraph):
             if (
                 element.geometry.geom_type == "LineString"
                 and intersection_points_in_polygon_below
+
             ):
-                for edge in intersection_points_in_polygon_below:
+                inters_below_set = set(intersection_points_in_polygon_below)
+                for edge in inters_below_set:
                     self.remove_edge(*edge)
 
     def add_intersection_indexes_below(self):
