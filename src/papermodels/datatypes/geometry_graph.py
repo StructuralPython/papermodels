@@ -261,6 +261,11 @@ class GeometryGraph(nx.DiGraph):
             frame element transferring load to the supporting frame element. The correct load
             path should be |FB0.1 -> FB0.2 -> column| instead of |FB0.1 -> column| with
             |FB0.1 -> FB0.2 -> column| also.
+        4. A Polygon node, with "linear" reaction type, that is intersecting with LineString
+            elements that run perpendicular to it. This can occur if a beam is drawn to
+            transfer out a wall from above but that same beam has other beams framing into
+            it perpendicular. We do not want the wall to transfer out to these other beams
+            at the intersection points.
 
         Modifications to the implementation of this function can adjust how load paths are
         conceptually created. For example, to implement baloon framing, the second rule
@@ -386,6 +391,23 @@ class GeometryGraph(nx.DiGraph):
                 inters_below_set = set(intersection_points_in_polygon_below)
                 for edge in inters_below_set:
                     self.remove_edge(*edge)
+
+            # Rule 4
+            if (
+                element.geometry.geom_type == "Polygon"
+                and element.reaction_type == "linear"
+                and "intersection" in edge_properties
+            ):
+                center_line = geom.get_rectangle_centerline(
+                    element.geometry
+                )
+                for idx, dep in enumerate(dependents):
+                    dep_geom = self.nodes[dep]["element"].geometry
+                    if dep_geom.geom_type == "LineString":
+                        is_roughly_parallel = geom.check_2d_linestring_parallel(center_line, dep_geom, tol=0.01)
+                        if not is_roughly_parallel:
+                            self.remove_edge(element.tag, dep)
+                        
 
     def add_intersection_indexes_below(self):
         sorted_nodes = nx.topological_sort(self)

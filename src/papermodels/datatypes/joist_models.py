@@ -621,6 +621,11 @@ class JoistArrayModel:
                 intersecting_supports, grid_size=1e-3
             )
             ordered_intersections = geom_ops.order_nodes_positive(support_locs)
+            if len(ordered_intersections) < 2:
+                return None
+                raise geom_ops.GeometryError(
+                    f"Joist prototype {self.element.tag} is not intersecting correctly."
+                )
             support_a_loc, support_b_loc = (
                 ordered_intersections[0],
                 ordered_intersections[-1],
