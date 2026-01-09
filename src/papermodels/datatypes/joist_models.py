@@ -639,12 +639,12 @@ class JoistArrayModel:
             end_a = support_a_loc = self._extents[0][0]
             end_b = support_b_loc = self._extents[-1][0]
             # stand-in values for so that the variable intersecting_supports exists
-            intersecting_supports = [0, 1]
+            intersecting_supports = [0, 1] # bug: These allow joists to exist beyond the edge of the support for start and end joists
         elif index == len(self.joist_locations) - 1:
             end_a = support_a_loc = self._extents[0][1]
             end_b = support_b_loc = self._extents[-1][1]
             # stand-in values for so that the variable intersecting_supports exists
-            intersecting_supports = [0, 1]
+            intersecting_supports = [0, 1] # bug: These allow joists to exist beyond the edge of the support for start and end joists
 
         cant_a = self._cantilevers["A"]
         cant_b = self._cantilevers["B"]
