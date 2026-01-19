@@ -621,6 +621,11 @@ class JoistArrayModel:
                 intersecting_supports, grid_size=1e-3
             )
             ordered_intersections = geom_ops.order_nodes_positive(support_locs)
+            if len(ordered_intersections) < 2:
+                return None
+                raise geom_ops.GeometryError(
+                    f"Joist prototype {self.element.tag} is not intersecting correctly."
+                )
             support_a_loc, support_b_loc = (
                 ordered_intersections[0],
                 ordered_intersections[-1],
@@ -634,12 +639,18 @@ class JoistArrayModel:
             end_a = support_a_loc = self._extents[0][0]
             end_b = support_b_loc = self._extents[-1][0]
             # stand-in values for so that the variable intersecting_supports exists
-            intersecting_supports = [0, 1]
+            intersecting_supports = [
+                0,
+                1,
+            ]  # bug: These allow joists to exist beyond the edge of the support for start and end joists
         elif index == len(self.joist_locations) - 1:
             end_a = support_a_loc = self._extents[0][1]
             end_b = support_b_loc = self._extents[-1][1]
             # stand-in values for so that the variable intersecting_supports exists
-            intersecting_supports = [0, 1]
+            intersecting_supports = [
+                0,
+                1,
+            ]  # bug: These allow joists to exist beyond the edge of the support for start and end joists
 
         cant_a = self._cantilevers["A"]
         cant_b = self._cantilevers["B"]

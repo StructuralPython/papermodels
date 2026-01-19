@@ -144,8 +144,25 @@ def pike_annotation_to_pm_annotation(
         annot_type = str(annot["/Subj"])
     else:
         return None
-    if annot_type.lower() in ("polygon", "polyline", "circle", "ellipse"):
+    if annot_type.lower() in ("polygon", "polyline"):
         vertices = tuple(annot.get("/Vertices", tuple()))
+    elif annot_type.lower() in ("circle", "ellipse"):
+        annot_type = "Polygon"
+        rect = tuple(annot.get("/Rect", tuple()))
+        x1, y1, x2, y2 = rect
+        h = (x1 + x2) / 2
+        k = (y1 + y2) / 2
+        a = (x2 - x1) / 2
+        b = (y2 - y1) / 2
+        n = 16
+        x_vertices = float(h) + float(a) * np.cos(np.linspace(0, 2 * np.pi, n))
+        y_vertices = float(k) + float(b) * np.sin(np.linspace(0, 2 * np.pi, n))
+        vertices = []
+        for idx, x_vertex in enumerate(x_vertices):
+            vertices.append(Decimal(x_vertex))
+            y_vertex = y_vertices[idx]
+            vertices.append(Decimal(y_vertex))
+
     elif annot_type.lower() in (
         "rectangle",
         "square",
@@ -243,21 +260,29 @@ def parse_content_stream(stream: str) -> dict[str, list]:
     operators will only have one entry).
     """
     commands = {}
-    operand_with_operator = re.compile(r"[0-9.\s]+[a-zA-Z]+")
-    operators = re.compile(f"[a-zA-Z]+")
-    operands = re.compile(r"[\d.]+")
+    operand_with_operator = re.compile(r"([\d+\s*|\d+\.\d+\s*]*)([A-Za-z]{1,2})\s*")
+    operators_pattern = re.compile(r"[a-zA-Z]+")
+    operands_pattern = re.compile(r"[\d.]+")
+    floats_pattern = re.compile(r"^\d+\.\d+$")
+    integers_pattern = re.compile(r"^\d+$")
 
     matches = operand_with_operator.findall(stream)
     for match in matches:
-        operator = operators.findall(match)[0]
-        operand = operands.findall(match)
+        # operator = operators.findall(match)[0]
+        # operand = operands.findall(match)
+        operands, operator = match
         numerical_operands = []
-        for element in operand:
-            if "." in element:
+        operands_matches = operands_pattern.findall(operands)
+        for element in operands_matches:
+            element = element.strip()
+            float_match = floats_pattern.search(element)
+            integer_match = integers_pattern.search(element)
+            if float_match is not None:
                 elem = Decimal(element)
-            else:
+                numerical_operands.append(elem)
+            elif integer_match is not None:
                 elem = int(element)
-            numerical_operands.append(elem)
+                numerical_operands.append(elem)
         commands.update({operator: numerical_operands})
     return commands
 

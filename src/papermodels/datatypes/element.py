@@ -284,16 +284,13 @@ class Element:
                     self.trib_area,
                     extent_polygon=self.extent_polygon,
                 )
-            except (geom_ops.GeometryError, AssertionError, ValueError) as e:
-                print(
-                    f"{GeometryCollection(ordered_support_geoms).intersection(self.geometry).wkt=}"
+            except (geom_ops.GeometryError, AssertionError, ValueError, TypeError):
+                support_intersections = f"{GeometryCollection(ordered_support_geoms).intersection(self.geometry).wkt=}"
+                geometry = f"{self.geometry.wkt=}"
+                tag = f"{self.tag=}"
+                raise geom_ops.GeometryError(
+                    f"Debug information:{tag=}\n{geometry=}\n{support_intersections=}"
                 )
-                print(f"{self.geometry.wkt=}")
-                # raise AssertionError(
-                #     f"No intersection within joist extents: {self.tag=}"
-                # )
-                print(f"{self.tag=}")
-                raise e
             tagged_extents = {}
             for idx, extent in enumerate(extents):
                 support_geom = ordered_support_geoms[idx]
@@ -730,7 +727,6 @@ class LoadedElement(Element):
             transfer_type = intersection_above.other_reaction_type
             source_member = intersection_above.other_tag
             reaction_idx = intersection_above.other_index
-            # print(transfer_type, source_member, reaction_idx)
             if reaction_idx is None:
                 raise ValueError(
                     "The .other_index attribute within the .intersections_above list"
@@ -1374,7 +1370,10 @@ def trim_cantilevers(element: Element, abs_tol: Optional[float] = 0.02):
             start_point = cantilevers["A_intersection"]
         if (cantilevers["B"] == 0.0) and (cantilevers["B"] != cantilevers["B_orig"]):
             end_point = cantilevers["B_intersection"]
-        new_geometry = LineString([start_point, end_point])  # type: ignore
+        try:
+            new_geometry = LineString([start_point, end_point])  # type: ignore
+        except TypeError:
+            raise geom_ops.GeometryError(f"{element=}")
         new_element.geometry = new_geometry
         intersection_checks = [
             new_geometry.intersects(ib.other_geometry)

@@ -103,6 +103,8 @@ def parse_annotations(
             annot_attrs["geometry"] = annot_geom
             annot_attrs["page_label"] = annot.page
             annot_attrs["tag"] = existing_annot_tag
+            if annot_geom is None:
+                raise ValueError(f"{annot=}")
             for annot_key, annot_attr in annot_attributes.items():
                 annot_attrs[annot_key] = str_to_int(
                     annot_attr.split("<")[0]

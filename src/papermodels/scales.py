@@ -87,3 +87,48 @@ SCALE_3_QUARTER_INCH = Scale(
 SCALE_3_HALF_INCH = Scale(
     Decimal("1") / Decimal("72") * Decimal("2") / Decimal("3"), '3/2" = 1\'-0"'
 )
+
+SCALE_32ND_INCH_M = Scale(
+    Decimal("1") / Decimal("72") * Decimal("32") * Decimal("0.3048"),
+    '1/32" = 1\'-0" IN METERS',
+)
+SCALE_16TH_INCH_M = Scale(
+    Decimal("1") / Decimal("72") * Decimal("16") * Decimal("0.3048"),
+    '1/16" = 1\'-0" IN METERS',
+)
+SCALE_EIGHTH_INCH_M = Scale(
+    Decimal("1") / Decimal("72") * Decimal("8") * Decimal("0.3048"),
+    '1/8" = 1\'-0" IN METERS',
+)
+SCALE_QUARTER_INCH_M = Scale(
+    Decimal("1") / Decimal("72") * Decimal("4") * Decimal("0.3048"),
+    '1/4" = 1\'-0" IN METERS',
+)
+SCALE_HALF_INCH_M = Scale(
+    Decimal("1") / Decimal("72") * Decimal("2") * Decimal("0.3048"),
+    '1/2" = 1\'-0" IN METERS',
+)
+SCALE_ONE_INCH_M = Scale(
+    Decimal("1") / Decimal("72") * Decimal("0.3048"), '1" = 1\'-0"'
+)
+
+SCALE_3_32ND_INCH_M = Scale(
+    Decimal("1") / Decimal("72") * Decimal("32") / Decimal("3") * Decimal("0.3048"),
+    '3/32" = 1\'-0" IN METERS',
+)
+SCALE_3_16TH_INCH_M = Scale(
+    Decimal("1") / Decimal("72") * Decimal("16") / Decimal("3") * Decimal("0.3048"),
+    '3/16" = 1\'-0" IN METERS',
+)
+SCALE_3_EIGHTH_INCH_M = Scale(
+    Decimal("1") / Decimal("72") * Decimal("8") / Decimal("3") * Decimal("0.3048"),
+    '3/8" = 1\'-0" IN METERS',
+)
+SCALE_3_QUARTER_INCH_M = Scale(
+    Decimal("1") / Decimal("72") * Decimal("4") / Decimal("3") * Decimal("0.3048"),
+    '3/4" = 1\'-0" IN METERS',
+)
+SCALE_3_HALF_INCH_M = Scale(
+    Decimal("1") / Decimal("72") * Decimal("2") / Decimal("3") * Decimal("0.3048"),
+    '3/2" = 1\'-0" IN METERS',
+)
