@@ -807,7 +807,9 @@ def get_joist_locations(
         if initial_offset:
             joist_locs.append(initial_offset)
             distance_remaining -= initial_offset
-    while distance_remaining > 1.5 * spacing: # Use 1.5*spacing instead of 1.0*spacing to prevent "sliver joists" at the end
+    while (
+        distance_remaining > 1.5 * spacing
+    ):  # Use 1.5*spacing instead of 1.0*spacing to prevent "sliver joists" at the end
         distance_remaining -= spacing
         joist_locs.append(distance - distance_remaining)
     else:

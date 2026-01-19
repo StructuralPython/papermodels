@@ -1,5 +1,6 @@
 from __future__ import annotations
 from typing import Optional, TypeAlias, Callable
+from collections import Counter
 from copy import deepcopy
 from decimal import Decimal
 import pathlib
@@ -386,7 +387,6 @@ class GeometryGraph(nx.DiGraph):
             if (
                 element.geometry.geom_type == "LineString"
                 and intersection_points_in_polygon_below
-
             ):
                 inters_below_set = set(intersection_points_in_polygon_below)
                 for edge in inters_below_set:
@@ -398,16 +398,15 @@ class GeometryGraph(nx.DiGraph):
                 and element.reaction_type == "linear"
                 and "intersection" in edge_properties
             ):
-                center_line = geom.get_rectangle_centerline(
-                    element.geometry
-                )
+                center_line = geom.get_rectangle_centerline(element.geometry)
                 for idx, dep in enumerate(dependents):
                     dep_geom = self.nodes[dep]["element"].geometry
                     if dep_geom.geom_type == "LineString":
-                        is_roughly_parallel = geom.check_2d_linestring_parallel(center_line, dep_geom, tol=0.01)
+                        is_roughly_parallel = geom.check_2d_linestring_parallel(
+                            center_line, dep_geom, tol=0.01
+                        )
                         if not is_roughly_parallel:
                             self.remove_edge(element.tag, dep)
-                        
 
     def add_intersection_indexes_below(self):
         sorted_nodes = nx.topological_sort(self)
@@ -1060,6 +1059,7 @@ class GeometryGraph(nx.DiGraph):
         structural_element_entries = {}
         parsed_annotations_acc = {}
         raw_annotations_acc = {}
+        tag_checker = []
         for annots_in_page in annots_by_page:
             if scale is not None:
                 scaled_annots_in_page = scale_annotations(annots_in_page, scale)
@@ -1074,6 +1074,7 @@ class GeometryGraph(nx.DiGraph):
             parsed_annotations_acc = parsed_annotations | parsed_annotations_acc
             raw_annotations_acc = raw_annotations | raw_annotations_acc
             for annot, annot_attrs in parsed_annotations.items():
+                tag = annot_attrs["tag"]
                 if "occupancy" in annot_attrs:
                     load_entries.update({annot: annot_attrs})
                 elif "trib area" in annot_attrs.get("type", "").lower():
@@ -1081,11 +1082,19 @@ class GeometryGraph(nx.DiGraph):
                 elif "extent" in annot_attrs.get("type", "").lower():
                     extent_entries.update({annot: annot_attrs})
                 else:
+                    tag_checker.append(tag)
                     structural_element_entries.update({annot: annot_attrs})
             structural_element_entries = correlate_extents(
                 structural_element_entries, extent_entries
             )
-
+        tag_counter = Counter(tag_checker)
+        tag_counter.pop(None)  # Exclude None tags from the check
+        duplicate_tags = [tag for tag in tag_counter if tag_counter[tag] > 1]
+        if duplicate_tags:
+            raise ValueError(
+                "Geometry graph could not be built because the following"
+                f" duplicate tags were found: {duplicate_tags}"
+            )
         if not structural_element_entries and not legend_entries:
             raise ValueError(
                 "No structural element entities were found.\n"
