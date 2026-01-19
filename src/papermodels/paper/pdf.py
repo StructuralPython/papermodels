@@ -155,8 +155,8 @@ def pike_annotation_to_pm_annotation(
         a = (x2 - x1) / 2
         b = (y2 - y1) / 2
         n = 16
-        x_vertices = float(h) + float(a) * np.cos(np.linspace(0, 2*np.pi, n))
-        y_vertices = float(k) + float(b) * np.sin(np.linspace(0, 2*np.pi, n))
+        x_vertices = float(h) + float(a) * np.cos(np.linspace(0, 2 * np.pi, n))
+        y_vertices = float(k) + float(b) * np.sin(np.linspace(0, 2 * np.pi, n))
         vertices = []
         for idx, x_vertex in enumerate(x_vertices):
             vertices.append(Decimal(x_vertex))
