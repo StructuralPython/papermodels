@@ -14,7 +14,6 @@ from ..paper.annotations import (
 from ..geometry import geom_ops
 import parse
 import math
-import tomli_w
 import json
 
 
@@ -939,13 +938,6 @@ class LoadedElement(Element):
             return distributed_loads
         else:
             return []
-
-    def dump_toml(self, fp, precision=3):
-        """
-        Dumps the .model attribute to a TOML file
-        """
-        tomli_w.dump(self.model(precision), fp)
-        return fp
 
     def dump_json(self, fp, precision=3):
         """
