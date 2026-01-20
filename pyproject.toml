@@ -11,19 +11,14 @@ dependencies = [
     "shapely >= 2.0.0",
     "matplotlib",
     "numpy >= 2.0.0",
-    "pandas >= 2.0.0",
-    "scikit-spatial >= 8.1.0",
     "pikepdf",
     "parse",
-    "colour",
-    "pytest",
     "networkx",
     "numpy",
-    "rich",
-    "tomli-w",
     "ezdxf",
     "textalloc>=1.2.1",
     "load-distribution>=0.1.7",
+    "rich>=14.2.0",
 ]
 
 
@@ -39,5 +34,6 @@ graphviz = [
 dev = [
     "black>=25.1.0",
     "ipykernel>=6.30.1",
+    "pytest",
     "pytest-check>=2.5.4",
 ]

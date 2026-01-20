@@ -12,9 +12,7 @@ from ..paper.annotations import (
     tag_parsed_annotations,
 )
 from ..geometry import geom_ops
-import parse
 import math
-import tomli_w
 import json
 
 
@@ -940,13 +938,6 @@ class LoadedElement(Element):
         else:
             return []
 
-    def dump_toml(self, fp, precision=3):
-        """
-        Dumps the .model attribute to a TOML file
-        """
-        tomli_w.dump(self.model(precision), fp)
-        return fp
-
     def dump_json(self, fp, precision=3):
         """
         Dumps the .model attribute to a TOML file
@@ -1513,16 +1504,6 @@ def annotations_by_page(
         annots_on_page.update({annot: annot_attrs})
         annots_by_page[annot.page] = annots_on_page
     return annots_by_page
-
-
-def get_tag_type(this_element_tag: str) -> str:
-    """
-    Returns the prefix portion of 'this_element_tag'. The prefix portion is the
-    alphabetical portion of the tag at the beginning.
-    """
-    format = "{type_tag}{page_tag:d}.{enum_tag:d}"
-    result = parse.parse(format, this_element_tag)
-    return result.named["type_tag"]
 
 
 def get_elements_by_page(elements: list[Element]) -> dict[int, list[Element]]:
