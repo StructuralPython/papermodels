@@ -11,7 +11,6 @@ from papermodels.paper.annotations import scale_annotations
 from papermodels.geometry import geom_ops
 import shapely as shp
 import pathlib
-import parse
 import numpy as np
 
 

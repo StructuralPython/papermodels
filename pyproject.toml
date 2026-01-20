@@ -18,6 +18,7 @@ dependencies = [
     "ezdxf",
     "textalloc>=1.2.1",
     "load-distribution>=0.1.7",
+    "rich>=14.2.0",
 ]
 
 

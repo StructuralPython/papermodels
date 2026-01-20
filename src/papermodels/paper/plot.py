@@ -2,11 +2,9 @@ from __future__ import annotations
 from typing import Optional, Any, Union
 import pathlib
 
-from colour import Color
 from matplotlib.figure import Figure
 from matplotlib.patches import Polygon
 import numpy as np
-import parse
 from ..datatypes.annotation import Annotation
 from shapely.ops import polylabel
 import textalloc as ta
