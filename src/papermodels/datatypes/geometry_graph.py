@@ -1088,7 +1088,7 @@ class GeometryGraph(nx.DiGraph):
                 structural_element_entries, extent_entries
             )
         tag_counter = Counter(tag_checker)
-        tag_counter.pop(None)  # Exclude None tags from the check
+        tag_counter.pop(None, None)  # Exclude None tags from the check (still works if there are no None)
         duplicate_tags = [tag for tag in tag_counter if tag_counter[tag] > 1]
         if duplicate_tags:
             raise ValueError(
