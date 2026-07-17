@@ -332,6 +332,23 @@ preserved.
      `intersections.pdf` fixture; **jitter test** (perturb every coordinate by
      1e-6…1e-9) shows the intersection topology — node set, edge set, incidence
      multiset — is invariant; build is idempotent.
-3. **Phase 2.** Tolerance extend/trim noding preprocessing (`noding_abs_tol`).
+3. **Phase 2 (done).** Tolerance extend/trim noding preprocessing
+   (`noding_abs_tol`). Implemented in `src/papermodels/geometry/noding.py`,
+   tested in `tests/test_noding.py`:
+   - `node_geometries` — per line endpoint, query the `STRtree` (`dwithin`) for
+     geometry within `noding_abs_tol` and relocate the endpoint onto the nearest
+     point on the nearest candidate (extend if short, trim if overshooting).
+     Endpoints already touching a candidate are anchored and left alone;
+     polygons (columns) and `fixed_ids` (wall centerlines) are snap targets but
+     never moved.
+   - Cascade handling: each pass works from a frozen snapshot; passes iterate to
+     a fixed point, capped at `max_passes` with a **warning** (not an error) if
+     the cap is hit — the cap+warning decision (§9). Returns a `NodingReport`
+     (`passes`, `converged`, `moves`).
+   - Wired into `GeometryModel.from_elements` as an opt-in pre-index step
+     (`noding_abs_tol=…`), separate from `node_abs_tol` (§9). Validated: bridges
+     a sub-tolerance gap into a real crossing, preserves already-clean fixture
+     crossings, holds wall spines fixed, and the jitter test stays invariant
+     with noding on.
 4. **Phase 3.** Migrate downstream `Element` methods to read from the model;
    remove obsolete `geom_ops.py` workarounds.

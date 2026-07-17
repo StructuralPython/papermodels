@@ -39,6 +39,7 @@ from shapely import STRtree, Point
 from shapely.geometry.base import BaseGeometry
 
 from ..geometry import geom_ops
+from ..geometry.noding import NodingReport, node_geometries
 
 # A geometry's identity in the model.  In practice this is the element ``tag``.
 GeomId = str
@@ -208,23 +209,57 @@ class GeometryModel:
         self.geom_nodes: dict[GeomId, set[NodeId]] = {}
         self.index: Optional[STRtree] = None
         self._index_geom_ids: list[GeomId] = []
+        # Set when built with noding enabled (Phase 2); None otherwise.
+        self.noding_report: Optional[NodingReport] = None
 
     # -- construction -------------------------------------------------------
 
     @classmethod
     def from_elements(
-        cls, elements: Iterable, node_abs_tol: float = DEFAULT_NODE_ABS_TOL
+        cls,
+        elements: Iterable,
+        node_abs_tol: float = DEFAULT_NODE_ABS_TOL,
+        noding_abs_tol: Optional[float] = None,
+        noding_max_passes: int = 10,
+        suppress_warnings: bool = False,
     ) -> "GeometryModel":
         """
         Build a model from ``Element``-like objects.  Each must expose
         ``tag``, ``geometry``, ``rank``, ``plane_id`` and ``reaction_type``.
+
+        If ``noding_abs_tol`` is given, Phase 2 tolerance extend/trim noding runs
+        over the index geometries *before* the crossing build (design §6/§7): line
+        endpoints within ``noding_abs_tol`` of nearby geometry are snapped onto it
+        so the arrangement is topologically clean when crossings are
+        canonicalized.  Wall centerlines are held fixed (valid snap targets but
+        never moved).  ``noding_abs_tol`` is separate from ``node_abs_tol`` (§9).
         """
         self = cls(node_abs_tol)
         for element in elements:
             self._add_element(element)
+        if noding_abs_tol is not None:
+            self._apply_noding(noding_abs_tol, noding_max_passes, suppress_warnings)
         self._build_index()
         self._build_incidence()
         return self
+
+    def _apply_noding(
+        self, noding_abs_tol: float, max_passes: int, suppress_warnings: bool
+    ) -> None:
+        # Walls contribute a derived centerline spine; keep those fixed so noding
+        # snaps other lines onto them without dragging the spine around (§7).
+        fixed_ids = {
+            gid
+            for gid in self.geometries
+            if self.reaction_types.get(gid) == "linear" and gid in self.polygons
+        }
+        self.geometries, self.noding_report = node_geometries(
+            self.geometries,
+            noding_abs_tol,
+            max_passes=max_passes,
+            fixed_ids=fixed_ids,
+            suppress_warnings=suppress_warnings,
+        )
 
     def _add_element(self, element) -> None:
         gid = element.tag

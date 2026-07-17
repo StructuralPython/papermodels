@@ -211,6 +211,15 @@ def test_model_builds_from_fixtures(fixture_name):
     assert len(model.intersection_edges()) > 0
 
 
+def test_noding_preserves_fixture_intersections():
+    # Enabling Phase 2 noding must not drop the already-clean crossings.
+    elements = _fixture_elements("intersections.pdf")
+    model = GeometryModel.from_elements(elements, noding_abs_tol=1e-3)
+    missing = _EXPECTED_INTERSECTION_EDGES - model.intersection_edges()
+    assert not missing, f"noding dropped crossings: {missing}"
+    assert model.noding_report is not None and model.noding_report.converged
+
+
 # --------------------------------------------------------------------------
 # Jitter test (acceptance criterion, design §10) + idempotence
 # --------------------------------------------------------------------------
@@ -237,15 +246,20 @@ def _jitter_geometry(geom, rng, mag):
 
 
 @pytest.mark.parametrize("magnitude", [1e-6, 1e-7, 1e-8, 1e-9])
-def test_topology_invariant_under_jitter(magnitude):
+@pytest.mark.parametrize("noding_abs_tol", [None, 1e-3])
+def test_topology_invariant_under_jitter(magnitude, noding_abs_tol):
     elements = _fixture_elements("intersections.pdf")
-    base = GeometryModel.from_elements(elements).topology_signature()
+    base = GeometryModel.from_elements(
+        elements, noding_abs_tol=noding_abs_tol
+    ).topology_signature()
     rng = np.random.default_rng(1234)
     for _ in range(10):
         jittered = copy.deepcopy(elements)
         for element in jittered:
             element.geometry = _jitter_geometry(element.geometry, rng, magnitude)
-        sig = GeometryModel.from_elements(jittered).topology_signature()
+        sig = GeometryModel.from_elements(
+            jittered, noding_abs_tol=noding_abs_tol
+        ).topology_signature()
         assert sig["n_nodes"] == base["n_nodes"]
         assert sig["edges"] == base["edges"]
         assert sig["incidence"] == base["incidence"]
