@@ -113,6 +113,8 @@ GeometryModel
   `intersections_below()` / `corresponding_above()` by querying the model.
 - The `networkx` DiGraph is retained as the structural graph; its edges are
   backed by shared `NodeId`s.
+- **Walls are stored in the `STRtree` as centerlines, not polygons** (see §5.4).
+  The wall's polygon is retained separately for correspondence (§5.5).
 
 ### 5.2 `NodeRegistry` — canonical node identities
 
@@ -146,12 +148,70 @@ Incidence(geom_id: GeomId, rank: int, role: str)   # role ∈ {"endpoint", "inte
 "elements incident to this node, filtered by rank." One structure replaces the
 two independently-computed lists maintained today.
 
+### 5.4 Wall representation: polygon in, centerline in the index
+
+Walls are drawn and stored as **polygons**. This is deliberate — a polygon gives
+a forgiving, area-based way to determine *correspondence* between levels
+(adjacent PDF pages), which is robust to the wall being drawn slightly
+differently from one plane to the next (§5.5).
+
+But a polygon is the wrong thing to intersect for load-path purposes: what a
+joist or beam actually bears on is the wall's **centerline**. The historical
+sticking point has been computing that centerline. The existing
+`geom_ops.get_rectangle_centerline` explodes the polygon's own edges and assumes
+a clean, effectively axis-aligned 4-vertex rectangle; it degrades on rotated
+walls, walls with vertex noise, or walls with extra/clipped vertices, and the
+surrounding orientation logic then falls back to an "is it horizontal or
+vertical?" test that fails for anything off-axis.
+
+**Generalized approach (implemented): oriented bounding box.**
+`geom_ops.get_wall_centerline` fits the **minimum-area rotated bounding
+rectangle** (OBB, `shapely.minimum_rotated_rectangle`) around the wall polygon,
+then connects the midpoints of the OBB's two short (opposite) end faces:
+
+- The OBB is a true rectangle regardless of the input's orientation, so the
+  result is correct at **any angle** — no axis-alignment assumption.
+- Because the OBB is fitted rather than read off the raw edges, it **absorbs
+  vertex noise, extra vertices, and clipped corners**; an approximately
+  rectangular wall yields the same spine as the clean rectangle would.
+- Selecting an **opposite** edge pair (not merely "the two shortest edges")
+  means a near-square wall degenerates to a valid long-axis spine instead of a
+  diagonal.
+
+Validated on axis-aligned, 30°-rotated, noisy (extra vertex + jitter),
+clipped-corner, and near-square walls: all produce a correct long-axis
+centerline of the expected length.
+
+In the build pipeline, each wall element contributes its **centerline** to the
+`STRtree` and the node registry (so crossings are computed against the spine),
+while its polygon is retained on the element for correspondence.
+
+### 5.5 Correspondents stay ratio-based (decided)
+
+Cross-plane *correspondence* remains computed from **polygon area/length
+overlap ratios**, not from shared nodes. This is a deliberate decision, not a
+limitation:
+
+- Walls (and columns) keep their polygon precisely so correspondence can be
+  forgiving to plane-to-plane drawing differences.
+- The overlap **ratio** is load-bearing information: when multiple elements
+  converge at one location between levels, the ratio provides the basis for
+  **choosing a specific load path** (see `prioritize_correspondents` in
+  `element.py`). Collapsing correspondence to a shared node would discard the
+  signal used to disambiguate.
+
+Correspondents therefore benefit from the shared `STRtree` broad phase (fewer
+pairwise checks) but not from the node registry. The node registry governs
+*intersections* (same-plane crossings); correspondence governs *between-plane*
+transfer and stays ratio-based.
+
 ## 6. Build Pipeline
 
 ```
 1. Ingest + snap to grid            (existing: annotations.py:45, set_precision grid=1e-3)
+1a. Wall polygons -> centerlines    (geom_ops.get_wall_centerline; polygon kept for correspondence — §5.4)
 2. Tolerance noding (Phase 2)       (extend/trim endpoints within abs_tol — §7)
-3. Build STRtree over geometries
+3. Build STRtree over geometries    (walls contribute their centerline)
 4. Broad phase: per geom, query index for candidates; filter by rank + plane
 5. Compute each crossing ONCE; register its point via NodeRegistry.get_or_create
 6. Build incidence graph keyed by NodeId; derive above/below by incident ranks
@@ -199,6 +259,11 @@ that today "compute a crossing" must change to "look up a node":
   `get_collector_extents` — read canonical nodes from the model instead.
 - Many `geom_ops.py` snapping workarounds become unnecessary once every
   coordinate is a canonical node, and can be removed in a follow-up cleanup.
+- Wall-handling call sites that use `get_rectangle_centerline` with the
+  axis-aligned assumption (and the `"horizontal"`/`"vertical"` orientation
+  fallbacks around it) migrate to `get_wall_centerline`. `get_rectangle_centerline`
+  may be retained for genuinely axis-aligned internal box geometry, or removed
+  once no longer relied upon.
 
 The existing test fixtures and the geometry-graph tests are the migration safety
 net; behavior (graph topology: nodes, edges, intersection counts) must be
@@ -219,9 +284,14 @@ preserved.
   aggressive than crossing-merging.
 - **Cascade convergence bound** for Phase 2 on pathological inputs — cap +
   warning vs. hard error.
-- **Correspondents** (cross-plane overlap) currently use area/length ratios, not
-  point crossings. They benefit from the shared STRtree but not directly from the
-  node registry; confirm whether they stay ratio-based.
+- **Correspondents** (cross-plane overlap) stay **ratio-based** — decided; see
+  §5.5. The overlap ratio is retained deliberately because it is the basis for
+  choosing a load path when multiple elements converge. They benefit from the
+  shared STRtree broad phase but not from the node registry.
+- **Wall centerline endpoints from the OBB** extend to the bounding-box extent,
+  which for a clipped/irregular wall can slightly overhang the true polygon end.
+  This is generally desirable for a spine but should be confirmed against the
+  extent/bearing calculations that consume it.
 
 ## 10. Validation Strategy
 

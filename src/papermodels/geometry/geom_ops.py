@@ -17,6 +17,7 @@ from shapely import (
     GeometryCollection,
     set_precision,
     intersection_all,
+    minimum_rotated_rectangle,
 )
 import shapely.ops as ops
 import shapely.affinity as aff
@@ -1125,6 +1126,42 @@ def get_rectangle_centerline(p: Polygon, on_long_edge: bool = False) -> LineStri
     start, end = order_nodes_positive([edge1.centroid, edge2.centroid])
     center_line = LineString([start, end])
     return center_line
+
+
+def get_wall_centerline(wall: Polygon) -> LineString:
+    """
+    Returns the centerline (spine) of a wall Polygon of arbitrary orientation.
+
+    Unlike 'get_rectangle_centerline', this does not assume the wall is
+    axis-aligned or a clean 4-vertex rectangle. It first fits the minimum-area
+    rotated bounding rectangle (the oriented bounding box, or "OBB") around
+    'wall'. Because the OBB is a true rectangle regardless of the input's
+    orientation, vertex noise, or extra/clipped vertices, extracting the
+    centerline from it is both general and robust:
+
+        - The OBB has four corners in ring order, so opposite edges are the
+          parallel pairs (edge 0 || edge 2, edge 1 || edge 3).
+        - The wall's long axis runs perpendicular to its two SHORT end faces.
+        - The centerline connects the midpoints of that short (opposite) pair.
+
+    Selecting an opposite pair (rather than "the two shortest edges") means a
+    near-square wall degenerates gracefully to a valid axis instead of a
+    diagonal.
+
+    The result is created with a +ve X-bias (see 'order_nodes_positive').
+    """
+    obb = minimum_rotated_rectangle(wall)
+    corners = list(obb.exterior.coords)[:-1]  # four unique corners, ring order
+    edges = [
+        LineString([corners[i], corners[(i + 1) % 4]]) for i in range(4)
+    ]
+    # edges[0] || edges[2] and edges[1] || edges[3]; the short pair are the ends.
+    if edges[0].length <= edges[1].length:
+        short_a, short_b = edges[0], edges[2]
+    else:
+        short_a, short_b = edges[1], edges[3]
+    start, end = order_nodes_positive([short_a.centroid, short_b.centroid])
+    return LineString([start, end])
 
 
 def calculate_trapezoid_area_sums(member_loads: list[list[list[tuple]]]) -> list[float]:
