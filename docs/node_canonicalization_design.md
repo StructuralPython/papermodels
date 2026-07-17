@@ -350,5 +350,23 @@ preserved.
      a sub-tolerance gap into a real crossing, preserves already-clean fixture
      crossings, holds wall spines fixed, and the jitter test stays invariant
      with noding on.
-4. **Phase 3.** Migrate downstream `Element` methods to read from the model;
-   remove obsolete `geom_ops.py` workarounds.
+4. **Phase 3 (in progress).** Migrate downstream `Element` methods to read from
+   the model; remove obsolete `geom_ops.py` workarounds.
+   - **3a (done).** `get_geometry_intersections` now computes each crossing
+     **once** and snaps its region through a shared `NodeRegistry`, so the
+     `below` view (on the lower-rank element) and the `above` view (on the
+     higher-rank element) carry the byte-identical coordinate — removing the
+     "computed twice, never reconciled" root cause in the production build.
+     Regression test in `tests/test_geometry_graph.py`
+     (`test_intersection_region_shared_below_and_above`). See §8.
+   - **3b (pending).** The gravity-frame post-processing
+     (`align_frames_to_centroids`, `add_intersection_indexes_above/below`) and
+     the extent/support recomputation sites (`get_transfer_extents`,
+     `_get_support_locations`, `get_collector_extents`) still call
+     `self.geometry.intersection(other)` and re-diverge the regions. Migrating
+     them to read the stored canonical region is the larger, load-path-touching
+     part of Phase 3 and the likely resolution of the pre-existing
+     `test_wall_point_load_locations` floating-point spacing failure.
+   - **3c (pending).** Stop copying `other_geometry` into `Intersection` /
+     `Correspondent` (reference `GeomId`/`NodeId`); retire the now-unnecessary
+     `geom_ops.py` tolerance workarounds.
