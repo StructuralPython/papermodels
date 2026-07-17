@@ -120,14 +120,14 @@ GeometryModel
 
 ```
 NodeRegistry
-├── abs_tol : float                                  # absolute snapping tolerance (real-world units)
+├── node_abs_tol : float                             # absolute snapping tolerance (real-world units); separate from noding_abs_tol (§7)
 ├── coord   : dict[NodeId, tuple[float, float]]      # canonical coordinate per node
 └── _buckets: dict[tuple[int, int], list[NodeId]]    # quantized spatial hash
 
   get_or_create(point) -> NodeId
-      q = quantize(point, abs_tol)
+      q = quantize(point, node_abs_tol)
       for candidate in neighbor_buckets(q):          # 9-cell neighborhood
-          if distance(point, coord[candidate]) <= abs_tol:
+          if distance(point, coord[candidate]) <= node_abs_tol:
               return candidate                        # snap to existing node
       return register_new(point)                      # otherwise new node
 ```
@@ -224,10 +224,12 @@ identity is shared thereafter.
 ## 7. Phase 2 — Tolerance Extend/Trim (Noding)
 
 A preprocessing step that repairs "approximately intersecting" geometry, governed
-by a single **absolute** tolerance `abs_tol` in real-world units:
+by an **absolute** tolerance `noding_abs_tol` in real-world units. This is
+**separate** from the canonicalization tolerance `node_abs_tol` (§5.2), so
+endpoint repair can reach wider than crossing-merging (decided, §9):
 
-- For each line endpoint, query the `STRtree` for geometry within `abs_tol`.
-- If the nearest point on a candidate is within `abs_tol`:
+- For each line endpoint, query the `STRtree` for geometry within `noding_abs_tol`.
+- If the nearest point on a candidate is within `noding_abs_tol`:
   - **extend** the line to that point if it falls short, or
   - **trim** the line to that point if it overshoots.
 
@@ -271,26 +273,32 @@ preserved.
 
 ## 9. Risks & Open Questions
 
-- **Batch vs incremental canonicalization.** Batch clustering gives the most
-  stable canonical coordinate (centroid of a cluster) but needs all points up
-  front; incremental `get_or_create` is simpler and dependency-free but the
-  canonical coordinate is "first point wins." Decide per performance/stability
-  needs. *(Leaning incremental + quantized hash to avoid a scipy dependency.)*
+- **Batch vs incremental canonicalization — decided: incremental now, batch
+  later.** Phase 1 ships the incremental `get_or_create` + quantized hash form
+  (dependency-free; canonical coordinate is "first point wins"). Batch clustering
+  (union-find + cluster centroid, requiring a scipy `cKDTree`) is kept as a future
+  option to be introduced only if stability testing shows "first point wins"
+  produces unstable canonical coordinates.
 - **Bucket-boundary straddling.** Two points within `abs_tol` can fall in
   adjacent buckets; the 9-cell neighborhood probe handles the 2D case and must
   be covered by tests.
-- **Single `abs_tol` for both noding and canonicalization?** Likely yes (one
-  precision model), but they could be separated if noding needs to be more
-  aggressive than crossing-merging.
-- **Cascade convergence bound** for Phase 2 on pathological inputs — cap +
-  warning vs. hard error.
+- **Tolerances — decided: separate.** Noding (Phase 2 extend/trim) and node
+  canonicalization use **distinct** tolerances rather than a single shared one,
+  so endpoint repair can reach wider than crossing-merging without forcing the
+  two to move together. (E.g. `node_abs_tol` for canonicalization,
+  `noding_abs_tol` for Phase 2.) Both remain absolute, real-world units.
+- **Cascade convergence bound — decided: cap + warning.** Phase 2 iterates to a
+  fixed point up to a capped number of passes; if the cap is hit it emits a
+  warning and proceeds with the best-so-far arrangement rather than raising.
+  Pathological inputs degrade gracefully instead of aborting the build.
 - **Correspondents** (cross-plane overlap) stay **ratio-based** — decided; see
   §5.5. The overlap ratio is retained deliberately because it is the basis for
   choosing a load path when multiple elements converge. They benefit from the
   shared STRtree broad phase but not from the node registry.
-- **Wall centerline endpoints from the OBB** extend to the bounding-box extent,
-  which for a clipped/irregular wall can slightly overhang the true polygon end.
-  This is generally desirable for a spine but should be confirmed against the
+- **Wall centerline endpoints from the OBB — decided: accept overhang.** OBB
+  endpoints extend to the bounding-box extent, which for a clipped/irregular wall
+  can slightly overhang the true polygon end. This is accepted as desirable for a
+  bearing spine; it should still be confirmed (not clamped) against the
   extent/bearing calculations that consume it.
 
 ## 10. Validation Strategy
@@ -307,10 +315,23 @@ preserved.
 
 ## 11. Proposed Phasing
 
-1. **Phase 0 (this doc).** Design + agreement.
-2. **Phase 1.** `GeometryModel` + `NodeRegistry` prototype behind the existing
-   API, validated against current fixtures; add the jitter test.
-3. **Phase 2.** Tolerance extend/trim noding preprocessing.
+1. **Phase 0 (this doc).** Design + agreement. ✅
+2. **Phase 1 (done).** `GeometryModel` + `NodeRegistry` prototype behind the
+   existing API, validated against current fixtures; jitter test added.
+   Implemented in `src/papermodels/datatypes/geometry_model.py`, tested in
+   `tests/test_geometry_model.py`:
+   - `NodeRegistry` — incremental `get_or_create`, quantized-hash buckets,
+     9-cell neighborhood probe, nearest-wins snapping, "first point wins"
+     canonical coordinate (the "incremental now, batch later" decision, §9).
+   - `GeometryModel.from_elements` — STRtree broad phase, walls indexed by
+     centerline (polygon retained), single-evaluation crossings canonicalized
+     through the registry, incidence keyed by `NodeId`, rank-derived
+     above/below queries. Not yet wired into `GeometryGraph` (parallel
+     prototype).
+   - Validation: reproduces all documented crossings of the
+     `intersections.pdf` fixture; **jitter test** (perturb every coordinate by
+     1e-6…1e-9) shows the intersection topology — node set, edge set, incidence
+     multiset — is invariant; build is idempotent.
+3. **Phase 2.** Tolerance extend/trim noding preprocessing (`noding_abs_tol`).
 4. **Phase 3.** Migrate downstream `Element` methods to read from the model;
    remove obsolete `geom_ops.py` workarounds.
-```
