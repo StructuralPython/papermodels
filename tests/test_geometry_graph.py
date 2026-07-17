@@ -244,3 +244,43 @@ def test_intersections_below_above(load_collector_extents_walls, load_intersecti
         assert "DB0.0" in ct1_above_tags
     with check:
         assert "DB0.1" in ct2_above_tags
+
+
+def test_intersection_region_shared_below_and_above():
+    """
+    Each physical crossing is computed once and shared: as built, the 'below'
+    view on the lower-rank element and the 'above' view on the higher-rank
+    element carry the byte-identical intersecting region (design §6, node
+    canonicalization). This is the invariant produced by
+    get_geometry_intersections; it is asserted on the raw graph (before the
+    gravity-frame post-processing that recomputes regions — a downstream site
+    still to be migrated in Phase 3).
+    """
+    graph = GeometryGraph.from_pdf_file(
+        TEST_DATA / "intersections.pdf",
+        scale=QUARTER_INCH_SCALE,
+        process_gravity_frame=False,
+    )
+    checked = 0
+    for node_name in graph.nodes:
+        element = graph.nodes[node_name]["element"]
+        if not element.intersections_below:
+            continue
+        for below in element.intersections_below:
+            other = graph.nodes[below.other_tag]["element"]
+            matching_above = [
+                above
+                for above in (other.intersections_above or [])
+                if above.other_tag == element.tag
+            ]
+            with check:
+                assert matching_above, (
+                    f"{below.other_tag} has no 'above' view of {element.tag}"
+                )
+            for above in matching_above:
+                with check:
+                    assert below.intersecting_region.equals_exact(
+                        above.intersecting_region, 0.0
+                    )
+                checked += 1
+    assert checked > 0
