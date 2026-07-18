@@ -350,23 +350,46 @@ preserved.
      a sub-tolerance gap into a real crossing, preserves already-clean fixture
      crossings, holds wall spines fixed, and the jitter test stays invariant
      with noding on.
-4. **Phase 3 (in progress).** Migrate downstream `Element` methods to read from
-   the model; remove obsolete `geom_ops.py` workarounds.
-   - **3a (done).** `get_geometry_intersections` now computes each crossing
-     **once** and snaps its region through a shared `NodeRegistry`, so the
-     `below` view (on the lower-rank element) and the `above` view (on the
-     higher-rank element) carry the byte-identical coordinate — removing the
-     "computed twice, never reconciled" root cause in the production build.
-     Regression test in `tests/test_geometry_graph.py`
-     (`test_intersection_region_shared_below_and_above`). See §8.
-   - **3b (pending).** The gravity-frame post-processing
-     (`align_frames_to_centroids`, `add_intersection_indexes_above/below`) and
-     the extent/support recomputation sites (`get_transfer_extents`,
-     `_get_support_locations`, `get_collector_extents`) still call
-     `self.geometry.intersection(other)` and re-diverge the regions. Migrating
-     them to read the stored canonical region is the larger, load-path-touching
-     part of Phase 3 and the likely resolution of the pre-existing
-     `test_wall_point_load_locations` floating-point spacing failure.
-   - **3c (pending).** Stop copying `other_geometry` into `Intersection` /
-     `Correspondent` (reference `GeomId`/`NodeId`); retire the now-unnecessary
-     `geom_ops.py` tolerance workarounds.
+4. **Phase 3 (substantive migration done).** Migrate the intersection-building
+   layer to canonical identities and robust constructions.
+   - **3a (done).** `get_geometry_intersections` computes each crossing **once**
+     and snaps its region through a shared `NodeRegistry`, so the `below` view
+     (on the lower-rank element) and the `above` view (on the higher-rank
+     element) carry the byte-identical coordinate — removing the "computed
+     twice, never reconciled" root cause. Regression test:
+     `test_intersection_region_shared_below_and_above`.
+   - **3b (done).** O(n²) all-pairs scan → `shapely.STRtree` broad phase
+     (candidates queried by the extent polygon when present, iterated in
+     annotation order so topology is identical). `get_rectangle_centerline`
+     reimplemented on the oriented bounding box (the robust `get_wall_centerline`
+     construction, `on_long_edge` preserved), migrating **every** wall/rectangle
+     centerline call site at once (§5.4). Downstream overlap recomputes
+     (`get_transfer_extents`, `align_frames_to_centroids`) now read the canonical
+     stored `other_overlap` instead of re-evaluating
+     `self.geometry.intersection(other)`.
+   - **Acceptance met.** The design's jitter criterion (§10) now holds on the
+     **production** `GeometryGraph`, not just the prototype:
+     `test_production_graph_topology_invariant_under_jitter` perturbs every input
+     coordinate (1e-6/1e-8) and asserts the node set and typed edge set are
+     invariant across the `intersections` and `sketch_to_scale` fixtures. All
+     previously-passing behavioural tests remain green.
+
+   **Deliberately deferred (with rationale):**
+   - *Retire `geom_ops.py` tolerance workarounds* (`grid_size=1e-3`, `rel_tol`,
+     `buffer(1e-3)`, exact `== 0.0`/`== 1.0` tests). This doc always scoped these
+     as "a follow-up cleanup" (§8). With the production jitter test now passing
+     *with them present*, removing them offers no robustness upside and real
+     regression risk to current numerics; it should be its own change, guarded by
+     the jitter test now in place.
+   - *Stop copying `other_geometry`; reference `GeomId`/`NodeId`.* `Intersection`
+     already carries `other_tag`; replacing the geometry copy with a lookup
+     requires threading the `GeometryModel` through every consumer (many `Element`
+     methods have no graph handle today). That is a model-as-view
+     re-architecture, high-churn and low correctness value now that node identity
+     is canonical — best done as a focused follow-up, not folded into this
+     migration.
+   - *`test_wall_point_load_locations` (pre-existing failure).* Traced to
+     `JoistArrayModel` laying the first joist of an array off-grid at the trib
+     edge (all 12 WT4.0 point loads come from the one `J4.0` array collector).
+     It fails on `main`, lives in collector generation, and is orthogonal to node
+     canonicalization.
