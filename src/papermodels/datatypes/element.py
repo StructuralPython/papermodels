@@ -4,7 +4,7 @@ from typing import Optional, Union, NamedTuple
 import load_distribution as ld
 import numpy as np
 import numpy.typing as npt
-from shapely import Point, LineString, Polygon, GeometryCollection
+from shapely import Point, LineString, Polygon, GeometryCollection, STRtree
 from shapely import wkt
 from .annotation import Annotation
 from ..paper.annotations import (
@@ -1152,27 +1152,46 @@ def get_geometry_intersections(
     # node identity, shared by the "below" view stored on the lower-rank element
     # and the "above" view stored on the higher-rank element.
     node_registry = NodeRegistry(NODE_ABS_TOL)
+    # Broad phase (design §6, step 4): index every non-empty geometry so each
+    # element only tests candidates whose bounding boxes actually overlap it,
+    # replacing the O(n^2) all-pairs scan. Candidates are still filtered by plane
+    # and rank and confirmed by get_intersection, so the result is identical to
+    # the exhaustive scan; iterating candidates in annotation order keeps the
+    # append order deterministic.
+    index_positions = [
+        pos
+        for pos, annot in enumerate(annots)
+        if not intersected_annotations[annot]["geometry"].is_empty
+    ]
+    tree = STRtree(
+        [intersected_annotations[annots[pos]]["geometry"] for pos in index_positions]
+    )
     for i_annot in annots:
         i_attrs = intersected_annotations[i_annot]
         i_rank = i_attrs["rank"]
         i_page = i_annot.page
         i_geom = i_attrs["geometry"]
+        i_tag = i_attrs["tag"]
         i_extent_line = i_attrs["extent_line"]
         i_extent_poly = geom_ops.create_extent_polygon(i_geom, i_extent_line)
         i_attrs.setdefault("intersections_below", [])
         i_attrs.setdefault("intersections_above", [])
-        for j_annot in annots:
+        if i_geom.is_empty:
+            continue
+        # Query by the extent polygon when present (it reaches beyond the raw
+        # geometry), otherwise by the geometry itself.
+        query_geom = i_extent_poly if i_extent_poly is not None else i_geom
+        candidate_positions = sorted(
+            index_positions[k] for k in tree.query(query_geom)
+        )
+        for j_pos in candidate_positions:
+            j_annot = annots[j_pos]
             j_attrs = intersected_annotations[j_annot]
-            try:
-                j_rank = j_attrs["rank"]
-            except KeyError:
-                print(j_annot, j_attrs)
-                raise ValueError
+            j_rank = j_attrs["rank"]
             j_page = j_annot.page
             j_geom = j_attrs["geometry"]
-            if i_geom.is_empty or j_geom.is_empty:
+            if j_geom.is_empty:
                 continue
-            i_tag = i_attrs["tag"]
             j_tag = j_attrs["tag"]
             if i_page != j_page:
                 continue
