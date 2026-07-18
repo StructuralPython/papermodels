@@ -342,7 +342,11 @@ class Element:
                     self.geometry
                 ).coords
                 above_start_coord = Point(above_start_coord)
-                overlapping_linestring = self.geometry.intersection(other_geom)
+                # Use the overlap computed once at build time rather than
+                # re-evaluating self.geometry.intersection(other_geom) here (§8).
+                overlapping_linestring = intersection_below.other_overlap
+                if overlapping_linestring is None:
+                    overlapping_linestring = self.geometry.intersection(other_geom)
                 overlap_start, overlap_end = geom_ops.get_start_end_nodes(
                     overlapping_linestring
                 )
@@ -1479,12 +1483,17 @@ def align_frames_to_centroids(element: Element):
             if support_geom.contains(end_point):
                 end_support = support_geom
             overlap_region = ib.other_overlap
+            # The intersecting region is deliberately re-derived onto the support
+            # centroid/centerline (the whole point of aligning). The overlap,
+            # however, is the same set computed once at build time, so read the
+            # canonical stored overlap rather than re-evaluating it here (§8).
             if support_geom.geom_type == "Polygon" and support_reaction_type == "point":
-                # intersecting_region = support_geom.centroid
                 intersecting_region = geom_ops.get_projected_support_centroid(
                     geometry, support_geom
                 )
-                overlap_region = support_geom.intersection(geometry)
+                overlap_region = ib.other_overlap
+                if overlap_region is None:
+                    overlap_region = support_geom.intersection(geometry)
             elif (
                 support_geom.geom_type == "Polygon"
                 and support_reaction_type == "linear"
@@ -1492,7 +1501,9 @@ def align_frames_to_centroids(element: Element):
                 intersecting_region = geom_ops.get_projected_support_centerline(
                     geometry, support_geom
                 )
-                overlap_region = support_geom.intersection(geometry)
+                overlap_region = ib.other_overlap
+                if overlap_region is None:
+                    overlap_region = support_geom.intersection(geometry)
 
             if support_geom == start_support:
                 new_start_point = intersecting_region
