@@ -17,6 +17,7 @@ from shapely import (
     GeometryCollection,
     set_precision,
     intersection_all,
+    minimum_rotated_rectangle,
 )
 import shapely.ops as ops
 import shapely.affinity as aff
@@ -1110,21 +1111,53 @@ def explode_polygon(p: Polygon) -> list[LineString]:
 
 def get_rectangle_centerline(p: Polygon, on_long_edge: bool = False) -> LineString:
     """
-    Returns the centerline of the Polygon 'p' assuming that 'p' represents
-    a regular rectangle with a long dimension and a short dimension.
-    The LineString is created with a +ve X-bias.
+    Returns the centerline of the Polygon 'p', which is assumed to represent a
+    rectangle with a long dimension and a short dimension.
+
+    By default (``on_long_edge=False``) the result is the **long-axis spine** —
+    the line connecting the midpoints of the two short end faces. With
+    ``on_long_edge=True`` it is the short-axis line connecting the midpoints of
+    the two long edges instead.
+
+    The centerline is derived from the polygon's **oriented bounding box** (OBB,
+    the minimum-area rotated rectangle) rather than from the polygon's own edges.
+    This makes the result correct at any orientation and robust to vertex noise,
+    extra vertices, and clipped corners — an approximately rectangular input
+    yields the same spine as the clean rectangle would (see 'get_wall_centerline'
+    and docs/node_canonicalization_design.md §5.4). The result is created with a
+    +ve X-bias (see 'order_nodes_positive').
     """
-    rectangle_edges = explode_polygon(p)
-    sorted_edges = sorted(rectangle_edges, key=lambda x: x.length)
-    short_edges = sorted_edges[:2]
-    long_edges = sorted_edges[2:]
-    if on_long_edge:
-        edge1, edge2 = long_edges
+    obb = minimum_rotated_rectangle(p)
+    corners = list(obb.exterior.coords)[:-1]  # four unique corners, ring order
+    edges = [LineString([corners[i], corners[(i + 1) % 4]]) for i in range(4)]
+    # edges[0] || edges[2] and edges[1] || edges[3]. Selecting an *opposite*
+    # pair (not merely "the two shortest edges") means a near-square input
+    # degenerates to a valid axis instead of a diagonal.
+    if edges[0].length <= edges[1].length:
+        short_a, short_b = edges[0], edges[2]
+        long_a, long_b = edges[1], edges[3]
     else:
-        edge1, edge2 = short_edges
+        short_a, short_b = edges[1], edges[3]
+        long_a, long_b = edges[0], edges[2]
+    if on_long_edge:
+        edge1, edge2 = long_a, long_b
+    else:
+        edge1, edge2 = short_a, short_b
     start, end = order_nodes_positive([edge1.centroid, edge2.centroid])
-    center_line = LineString([start, end])
-    return center_line
+    return LineString([start, end])
+
+
+def get_wall_centerline(wall: Polygon) -> LineString:
+    """
+    Returns the long-axis centerline (spine) of a wall Polygon of arbitrary
+    orientation.
+
+    This is the oriented-bounding-box long-axis spine — identical to
+    ``get_rectangle_centerline(wall, on_long_edge=False)``. It is kept as a named
+    entry point for wall handling (docs/node_canonicalization_design.md §5.4);
+    both functions now share the same robust OBB implementation.
+    """
+    return get_rectangle_centerline(wall, on_long_edge=False)
 
 
 def calculate_trapezoid_area_sums(member_loads: list[list[list[tuple]]]) -> list[float]:

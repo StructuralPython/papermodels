@@ -4,7 +4,7 @@ from typing import Optional, Union, NamedTuple
 import load_distribution as ld
 import numpy as np
 import numpy.typing as npt
-from shapely import Point, LineString, Polygon, GeometryCollection
+from shapely import Point, LineString, Polygon, GeometryCollection, STRtree
 from shapely import wkt
 from .annotation import Annotation
 from ..paper.annotations import (
@@ -12,11 +12,19 @@ from ..paper.annotations import (
     tag_parsed_annotations,
 )
 from ..geometry import geom_ops
+from .geometry_model import NodeRegistry
 import math
 import json
 
 
 Geometry = Union[LineString, Polygon]
+
+# Absolute tolerance for canonicalizing intersection-region coordinates so that
+# a single physical crossing has one identity shared by every incident element
+# (see docs/node_canonicalization_design.md). Kept well below the ~1e-3 drawing
+# grid so genuinely-distinct crossings are never merged, but far above the
+# low-bit noise (~1e-12) that separate evaluations of the same point produce.
+NODE_ABS_TOL = 1e-6
 
 ELEMENT_ATTRS = {
     "tag",
@@ -334,7 +342,11 @@ class Element:
                     self.geometry
                 ).coords
                 above_start_coord = Point(above_start_coord)
-                overlapping_linestring = self.geometry.intersection(other_geom)
+                # Use the overlap computed once at build time rather than
+                # re-evaluating self.geometry.intersection(other_geom) here (§8).
+                overlapping_linestring = intersection_below.other_overlap
+                if overlapping_linestring is None:
+                    overlapping_linestring = self.geometry.intersection(other_geom)
                 overlap_start, overlap_end = geom_ops.get_start_end_nodes(
                     overlapping_linestring
                 )
@@ -1101,6 +1113,37 @@ def create_element_filter(
     return filter_function
 
 
+def _canonicalize_region(region, registry: NodeRegistry):
+    """
+    Return ``region`` with its node coordinates snapped to canonical identities
+    from ``registry``.
+
+    Point regions and the endpoints of LineString regions are the "nodes" of the
+    arrangement; snapping them through a shared registry makes every element that
+    meets at one physical crossing reference the *same* coordinate, rather than
+    each holding an independent evaluation that differs in its low bits. Polygon
+    (and other) regions are returned unchanged.
+    """
+    if region is None:
+        return None
+    geom_type = region.geom_type
+    if geom_type == "Point":
+        node_id = registry.get_or_create((region.x, region.y))
+        return Point(registry.coord[node_id])
+    if geom_type == "LineString":
+        coords = list(region.coords)
+        last = len(coords) - 1
+        new_coords = []
+        for idx, coord in enumerate(coords):
+            if idx == 0 or idx == last:  # only endpoints are nodes
+                node_id = registry.get_or_create((coord[0], coord[1]))
+                new_coords.append(registry.coord[node_id])
+            else:
+                new_coords.append(coord)
+        return LineString(new_coords)
+    return region
+
+
 def get_geometry_intersections(
     tagged_annotations: dict[Annotation, dict],
 ) -> dict[Annotation, dict]:
@@ -1109,27 +1152,48 @@ def get_geometry_intersections(
     """
     annots = list(tagged_annotations.keys())
     intersected_annotations = tagged_annotations.copy()
+    # One registry per build: every physical crossing gets a single canonical
+    # node identity, shared by the "below" view stored on the lower-rank element
+    # and the "above" view stored on the higher-rank element.
+    node_registry = NodeRegistry(NODE_ABS_TOL)
+    # Broad phase (design §6, step 4): index every non-empty geometry so each
+    # element only tests candidates whose bounding boxes actually overlap it,
+    # replacing the O(n^2) all-pairs scan. Candidates are still filtered by plane
+    # and rank and confirmed by get_intersection, so the result is identical to
+    # the exhaustive scan; iterating candidates in annotation order keeps the
+    # append order deterministic.
+    index_positions = [
+        pos
+        for pos, annot in enumerate(annots)
+        if not intersected_annotations[annot]["geometry"].is_empty
+    ]
+    tree = STRtree(
+        [intersected_annotations[annots[pos]]["geometry"] for pos in index_positions]
+    )
     for i_annot in annots:
         i_attrs = intersected_annotations[i_annot]
         i_rank = i_attrs["rank"]
         i_page = i_annot.page
         i_geom = i_attrs["geometry"]
+        i_tag = i_attrs["tag"]
         i_extent_line = i_attrs["extent_line"]
         i_extent_poly = geom_ops.create_extent_polygon(i_geom, i_extent_line)
         i_attrs.setdefault("intersections_below", [])
         i_attrs.setdefault("intersections_above", [])
-        for j_annot in annots:
+        if i_geom.is_empty:
+            continue
+        # Query by the extent polygon when present (it reaches beyond the raw
+        # geometry), otherwise by the geometry itself.
+        query_geom = i_extent_poly if i_extent_poly is not None else i_geom
+        candidate_positions = sorted(index_positions[k] for k in tree.query(query_geom))
+        for j_pos in candidate_positions:
+            j_annot = annots[j_pos]
             j_attrs = intersected_annotations[j_annot]
-            try:
-                j_rank = j_attrs["rank"]
-            except KeyError:
-                print(j_annot, j_attrs)
-                raise ValueError
+            j_rank = j_attrs["rank"]
             j_page = j_annot.page
             j_geom = j_attrs["geometry"]
-            if i_geom.is_empty or j_geom.is_empty:
+            if j_geom.is_empty:
                 continue
-            i_tag = i_attrs["tag"]
             j_tag = j_attrs["tag"]
             if i_page != j_page:
                 continue
@@ -1139,47 +1203,50 @@ def get_geometry_intersections(
                         i_attrs["tag"], j_attrs["tag"]
                     ):
                         continue
-                # Use the extent polygon to find intersections (if it exists)
-                extent_intersection = False
+                # Compute the crossing ONCE (design §6, step 5). The "below"
+                # view (stored on i) and the "above" view (stored on j) are two
+                # perspectives on a single physical crossing, so they must share
+                # the same intersecting region and overlap rather than each being
+                # evaluated independently. Use the extent polygon if it exists.
                 if (
-                    # i_rank == 0
-                    # and i_extent_poly is not None
                     i_extent_poly is not None
                     and check_eligible_collector_extent_polygon_intersection(
                         j_geom.geom_type, j_attrs["reaction_type"]
                     )
                 ):
-                    intersection_below = geom_ops.get_intersection(
+                    crossing = geom_ops.get_intersection(
                         i_geom, j_geom, j_tag, i_extent_poly
                     )
-                    j_intersection_above = geom_ops.get_intersection(
-                        i_geom, j_geom, i_tag, i_extent_poly
-                    )
                 else:
-                    intersection_below = geom_ops.get_intersection(
-                        i_geom, j_geom, j_tag
-                    )
-                    j_intersection_above = geom_ops.get_intersection(
-                        j_geom, i_geom, i_tag
-                    )
+                    crossing = geom_ops.get_intersection(i_geom, j_geom, j_tag)
 
-                if intersection_below is None:
+                if crossing is None:
                     continue
+
+                region, _below_geom, _below_tag, overlap_region = crossing
+                # Snap the crossing to a canonical node identity so the below and
+                # above views (and any other element meeting here) agree exactly.
+                region = _canonicalize_region(region, node_registry)
 
                 i_attrs["intersections_below"].append(
                     Intersection(
-                        *intersection_below,
+                        region,
+                        j_geom,
+                        j_tag,
+                        overlap_region,
                         other_reaction_type=j_attrs["reaction_type"],
                     )
                 )
-                if j_intersection_above is not None:
-                    j_attrs.setdefault("intersections_above", [])
-                    j_attrs["intersections_above"].append(
-                        Intersection(
-                            *j_intersection_above,
-                            other_reaction_type=i_attrs["reaction_type"],
-                        )
+                j_attrs.setdefault("intersections_above", [])
+                j_attrs["intersections_above"].append(
+                    Intersection(
+                        region,
+                        i_geom,
+                        i_tag,
+                        overlap_region,
+                        other_reaction_type=i_attrs["reaction_type"],
                     )
+                )
 
     return intersected_annotations
 
@@ -1414,12 +1481,17 @@ def align_frames_to_centroids(element: Element):
             if support_geom.contains(end_point):
                 end_support = support_geom
             overlap_region = ib.other_overlap
+            # The intersecting region is deliberately re-derived onto the support
+            # centroid/centerline (the whole point of aligning). The overlap,
+            # however, is the same set computed once at build time, so read the
+            # canonical stored overlap rather than re-evaluating it here (§8).
             if support_geom.geom_type == "Polygon" and support_reaction_type == "point":
-                # intersecting_region = support_geom.centroid
                 intersecting_region = geom_ops.get_projected_support_centroid(
                     geometry, support_geom
                 )
-                overlap_region = support_geom.intersection(geometry)
+                overlap_region = ib.other_overlap
+                if overlap_region is None:
+                    overlap_region = support_geom.intersection(geometry)
             elif (
                 support_geom.geom_type == "Polygon"
                 and support_reaction_type == "linear"
@@ -1427,7 +1499,9 @@ def align_frames_to_centroids(element: Element):
                 intersecting_region = geom_ops.get_projected_support_centerline(
                     geometry, support_geom
                 )
-                overlap_region = support_geom.intersection(geometry)
+                overlap_region = ib.other_overlap
+                if overlap_region is None:
+                    overlap_region = support_geom.intersection(geometry)
 
             if support_geom == start_support:
                 new_start_point = intersecting_region

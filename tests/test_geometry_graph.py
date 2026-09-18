@@ -11,7 +11,8 @@ import numpy.testing as npt
 from pytest import fixture
 import pytest
 from pytest_check.context_manager import check
-from shapely import Polygon, box, Point
+from shapely import Polygon, box, Point, transform
+import copy
 import pathlib
 import fixtures
 from decimal import Decimal
@@ -244,3 +245,95 @@ def test_intersections_below_above(load_collector_extents_walls, load_intersecti
         assert "DB0.0" in ct1_above_tags
     with check:
         assert "DB0.1" in ct2_above_tags
+
+
+def _jitter_geometry(geom, rng, magnitude):
+    """Perturb every vertex by up to 'magnitude'; identical vertices move together."""
+    cache = {}
+
+    def fn(coords):
+        out = np.empty_like(coords)
+        for i, (x, y) in enumerate(coords):
+            key = (round(float(x), 9), round(float(y), 9))
+            if key not in cache:
+                cache[key] = rng.uniform(-magnitude, magnitude, size=2)
+            out[i] = np.array([x, y], dtype=float) + cache[key]
+        return out
+
+    return transform(geom, fn)
+
+
+def _graph_edge_set(graph):
+    return set(
+        (u, v, graph.edges[u, v]["edge_type"]) for u, v in graph.edges
+    )
+
+
+@pytest.mark.parametrize("magnitude", [1e-6, 1e-8])
+@pytest.mark.parametrize(
+    "fixture_name", ["intersections.pdf", "sketch_to_scale.pdf"]
+)
+def test_production_graph_topology_invariant_under_jitter(fixture_name, magnitude):
+    """
+    The acceptance criterion for the node-canonicalization effort (design §10),
+    applied to the real production pipeline: perturbing every input coordinate
+    must leave the load-path graph (node set and typed edge set) unchanged.
+    """
+    raw = GeometryGraph.from_pdf_file(
+        TEST_DATA / fixture_name,
+        scale=QUARTER_INCH_SCALE,
+        process_gravity_frame=False,
+    )
+    elements = [raw.nodes[n]["element"] for n in raw.nodes]
+    base = GeometryGraph.from_elements(copy.deepcopy(elements))
+    base_nodes, base_edges = set(base.nodes), _graph_edge_set(base)
+    rng = np.random.default_rng(20260717)
+    for _ in range(5):
+        jittered = copy.deepcopy(elements)
+        for element in jittered:
+            element.geometry = _jitter_geometry(element.geometry, rng, magnitude)
+        graph = GeometryGraph.from_elements(jittered)
+        with check:
+            assert set(graph.nodes) == base_nodes
+        with check:
+            assert _graph_edge_set(graph) == base_edges
+
+
+def test_intersection_region_shared_below_and_above():
+    """
+    Each physical crossing is computed once and shared: as built, the 'below'
+    view on the lower-rank element and the 'above' view on the higher-rank
+    element carry the byte-identical intersecting region (design §6, node
+    canonicalization). This is the invariant produced by
+    get_geometry_intersections; it is asserted on the raw graph (before the
+    gravity-frame post-processing that recomputes regions — a downstream site
+    still to be migrated in Phase 3).
+    """
+    graph = GeometryGraph.from_pdf_file(
+        TEST_DATA / "intersections.pdf",
+        scale=QUARTER_INCH_SCALE,
+        process_gravity_frame=False,
+    )
+    checked = 0
+    for node_name in graph.nodes:
+        element = graph.nodes[node_name]["element"]
+        if not element.intersections_below:
+            continue
+        for below in element.intersections_below:
+            other = graph.nodes[below.other_tag]["element"]
+            matching_above = [
+                above
+                for above in (other.intersections_above or [])
+                if above.other_tag == element.tag
+            ]
+            with check:
+                assert matching_above, (
+                    f"{below.other_tag} has no 'above' view of {element.tag}"
+                )
+            for above in matching_above:
+                with check:
+                    assert below.intersecting_region.equals_exact(
+                        above.intersecting_region, 0.0
+                    )
+                checked += 1
+    assert checked > 0
