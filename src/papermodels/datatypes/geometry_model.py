@@ -282,9 +282,7 @@ class GeometryModel:
 
     def _build_index(self) -> None:
         self._index_geom_ids = list(self.geometries.keys())
-        self.index = STRtree(
-            [self.geometries[gid] for gid in self._index_geom_ids]
-        )
+        self.index = STRtree([self.geometries[gid] for gid in self._index_geom_ids])
 
     def _build_incidence(self) -> None:
         ids = self._index_geom_ids
@@ -304,9 +302,7 @@ class GeometryModel:
                     continue
                 self._register_crossing(gid_i, geom_i, gid_j, geoms[int(j)])
 
-    def _register_crossing(
-        self, gid_i: GeomId, geom_i, gid_j: GeomId, geom_j
-    ) -> None:
+    def _register_crossing(self, gid_i: GeomId, geom_i, gid_j: GeomId, geom_j) -> None:
         crossing = geom_i.intersection(geom_j)
         if crossing.is_empty:
             return

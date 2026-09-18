@@ -1185,9 +1185,7 @@ def get_geometry_intersections(
         # Query by the extent polygon when present (it reaches beyond the raw
         # geometry), otherwise by the geometry itself.
         query_geom = i_extent_poly if i_extent_poly is not None else i_geom
-        candidate_positions = sorted(
-            index_positions[k] for k in tree.query(query_geom)
-        )
+        candidate_positions = sorted(index_positions[k] for k in tree.query(query_geom))
         for j_pos in candidate_positions:
             j_annot = annots[j_pos]
             j_attrs = intersected_annotations[j_annot]
