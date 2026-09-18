@@ -48,8 +48,8 @@ from . import geom_ops
 # Numerical tolerance for comparing stations/t-values that were derived from the
 # same inputs (not a drawing tolerance).
 EPS = 1e-9
-# Margin (real-world units) used when building "infinite" frame lines/bands.
-_FAR = 1e3
+# Outward pad on array regions so outer supports are strictly inside them.
+REGION_PAD = 1e-6
 
 MODE_FIXED = "fixed"  # ends from the outer supports + constant cantilevers
 MODE_CONTAINER = "container"  # ends from the container boundary
@@ -164,24 +164,58 @@ def fixed_region(
     s_range: tuple[float, float],
     cant_a: float,
     cant_b: float,
+    pad: float = REGION_PAD,
 ) -> Polygon:
     """
     The plain-prototype array region: the quadrilateral bounded by the outer
     supports ``support_a`` (smaller t) and ``support_b`` over ``s_range``,
     extended outward along ``u`` by the (non-negative) cantilevers.  Handles
     non-parallel supports (e.g. a triangular roof layout) without special cases.
+
+    ``pad`` widens it along ``u`` so that, with zero cantilevers, the outer
+    supports are strictly inside rather than *on* the region's edges (clipping
+    a line against an edge it is collinear with is float-fragile).  ``s_range``
+    must not extend past a point where the supports cross (see
+    :func:`converging_s_range`).
     """
     s0, s1 = s_range
     a0, a1 = _t_on_line(frame, support_a, s0), _t_on_line(frame, support_a, s1)
     b0, b1 = _t_on_line(frame, support_b, s0), _t_on_line(frame, support_b, s1)
+    ea, eb = cant_a + pad, cant_b + pad
     return Polygon(
         [
-            frame.xy(a0 - cant_a, s0),
-            frame.xy(b0 + cant_b, s0),
-            frame.xy(b1 + cant_b, s1),
-            frame.xy(a1 - cant_a, s1),
+            frame.xy(a0 - ea, s0),
+            frame.xy(b0 + eb, s0),
+            frame.xy(b1 + eb, s1),
+            frame.xy(a1 - ea, s1),
         ]
     )
+
+
+def converging_s_range(
+    frame: ArrayFrame,
+    support_a: LineString,
+    support_b: LineString,
+    s_range: tuple[float, float],
+    s_prototype: float,
+) -> tuple[tuple[float, float], bool, bool]:
+    """
+    Clip ``s_range`` where the outer supports meet (e.g. the apex of a triangular
+    roof area), keeping the prototype's side.  Returns
+    ``(s_range, converges_at_start, converges_at_end)``; a joist at a converging
+    end would have zero backspan, so none is placed there.
+    """
+    s0, s1 = s_range
+    d0 = _t_on_line(frame, support_b, s0) - _t_on_line(frame, support_a, s0)
+    d1 = _t_on_line(frame, support_b, s1) - _t_on_line(frame, support_a, s1)
+    at_start, at_end = abs(d0) <= EPS, abs(d1) <= EPS
+    if d0 * d1 < 0:  # the supports cross strictly inside the range
+        s_star = s0 + (s1 - s0) * d0 / (d0 - d1)
+        if s_star > s_prototype:
+            s1, at_end = s_star, True
+        else:
+            s0, at_start = s_star, True
+    return (s0, s1), at_start, at_end
 
 
 def clip_support_to_region(

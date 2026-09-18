@@ -509,7 +509,9 @@ class GeometryGraph(nx.DiGraph):
                             )
                             sub_id = subelem.tag
                             try:
-                                subextents = subelem.get_collector_extents()
+                                subextents = _precomputed_extents(subelem)
+                                if subextents is None:
+                                    subextents = subelem.get_collector_extents()
                             except geom.GeometryError:
                                 self.omitted.update({sub_id: subelem})
                                 if not self.suppress_warnings:
@@ -1346,6 +1348,18 @@ def _node_points(region) -> list[tuple[float, float]]:
         coords = list(region.coords)
         return [tuple(coords[0][:2]), tuple(coords[-1][:2])]
     return []
+
+
+def _precomputed_extents(element: Element) -> Optional[dict[str, tuple]]:
+    """
+    The collector extents already attached to a subelement's intersections
+    (JoistArrayModel computes them from its trib bands), or None if any are
+    missing and they must be derived with Element.get_collector_extents.
+    """
+    intersections = element.intersections_below or []
+    if not intersections or any(ib.other_extents is None for ib in intersections):
+        return None
+    return {ib.other_tag: ib.other_extents for ib in intersections}
 
 
 def _accepts_kwarg(func: callable, name: str) -> bool:

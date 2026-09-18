@@ -218,6 +218,9 @@ class GeometryModel:
         # Set when geometry is added after the index was built; the STRtree is
         # immutable, so it is rebuilt lazily on the next query.
         self._index_stale = False
+        # Parent GeomId -> GeomIds of the geometry generated from it (e.g. the
+        # joists of a joist array), so a re-generation replaces the old set.
+        self.generated: dict[GeomId, list[GeomId]] = {}
         # Set when built with noding enabled (Phase 2); None otherwise.
         self.noding_report: Optional[NodingReport] = None
 
@@ -354,6 +357,7 @@ class GeometryModel:
         plane: PlaneId,
         reaction_type: str = "point",
         crossings: Optional[dict[NodeId, GeomId]] = None,
+        parent: Optional[GeomId] = None,
     ) -> None:
         """
         Write a generated geometry (e.g. a joist produced by a joist array) into
@@ -363,6 +367,9 @@ class GeometryModel:
         obtained from ``self.nodes``) to the geometry it meets there; incidence
         is recorded for both sides.  Crossings are *not* recomputed: the caller
         constructed the geometry from those nodes.
+
+        ``parent`` records which geometry this one was generated from (see
+        :meth:`remove_generated`).
         """
         if gid in self.geometries:
             raise ValueError(f"Geometry id {gid!r} already exists in the model.")
@@ -372,6 +379,8 @@ class GeometryModel:
         self.geometries[gid] = geom
         self.geom_nodes[gid] = set()
         self._index_stale = True
+        if parent is not None:
+            self.generated.setdefault(parent, []).append(gid)
         tol = self.node_abs_tol
         for node_id, other_gid in (crossings or {}).items():
             if node_id not in self.nodes:
@@ -382,6 +391,34 @@ class GeometryModel:
             incs = self.incidence.setdefault(node_id, [])
             self._touch(incs, gid, geom, x, y, tol)
             self._touch(incs, other_gid, self.geometries[other_gid], x, y, tol)
+
+    def remove_geometry(self, gid: GeomId) -> None:
+        """Remove a geometry and its incidence (nodes stay: they are identities)."""
+        for node_id in self.geom_nodes.pop(gid, set()):
+            incs = [
+                inc for inc in self.incidence.get(node_id, []) if inc.geom_id != gid
+            ]
+            if len(incs) >= 2:
+                self.incidence[node_id] = incs
+                continue
+            # Only one geometry left at this node: it is no longer a crossing.
+            self.incidence.pop(node_id, None)
+            for inc in incs:
+                self.geom_nodes[inc.geom_id].discard(node_id)
+        for store in (
+            self.geometries,
+            self.polygons,
+            self.ranks,
+            self.planes,
+            self.reaction_types,
+        ):
+            store.pop(gid, None)
+        self._index_stale = True
+
+    def remove_generated(self, parent: GeomId) -> None:
+        """Remove every geometry previously generated from ``parent``."""
+        for gid in self.generated.pop(parent, []):
+            self.remove_geometry(gid)
 
     # -- queries ------------------------------------------------------------
 

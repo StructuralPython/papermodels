@@ -277,17 +277,16 @@ def test_wall_point_load_locations(sketch_to_scale_to_array_loaded_elements):
 
     with check:
         # Test that all intervals are about the same size by not exceeding the prescribed spacing
-        # First, for walls
-        joist_intervals = [x[0] - x[1] for x in zip(acc[:-1], acc[1:])]
+        # First, for walls (order-independent: the array direction is a convention)
+        acc = sorted(acc)
+        joist_intervals = [x[1] - x[0] for x in zip(acc[:-1], acc[1:])]
         assert math.isclose(max(joist_intervals), 1)
 
         # Test that all intervals are about the same size by not exceeding the prescribed spacing
         # Next, for beams
         fb4_pt = les["FB4.0"].model()["loads"]["point_loads"]
-        acc = []
-        for load in fb4_pt:
-            acc.append(load["location"])
-        joist_intervals = [x[0] - x[1] for x in zip(acc[:-1], acc[1:])]
+        acc = sorted(load["location"] for load in fb4_pt)
+        joist_intervals = [x[1] - x[0] for x in zip(acc[:-1], acc[1:])]
         assert math.isclose(max(joist_intervals), 1)
 
 
@@ -295,11 +294,11 @@ def test_horiz_extents_joist_extents(horiz_extents_to_array_loaded_elements):
     les = horiz_extents_to_array_loaded_elements
     db0 = les["DB0.0"].model()
     db1 = les["DB0.1"].model()
-    pls = db0["loads"]["point_loads"]
-    assert pls[0]["location"] == 7.83
-    assert pls[-1]["location"] == 3.134
-    assert db0['element_geometry']['supports'][0]['location'] == 0.0
-    assert db0['element_geometry']['supports'][1]['location'] == 11.610
+    locations = sorted(pl["location"] for pl in db0["loads"]["point_loads"])
+    assert locations[-1] == 7.83
+    assert locations[0] == 3.134
+    assert db0["element_geometry"]["supports"][0]["location"] == 0.0
+    assert db0["element_geometry"]["supports"][1]["location"] == 11.610
 
 
 def test_trib_areas_basic_loads(trib_areas_basic_loaded_elements):

@@ -142,11 +142,18 @@ def test_resi_dormers_array(load_resi_dormers):
     les = graph.create_loaded_elements()
     assert les["FB0.3"].model()["loads"]["point_loads"]
     fb03_pl = les["FB0.3"].model()["loads"]["point_loads"]
-    assert len(fb03_pl) == 5 # TODO: Need to solve the GeometryError caused in the test when RJ0.0-6 is not omitted from the geometry graph.
-    rj001 = les["RJ0.0-1"].model()
-    # rj006 = les["RJ0.0-6"].model()
-    assert rj001["element_attributes"]["length"] == 0.969
-    # assert rj006["element_attributes"]["length"] == 5.767
+    # Every joist in the triangular array reaches FB0.3, including the long one
+    # at the open end; the zero-backspan joist at the apex is not generated.
+    assert len(fb03_pl) == 6
+    assert not graph.omitted
+    rj_lengths = [
+        les[f"RJ0.0-{idx}"].model()["element_attributes"]["length"] for idx in range(6)
+    ]
+    assert rj_lengths[0] == 5.707
+    assert rj_lengths[-1] == 0.864
+    # Joists shorten linearly toward the apex (FB0.3 is at 45 degrees; 1.0 spacing)
+    steps = [a - b for a, b in zip(rj_lengths, rj_lengths[1:])]
+    assert max(steps) - min(steps) < 2e-3
 
 
 def test_many_correspondents(load_many_correspondents):
@@ -264,15 +271,11 @@ def _jitter_geometry(geom, rng, magnitude):
 
 
 def _graph_edge_set(graph):
-    return set(
-        (u, v, graph.edges[u, v]["edge_type"]) for u, v in graph.edges
-    )
+    return set((u, v, graph.edges[u, v]["edge_type"]) for u, v in graph.edges)
 
 
 @pytest.mark.parametrize("magnitude", [1e-6, 1e-8])
-@pytest.mark.parametrize(
-    "fixture_name", ["intersections.pdf", "sketch_to_scale.pdf"]
-)
+@pytest.mark.parametrize("fixture_name", ["intersections.pdf", "sketch_to_scale.pdf"])
 def test_production_graph_topology_invariant_under_jitter(fixture_name, magnitude):
     """
     The acceptance criterion for the node-canonicalization effort (design §10),
@@ -327,9 +330,9 @@ def test_intersection_region_shared_below_and_above():
                 if above.other_tag == element.tag
             ]
             with check:
-                assert matching_above, (
-                    f"{below.other_tag} has no 'above' view of {element.tag}"
-                )
+                assert (
+                    matching_above
+                ), f"{below.other_tag} has no 'above' view of {element.tag}"
             for above in matching_above:
                 with check:
                     assert below.intersecting_region.equals_exact(
@@ -337,3 +340,47 @@ def test_intersection_region_shared_below_and_above():
                     )
                 checked += 1
     assert checked > 0
+
+
+def _array_signature(graph):
+    """Per collector: its subelement tags and each subelement's support tags."""
+    sig = {}
+    for node in graph.collector_elements:
+        element = graph.nodes[node]["element"]
+        sig[node] = [
+            (sub.tag, tuple(sorted(ib.other_tag for ib in sub.intersections_below)))
+            for sub in element.subelements or []
+        ]
+    return sig
+
+
+@pytest.mark.parametrize("magnitude", [1e-6, 1e-8])
+@pytest.mark.parametrize(
+    "fixture_name",
+    ["intersections.pdf", "sketch_to_scale.pdf", "collector_extents.pdf"],
+)
+def test_joist_arrays_invariant_under_jitter(fixture_name, magnitude):
+    """
+    Jitter acceptance (design §10) extended to JoistArrayModel: perturbing every
+    input coordinate must not change which joists are generated or what each
+    one bears on.
+    """
+    raw = GeometryGraph.from_pdf_file(
+        TEST_DATA / fixture_name,
+        scale=QUARTER_INCH_SCALE,
+        process_gravity_frame=False,
+    )
+    elements = [raw.nodes[n]["element"] for n in raw.nodes]
+    base = GeometryGraph.from_elements(copy.deepcopy(elements))
+    base.assign_collector_behaviour(JoistArrayModel, spacing=1.0)
+    base_sig = _array_signature(base)
+    assert any(base_sig.values())
+    rng = np.random.default_rng(20260918)
+    for _ in range(3):
+        jittered = copy.deepcopy(elements)
+        for element in jittered:
+            element.geometry = _jitter_geometry(element.geometry, rng, magnitude)
+        graph = GeometryGraph.from_elements(jittered)
+        graph.assign_collector_behaviour(JoistArrayModel, spacing=1.0)
+        with check:
+            assert _array_signature(graph) == base_sig

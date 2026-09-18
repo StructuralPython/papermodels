@@ -356,3 +356,25 @@ def test_graph_geometry_model_holds_every_intersection_node():
             region = ib.intersecting_region
             if region.geom_type == "Point":
                 assert (region.x, region.y) in coords
+
+
+def test_remove_generated_replaces_previous_generation():
+    model = GeometryModel.from_elements(_support_scene(), node_abs_tol=1e-6)
+    edges_before = model.intersection_edges()
+    n_wall = model.nodes.get_or_create((7.5, 0.0))
+    n_beam = model.nodes.get_or_create((7.5, 5.0))
+    model.add_geometry(
+        "J-0",
+        LineString([(7.5, 0.0), (7.5, 5.0)]),
+        rank=0,
+        plane=0,
+        crossings={n_wall: "WT", n_beam: "FB"},
+        parent="J",
+    )
+    assert model.generated == {"J": ["J-0"]}
+    model.remove_generated("J")
+    assert "J-0" not in model.geometries and model.generated == {}
+    assert model.intersection_edges() == edges_before
+    assert n_wall not in model.geom_nodes["WT"]
+    # Regenerating under the same id is allowed after removal
+    model.add_geometry("J-0", LineString([(7.5, 0.0), (7.5, 5.0)]), rank=0, plane=0)
