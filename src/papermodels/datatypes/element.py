@@ -12,6 +12,7 @@ from ..paper.annotations import (
     tag_parsed_annotations,
 )
 from ..geometry import geom_ops
+from ..geometry.load_projection import project_loading_areas
 from .geometry_model import NodeRegistry
 import math
 import json
@@ -895,7 +896,7 @@ class LoadedElement(Element):
         """
         distributed_loads = []
         if self.geometry.geom_type == "LineString":
-            raw_dist_loads = ld.get_distributed_loads_from_projected_polygons(
+            raw_dist_loads = project_loading_areas(
                 self.geometry, self.applied_loading_areas
             )
             polygon_areas = geom_ops.calculate_trapezoid_area_sums(raw_dist_loads)
