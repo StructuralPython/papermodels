@@ -323,7 +323,7 @@ def plot_annotations(
                 Polygon(
                     xy=xy.T,
                     closed=True,
-                    # linestyle=annot.line_type,
+                    linestyle=_dash_linestyle(annot.line_type, annot.line_weight),
                     linewidth=float(annot.line_weight),
                     ec=tuple(float(elem) for elem in annot.line_color),
                     fc=face_color,
@@ -338,7 +338,7 @@ def plot_annotations(
             ax.plot(
                 xy[0],
                 xy[1],
-                # linestyle=annot.line_type,
+                linestyle=_dash_linestyle(annot.line_type, annot.line_weight),
                 linewidth=float(annot.line_weight),
                 color=tuple(float(elem) for elem in annot.line_color),
                 alpha=float(annot.line_opacity),
@@ -412,3 +412,20 @@ def _exterior_xy(area) -> np.ndarray:
         parts = [g for g in area.geoms if g.geom_type == "Polygon"]
         area = max(parts, key=lambda g: g.area)
     return np.array(list(zip(*area.exterior.coords)))
+
+
+def _dash_linestyle(line_type: Optional[tuple], line_weight) -> str | tuple:
+    """
+    Returns a matplotlib linestyle approximating the PDF dash array 'line_type'.
+
+    PDF dash lengths are in points while matplotlib dash lengths are multiples
+    of the line width, so each length is divided by 'line_weight'. The dashes
+    therefore render at their true size in points, independent of plot zoom.
+    """
+    if not line_type:
+        return "solid"
+    line_width = float(line_weight) or 1.0
+    dashes = tuple(line_type)
+    if len(dashes) % 2:  # PDF repeats an odd-length array to form on/off pairs
+        dashes = dashes * 2
+    return (0, tuple(float(length) / line_width for length in dashes))

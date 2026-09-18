@@ -139,6 +139,7 @@ def pike_annotation_to_pm_annotation(
         utf_stream = pike.Stream.read_bytes(content_stream).decode("utf-8")
         stream_dict = parse_content_stream(utf_stream)
     else:
+        utf_stream = None
         stream_dict = {}
     if "/Subj" in annot:
         annot_type = str(annot["/Subj"])
@@ -217,18 +218,7 @@ def pike_annotation_to_pm_annotation(
         line_opacity = global_opacity
     line_width = stream_dict.get("w", (1,))[0]
 
-    line_type = stream_dict.get("d", None)
-    if line_type is not None:
-        line_type = tuple(line_type)
-    # TODO: Fix test suite PDF files so that the linetype is no
-    # longer an issue.
-    # Use the above to get the line_type
-    # Currently the tests use PDF files created with a mixture
-    # of two softwares (Bluebeam Revu and Qoppa PDF Studio)
-    # Activating the line_type breaks the test suite because
-    # some entities are not recognized in the legend anymore
-    # because of small differences in the linetype
-    line_type = None
+    line_type = get_dash_pattern(annot, utf_stream)
 
     matrix = (1, 0, 0, 1, 0, 0)
 
@@ -247,6 +237,36 @@ def pike_annotation_to_pm_annotation(
         local_id=annot_idx,
     )
     return annotation
+
+
+def get_dash_pattern(annot, content_stream: Optional[str] = None) -> Optional[tuple]:
+    """
+    Returns the dash array of 'annot' as a tuple of floats (e.g. (4.0, 4.0)) or
+    None if the annotation is drawn with a solid line.
+
+    The border style dictionary (/BS) is the authoritative source. If the
+    annotation does not have one, the dash operator ('[...] phase d') in the
+    appearance 'content_stream' is used instead. PDF editors encode solid lines
+    in several ways (no /BS, /S /S, an empty dash array, '[] 0 d'); all of
+    these are normalized to None so that solid lines compare equal regardless
+    of the software used to draw them.
+    """
+    border_style = annot.get("/BS", None)
+    if border_style is not None:
+        if border_style.get("/S", None) != "/D":
+            return None
+        dash_array = tuple(border_style.get("/D", (3,)))  # [3] is the PDF default
+    elif content_stream is not None:
+        dash_match = re.search(r"\[([^\]]*)\]\s*[-\d.]+\s+d\b", content_stream)
+        if dash_match is None:
+            return None
+        dash_array = tuple(dash_match.group(1).split())
+    else:
+        return None
+    dash_array = tuple(float(length) for length in dash_array)
+    if not dash_array or sum(dash_array) <= 0:
+        return None
+    return dash_array
 
 
 def parse_content_stream(stream: str) -> dict[str, list]:
