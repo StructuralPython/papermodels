@@ -15,6 +15,7 @@ import pytest
 from shapely import LineString, Point, box, unary_union
 from shapely import affinity as aff
 
+import papermodels
 from papermodels.datatypes.element import Element, Intersection
 from papermodels.datatypes.geometry_graph import GeometryGraph
 from papermodels.datatypes.joist_models import JoistArrayModel
@@ -120,12 +121,25 @@ def test_prototype_on_one_support_is_a_clear_error():
 # --------------------------------------------------------------------------
 
 
+PAPERMODELS_DIR = pathlib.Path(papermodels.__file__).resolve().parent
+
+
+def _from_papermodels(warning: warnings.WarningMessage) -> bool:
+    """
+    True if papermodels itself issued the warning. Warnings from other
+    libraries are not what these tests are about, e.g. the numpy RuntimeWarnings
+    that shapely's oriented_envelope emits on macOS arm64 only.
+    """
+    return pathlib.Path(warning.filename).resolve().is_relative_to(PAPERMODELS_DIR)
+
+
 def _assigned(name, scale, kw):
+    """Assign joist arrays; also return the messages of papermodels' own warnings."""
     graph = GeometryGraph.from_pdf_file(TEST_DATA / name, scale=scale, **kw)
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         graph.assign_collector_behaviour(JoistArrayModel, spacing=1.0)
-    return graph, [str(w.message) for w in caught]
+    return graph, [str(w.message) for w in caught if _from_papermodels(w)]
 
 
 @pytest.mark.parametrize("name,scale,kw", FIXTURES)
