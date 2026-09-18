@@ -188,15 +188,48 @@ def test_intermediate_support_that_comes_and_goes_is_not_a_gap():
     assert counts == [2, 2, 2, 3, 3, 3, 3, 3, 2, 2, 2]
 
 
-def test_support_count_differing_from_both_neighbours_relocates():
+def test_short_intermediate_beam_does_not_move_the_joist_on_it():
     # A short intermediate beam under only the x=5 joist: 3 supports vs 2 and 2.
+    # An extra support is not a gap; the joist stays on the beam.
     short = S("SHORT", [(4.6, 5), (5.4, 5)])
     base = fixed_array(PROTO, [BOTTOM, TOP])
     r = fixed_array(PROTO, [BOTTOM, TOP, short], s_range=(-5, 5), region=base.region)
+    assert not r.events
+    assert [j.station for j in r.joists] == [j.station for j in base.joists]
+    counts = {round(j.station, 9): len(j.crossings) for j in r.joists}
+    assert counts[0.0] == 3 and set(counts.values()) == {2, 3}
+    (on_beam,) = [j for j in r.joists if len(j.crossings) == 3]
+    assert "SHORT" in {c.gid for c in on_beam.crossings}
+
+
+def test_gap_in_outer_line_under_an_intermediate_support_still_relocates():
+    # The bottom (outer) line has a gap at x=4.8..5.3, but a long intermediate
+    # beam keeps the x=5 joist at 2 supports (MID + TOP). Its neighbours have 3,
+    # so it is missing a support they bear on: move it, as for any gap.
+    bottom = [S("B1", [(0, 0), (4.8, 0)]), S("B2", [(5.3, 0), (10, 0)])]
+    mid = S("MID", [(2.5, 5), (7.5, 5)])
+    proto = LineString([(2, -0.5), (2, 11.0)])
+    frame = ja.ArrayFrame.from_prototype(proto)
+    s_range = (frame.ts((0, 0))[1], frame.ts((10, 0))[1])
+    region = ja.fixed_region(frame, TOP.line, bottom[0].line, s_range, 1.0, 0.5)
+    r = ja.build_array(
+        frame,
+        region,
+        bottom + [mid, TOP],
+        s_range,
+        ja.MODE_FIXED,
+        1.0,
+        cant_a=1.0,
+        cant_b=0.5,
+        min_bearing=MB,
+    )
     (ev,) = [e for e in r.events if e.kind == "relocated"]
-    assert math.isclose(ev.target, 0.0, abs_tol=1e-12)
-    assert math.isclose(abs(ev.final), 0.4 + MB, abs_tol=1e-9)
-    assert all(len(j.crossings) == 2 for j in r.joists)
+    assert math.isclose(frame.xy(0, ev.target)[0], 5.0, abs_tol=1e-9)
+    assert math.isclose(frame.xy(0, ev.final)[0], 4.8 - MB, abs_tol=1e-9)
+    for j in r.joists:
+        gids = {c.gid for c in j.crossings}
+        assert "TOP" in gids and gids & {"B1", "B2"}
+    assert_tiles(r)
 
 
 def test_no_valid_station_in_window_drops_joist():

@@ -95,12 +95,17 @@ exceeds the spacing, and `joist_at_start`, `joist_at_end` and `initial_offset`
 are all honoured.
 
 A target station is **invalid** if its interval has fewer than two supports, or
-if its support count differs from **both** neighbours' counts. An invalid
-station moves to the nearest valid station, found by a `bisect` over the
-breakpoints followed by an outward scan. The scan stays within half a spacing
-of the target and never passes a neighbour, and it insets from the edge of the
-valid interval by `min_bearing`. If nothing valid is in the window, the joist is
-dropped with a warning.
+**fewer** supports than both of its neighbours. Fewer than both means a support
+the neighbours bear on is missing here: a gap, for example in the outer line
+while an intermediate support still gives the joist two. Having **more**
+supports than both neighbours, such as a short intermediate beam under that one
+joist, is a legitimate extra bearing, so the joist stays on it.
+
+An invalid station moves to the nearest valid station, found by a `bisect` over
+the breakpoints followed by an outward scan. The scan stays within half a
+spacing of the target and never passes a neighbour, and it insets from the edge
+of the valid interval by `min_bearing`. If nothing valid is in the window, the
+joist is dropped with a warning.
 
 Intermediate supports that come and go (WT0.3 in `collector_extents`) don't
 trigger relocation, because their neighbours have the same count.
@@ -168,7 +173,7 @@ No existing helper was reused on trust. The audit is pinned by
 | `get_intersection`, extent branch | OBB centerline of the *clipped* wall piece turns perpendicular for narrow clips | replaced by `region_support_crossing` for arrays |
 | `get_wall_centerline` (OBB) | correct at any angle; tolerates noise; near-square gives an axis | kept |
 | `rotate_90_vector` | exact quarter turn | kept |
-| `load_distribution.get_distributed_loads_from_projected_polygons` | **defect:** after rotation a vertical edge keeps a ~1e-17 x-offset, which becomes a ~1e16 slope, so rectangular and trapezoidal bands about a 30° member project to zero load | guarded locally by `geometry.load_projection.project_loading_areas` (same rotation, snap to 1e-9, horizontal member); **fix upstream** |
+| `load_distribution.get_distributed_loads_from_projected_polygons` | **defect:** after rotation a vertical edge keeps a ~1e-17 x-offset, which becomes a ~1e16 slope, so rectangular and trapezoidal bands about a 30° member project to zero load | guarded locally by `geometry.load_projection.project_loading_areas` (same rotation, snap to 1e-9, horizontal member); **fix upstream** (see `load-distribution-bug.md`) |
 
 ## 6. Behaviour changes
 
@@ -185,10 +190,6 @@ No existing helper was reused on trust. The audit is pinned by
 
 ## 7. Open questions
 
-- **The literal neighbour rule** also moves a joist off a short intermediate
-  beam that sits under that one joist only (3 supports against 2 and 2). This
-  follows the spec, and is pinned by
-  `test_support_count_differing_from_both_neighbours_relocates`.
 - **Array ends** only require two supports, because the neighbour rule needs two
   neighbours. A wrong-pair end joist is still caught by the span-jump warning.
 - **DXF** gained extent and container routing but has no test fixture.

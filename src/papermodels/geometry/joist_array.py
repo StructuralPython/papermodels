@@ -514,16 +514,20 @@ class StationEvent:
 
 def _valid(count: int, left: Optional[int], right: Optional[int]) -> bool:
     """
-    The station-validity rule from the spec: at least two supports, and not a
-    support count that differs from both neighbours.  End stations (one
-    neighbour) only need two supports — they cannot be told apart from a
-    legitimate change in the support pattern.
+    Station validity: at least two supports, and not *fewer* supports than both
+    neighbours.  Fewer than both means a support the neighbours bear on is
+    missing here — a gap, e.g. in the outer support line while an intermediate
+    support still gives the joist two.  *More* than both neighbours is a
+    legitimate extra support (a short intermediate beam under this joist only)
+    and must not move the joist off it.  End stations (one neighbour) only need
+    two supports — they cannot be told apart from a legitimate change in the
+    support pattern.
     """
     if count < 2:
         return False
     if left is None or right is None:
         return True
-    return count in (left, right)
+    return count >= min(left, right)
 
 
 def resolve_stations(
