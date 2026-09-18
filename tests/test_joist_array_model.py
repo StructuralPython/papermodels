@@ -184,3 +184,17 @@ def test_reassigning_behaviour_replaces_generated_joists():
     assert graph.geometry_model.generated["SJ0.0"] == first
     generated = [g for kids in graph.geometry_model.generated.values() for g in kids]
     assert len(generated) == len(set(generated))
+
+
+def test_abrupt_span_change_warns_with_tag_and_advice():
+    # Top support steps 2.0 further out halfway along the extent: a span jump.
+    top_1 = ("FB0.1", LineString([(0, 10), (5.5, 10)]), "point")
+    top_2 = ("FB0.2", LineString([(5.5, 12), (10, 12)]), "point")
+    e = _element(LineString([(2, -0.5), (2, 10.5)]), [WALL, top_1, top_2])
+    e.extent_line = LineString([(0, 5), (10, 5)])
+    with pytest.warns(UserWarning, match=r"Joist array J0\.0: abrupt change in span"):
+        model = JoistArrayModel(e, spacing=1.0)
+    assert [ev.kind for ev in model.events] == ["span_jump"]
+    # Generation continues: every joist still bears on the wall and a top beam
+    for joist in model.result.joists:
+        assert len(joist.crossings) == 2
