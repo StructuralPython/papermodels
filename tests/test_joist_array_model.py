@@ -198,3 +198,16 @@ def test_abrupt_span_change_warns_with_tag_and_advice():
     # Generation continues: every joist still bears on the wall and a top beam
     for joist in model.result.joists:
         assert len(joist.crossings) == 2
+
+
+def test_point_reaction_polygon_support_is_borne_along_its_long_axis():
+    """Drawings made before the 'Reaction Type' legend field draw walls as point polygons."""
+    legacy_wall = ("WT0.0", box(0, -0.25, 10, 0.25), "point")
+    e = _element(LineString([(5, -0.1), (5, 10.5)]), [legacy_wall, BEAM])
+    with pytest.warns(UserWarning, match="add 'Reaction Type: Linear'"):
+        subs = JoistArrayModel(e, spacing=1.0)().subelements
+    assert len(subs) == 11
+    for sub in subs:
+        by_tag = {ib.other_tag: ib for ib in sub.intersections_below}
+        assert by_tag["WT0.0"].intersecting_region.y == pytest.approx(0.0, abs=1e-12)
+        assert by_tag["WT0.0"].other_reaction_type == "point"

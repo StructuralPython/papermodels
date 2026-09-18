@@ -148,7 +148,7 @@ def extent_region(
     """
     The extent-line array region: the parallelogram (a rectangle in the frame)
     swept by ``t_range`` over the extent line's station range.  Replaces the
-    axis-aligned bounding box of ``create_extent_polygon``.
+    axis-aligned bounding box the former ``create_extent_polygon`` used.
 
     ``s_include`` (default: the prototype's own station, 0) is always included.
     """
@@ -161,7 +161,7 @@ def prototype_extent_region(prototype: LineString, extent_line: LineString) -> P
     """
     The region a joist prototype sweeps along its extent line: the prototype's
     t-range over the extent line's station range, in the prototype's frame.
-    Replaces ``geom_ops.create_extent_polygon`` (an axis-aligned bounding box,
+    Replaces the former ``geom_ops.create_extent_polygon`` (an axis-aligned bounding box,
     wrong for any tilted prototype).
     """
     frame = ArrayFrame.from_prototype(prototype)
@@ -486,7 +486,7 @@ def target_stations(
     """
     Nominal joist stations over [s_min, s_max].  Joists are laid at ``spacing``
     from the first station; no gap exceeds ``spacing`` (the closing gap to an
-    end joist may be shorter).  Replaces ``geom_ops.get_joist_locations``, which
+    end joist may be shorter).  Replaces the former ``geom_ops.get_joist_locations``, which
     used a line-to-line distance, ignored ``joist_at_end`` and let the last gap
     reach 1.5x spacing.
     """

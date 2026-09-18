@@ -939,8 +939,9 @@ class LoadedElement(Element):
                             area_ratio = area_dist_load / total_polygon_area
                         # THIS GIVES THE CORRECT TRAPEZOID RATIO FOR COLLECTORTRIBMODEL
                         elif self.reaction_type == "linear":
-                            # In the CollectorTribModel the trib area reflects the size of a whole
-                            # spread of joists which will be reduced down to a reaction over a unit length.
+                            # A linear-reaction collector's trib area reflects the size of a whole
+                            # spread of joists (e.g. a user-drawn trib area with no joist model
+                            # assigned) which will be reduced down to a reaction over a unit length.
                             # In this case, we need an area ratio to reflect the percentage of area that
                             # an area load covers in relation to the total trib area.
                             area_ratio = (

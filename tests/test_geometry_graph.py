@@ -4,7 +4,7 @@ from papermodels.datatypes.annotation import Annotation, A0, A1
 from papermodels.paper.annotations import _annotation_to_wkt
 from papermodels.paper import annotations as an
 from papermodels.paper import pdf
-from papermodels.datatypes.joist_models import JoistArrayModel, CollectorTribModel
+from papermodels.datatypes.joist_models import JoistArrayModel
 from papermodels.datatypes.element import create_element_filter
 import numpy as np
 import numpy.testing as npt
@@ -89,20 +89,22 @@ def test_collector_assignment_frame_collectors_transfers(
         user_defined={"collector behaviour": "array"}
     )
     graph.assign_collector_behaviour(
-        CollectorTribModel
-    )  # Assign all collectors trib model
+        JoistArrayModel, spacing=4.0
+    )  # Assign all collectors a coarse array
+    coarse = len(graph.nodes["SJ0.0"]["element"].subelements)
     graph.assign_collector_behaviour(
         JoistArrayModel, steel_joist_arrays, spacing=1.0
-    )  # Assign steel joists the array
+    )  # Re-assign steel joists a finer array
     graph.assign_collector_behaviour(
         JoistArrayModel, user_designated_joists, spacing=1.0
     )
     les = graph.create_loaded_elements()
-    assert (
-        "SJ0.0-9" in les
-    )  # Confirms that JoistArray behaviour created for steel joists
-    assert "WJ0.0" in les  # Confirms that collector_trib behaviour created for WJ0.0
-    assert "WJ0.1-9" in les  # Confirms that JoistArray behaviour created for WJ0.1
+    # The later, filtered assignments replace the earlier one...
+    assert "SJ0.0-9" in les
+    assert len(graph.nodes["SJ0.0"]["element"].subelements) > coarse
+    assert "WJ0.1-9" in les
+    # ...and elements outside the filters keep the first assignment
+    assert "WJ0.0-0" in les and "WJ0.0-9" not in les
 
 
 def test_load_collector_extents(load_collector_extents):
@@ -127,9 +129,9 @@ def test_resi_dormers_array(load_resi_dormers):
     roof_joist_filter = create_element_filter(element_types=["RJ"])
     all_other_joists_filter = create_element_filter(exclude_element_types=["RJ"])
 
-    # First, assign the default behaviour to everything
+    # First, assign the default behaviour to everything else
     graph.assign_collector_behaviour(
-        CollectorTribModel, filter_function=all_other_joists_filter
+        JoistArrayModel, filter_function=all_other_joists_filter, spacing=2.0
     )
 
     # Then assign the special cases. These will overwrite the previously

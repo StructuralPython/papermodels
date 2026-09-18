@@ -3,7 +3,7 @@ from papermodels.datatypes.annotation import Annotation, A0, A1
 from papermodels.paper.annotations import _annotation_to_wkt
 from papermodels.paper import annotations as an
 from papermodels.paper import pdf
-from papermodels.datatypes.joist_models import JoistArrayModel, CollectorTribModel
+from papermodels.datatypes.joist_models import JoistArrayModel
 import numpy as np
 import numpy.testing as npt
 from pytest import fixture
@@ -56,25 +56,9 @@ def load_horiz_extents():
 
 
 @fixture()
-def sketch_to_scale_to_trib_loaded_elements(load_sketch_to_scale):
-    graph = load_sketch_to_scale
-    graph.assign_collector_behaviour(CollectorTribModel)
-    les = graph.create_loaded_elements()
-    return les
-
-
-@fixture()
 def sketch_to_scale_to_array_loaded_elements(load_sketch_to_scale):
     graph = load_sketch_to_scale
     graph.assign_collector_behaviour(JoistArrayModel, spacing=1)
-    les = graph.create_loaded_elements()
-    return les
-
-
-@fixture()
-def collector_extents_to_trib_loaded_elements(load_collector_extents):
-    graph = load_collector_extents
-    graph.assign_collector_behaviour(CollectorTribModel)
     les = graph.create_loaded_elements()
     return les
 
@@ -106,12 +90,6 @@ def test_sketch_to_scale_loads(load_sketch_to_scale):
     assert load_sketch_to_scale
 
 
-def test_sketch_to_scale_creates_trib_loaded_elements(
-    sketch_to_scale_to_trib_loaded_elements,
-):
-    assert sketch_to_scale_to_trib_loaded_elements
-
-
 def test_sketch_to_scale_creates_array_loaded_elements(
     sketch_to_scale_to_array_loaded_elements,
 ):
@@ -122,17 +100,6 @@ def test_sketch_to_scale_creates_array_loaded_elements(
 def test_horiz_extents_loads(horiz_extents_to_array_loaded_elements):
     les = horiz_extents_to_array_loaded_elements
     assert les
-
-
-def test_kwargs_pass_thru_sketch_to_scale_trib(sketch_to_scale_to_trib_loaded_elements):
-    les = sketch_to_scale_to_trib_loaded_elements
-    assert les["J4.0"].model()["element_attributes"]["user_defined"] == {
-        "slope": "4/12",
-        "slope_down": "right",
-    }
-    assert les["FB2.0"].model()["element_attributes"]["user_defined"] == {
-        "user_defined": "data"
-    }
 
 
 def test_kwargs_pass_thru_sketch_to_scale_array(
@@ -148,23 +115,34 @@ def test_kwargs_pass_thru_sketch_to_scale_array(
     }
 
 
-def test_joists_loaded_sketch_to_scale(sketch_to_scale_to_trib_loaded_elements):
-    les = sketch_to_scale_to_trib_loaded_elements
-    j40_joist = les["J4.0"].model()
+def test_joists_loaded_sketch_to_scale(sketch_to_scale_to_array_loaded_elements):
+    les = sketch_to_scale_to_array_loaded_elements
+    j40_subs = [tag for tag in les if tag.startswith("J4.0-")]
+    j40_loads = [
+        dl for tag in j40_subs for dl in les[tag].model()["loads"]["distributed_loads"]
+    ]
     with check:
-        assert j40_joist["loads"]["distributed_loads"][0]["occupancy"] == "roof"
-        assert j40_joist["loads"]["distributed_loads"][0]["applied_area"] == 188.496
-        j40_load = les["WT4.0"].model()["loads"]["distributed_loads"][0]
-        assert j40_load["transfer_source"] == "J4.0"
-        assert j40_load["start_loc"] == 0.573
-        assert j40_load["end_loc"] == 11.687
+        assert {dl["occupancy"] for dl in j40_loads} == {"roof"}
+        # All of the roof area over the array is carried by its joists
+        assert math.isclose(
+            sum(dl["applied_area"] for dl in j40_loads), 187.941, abs_tol=2e-3
+        )
+        wt40_loads = les["WT4.0"].model()["loads"]["point_loads"]
+        assert {pl["transfer_source"].rsplit("-", 1)[0] for pl in wt40_loads} == {
+            "J4.0"
+        }
+        wt40_locations = [pl["location"] for pl in wt40_loads]
+        assert min(wt40_locations) == 0.573
+        assert max(wt40_locations) == 11.687
 
-        # TODO: Update this test with what start and end locs should actually be
-        fb1_3 = les["FB1.3"].model()
-        assert fb1_3["loads"]["distributed_loads"][0]["start_loc"] == 0.433
-        assert fb1_3["loads"]["distributed_loads"][0]["end_loc"] == 10.906
+        fb1_3 = les["FB1.3"].model()["loads"]["point_loads"]
+        fb1_3_locations = [
+            pl["location"] for pl in fb1_3 if pl["transfer_source"].startswith("J1.1")
+        ]
+        assert min(fb1_3_locations) == 0.433
+        assert max(fb1_3_locations) == 10.906
 
-        j1_1 = les["J1.1"].model()
+        j1_1 = les["J1.1-0"].model()
         assert j1_1["element_geometry"]["supports"][1]["overlap_length"] == 0.392
 
 
@@ -173,92 +151,58 @@ def test_collector_extent_loads(load_collector_extents):
 
 
 def test_collector_extent_creates_loaded_elements(
-    collector_extents_to_trib_loaded_elements,
+    collector_extents_to_array_loaded_elements,
 ):
-    les = collector_extents_to_trib_loaded_elements
-    assert set(les.keys()) == set(
-        [
-            "SJ0.0-0",
-            "SJ0.0-1",
-            "SJ0.0-2",
-            "SJ0.0-3",
-            "SJ0.0-4",
-            "SJ0.0-5",
-            "SJ0.1",
-            "WT0.0",
-            "WT0.1",
-            "WT0.2",
-            "WT0.3",
-            "FB0.0",
-            "FB0.2",
-            "FB0.1",
-            "FB0.3",
-            "CT0.4",
-            "CT0.5",
-            "CT0.8",
-            "FB0.4",
-            "WT0.0",
-            "CT0.0",
-            "CT0.6",
-            "WT0.2",
-            "CT0.2",
-            "CT0.7",
-            "WT0.1",
-            "CT0.1",
-            "CT0.3",
-        ]
-    )
-    with check:
-        assert les["WT0.3"].model()["loads"][
-            "distributed_loads"
-        ]  # There are loads present on the intermediate support
-    with check:
-        assert (
-            les["WT0.1"].model()["loads"]["distributed_loads"][0]["transfer_source"]
-            == "SJ0.0-0"
-        )
-    with check:
-        assert (
-            les["WT0.1"].model()["loads"]["distributed_loads"][0]["start_loc"] == 2.195
-        )
-    with check:
-        assert les["WT0.1"].model()["loads"]["distributed_loads"][0]["end_loc"] == 3.857
+    """
+    An extent-line joist array (SJ0.0) spreading over supports that come and go:
+    WT0.3 is an intermediate support under part of the array only, and the
+    outer supports change from WT0.1/FB0.2 to FB0.0/WT0.2 to WT0.0/FB0.3.
+    """
+    les = collector_extents_to_array_loaded_elements
+    structural = {
+        "WT0.0",
+        "WT0.1",
+        "WT0.2",
+        "WT0.3",
+        "FB0.0",
+        "FB0.1",
+        "FB0.2",
+        "FB0.3",
+        "FB0.4",
+        "CT0.0",
+        "CT0.1",
+        "CT0.2",
+        "CT0.3",
+        "CT0.4",
+        "CT0.5",
+        "CT0.6",
+        "CT0.7",
+        "CT0.8",
+    }
+    joists = {f"SJ0.0-{i}" for i in range(15)} | {f"SJ0.1-{i}" for i in range(6)}
+    assert set(les.keys()) == structural | joists
+
+    def point_loads(tag):
+        return les[tag].model()["loads"]["point_loads"]
 
     with check:
-        assert (
-            les["WT0.1"].model()["loads"]["distributed_loads"][1]["start_loc"] == 3.858
-        )
+        # There are loads present on the intermediate support
+        assert point_loads("WT0.3")
+        assert {pl["transfer_source"] for pl in point_loads("WT0.3")} == {
+            f"SJ0.0-{i}" for i in range(2, 8)
+        }
     with check:
-        assert les["WT0.1"].model()["loads"]["distributed_loads"][1]["end_loc"] == 6.72
-
-        # This member experiences a splitting that occurs from an intermediate support that is found
-        # within its overlap region.
+        wt01 = point_loads("WT0.1")
+        assert wt01[0]["transfer_source"] == "SJ0.0-0"
+        assert wt01[0]["location"] == 2.195
+        assert [pl["location"] for pl in wt01] == [2.195, 3.195, 4.195, 5.195, 6.195]
     with check:
-        assert (
-            les["FB0.0"].model()["loads"]["distributed_loads"][0]["transfer_source"]
-            == "SJ0.0-2"
-        )
-    with check:
-        assert (
-            les["FB0.0"].model()["loads"]["distributed_loads"][0]["start_loc"] == 0.378
-        )  # 0.327
-
-    with check:
-        assert les["FB0.0"].model()["loads"]["distributed_loads"][0]["end_loc"] == 3.062
-
-    with check:
-        assert (
-            les["FB0.0"].model()["loads"]["distributed_loads"][1]["start_loc"] == 3.062
-        )
-
-    with check:
-        assert les["FB0.0"].model()["loads"]["distributed_loads"][1]["end_loc"] == 4.279
-
-    with check:
-        assert (
-            les["FB0.0"].model()["loads"]["distributed_loads"][1]["transfer_source"]
-            == "SJ0.0-3"
-        )
+        fb00 = point_loads("FB0.0")
+        assert fb00[0]["transfer_source"] == "SJ0.0-5"
+        assert fb00[0]["location"] == 0.379
+        assert {pl["transfer_source"] for pl in fb00} == {
+            f"SJ0.0-{i}" for i in range(5, 10)
+        }
 
 
 def test_collector_extents_creates_array_loaded_elements(
