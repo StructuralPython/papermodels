@@ -193,7 +193,11 @@ class GeometryModel:
     node identities are shared by every incident geometry.
     """
 
-    def __init__(self, node_abs_tol: float = DEFAULT_NODE_ABS_TOL):
+    def __init__(
+        self,
+        node_abs_tol: float = DEFAULT_NODE_ABS_TOL,
+        nodes: Optional[NodeRegistry] = None,
+    ):
         self.node_abs_tol = float(node_abs_tol)
         # GeomId -> geometry used for the index (walls store their centerline).
         self.geometries: dict[GeomId, BaseGeometry] = {}
@@ -202,13 +206,18 @@ class GeometryModel:
         self.ranks: dict[GeomId, int] = {}
         self.planes: dict[GeomId, PlaneId] = {}
         self.reaction_types: dict[GeomId, str] = {}
-        self.nodes = NodeRegistry(node_abs_tol)
+        # A caller may share its registry so that nodes created here and nodes
+        # created elsewhere in the build (e.g. element intersections) are one set.
+        self.nodes = nodes if nodes is not None else NodeRegistry(node_abs_tol)
         # NodeId -> list[Incidence] (one entry per distinct incident geom).
         self.incidence: dict[NodeId, list[Incidence]] = {}
         # GeomId -> set of NodeIds it is incident to.
         self.geom_nodes: dict[GeomId, set[NodeId]] = {}
         self.index: Optional[STRtree] = None
         self._index_geom_ids: list[GeomId] = []
+        # Set when geometry is added after the index was built; the STRtree is
+        # immutable, so it is rebuilt lazily on the next query.
+        self._index_stale = False
         # Set when built with noding enabled (Phase 2); None otherwise.
         self.noding_report: Optional[NodingReport] = None
 
@@ -222,6 +231,8 @@ class GeometryModel:
         noding_abs_tol: Optional[float] = None,
         noding_max_passes: int = 10,
         suppress_warnings: bool = False,
+        nodes: Optional[NodeRegistry] = None,
+        seed_points: Iterable = (),
     ) -> "GeometryModel":
         """
         Build a model from ``Element``-like objects.  Each must expose
@@ -233,8 +244,15 @@ class GeometryModel:
         so the arrangement is topologically clean when crossings are
         canonicalized.  Wall centerlines are held fixed (valid snap targets but
         never moved).  ``noding_abs_tol`` is separate from ``node_abs_tol`` (§9).
+
+        ``nodes`` shares an existing registry.  ``seed_points`` are registered
+        before any crossing is built; because the registry is "first point
+        wins", crossings computed here then reuse those exact coordinates (e.g.
+        the canonical intersection regions already stored on the elements).
         """
-        self = cls(node_abs_tol)
+        self = cls(node_abs_tol, nodes=nodes)
+        for point in seed_points:
+            self.nodes.get_or_create(point)
         for element in elements:
             self._add_element(element)
         if noding_abs_tol is not None:
@@ -283,6 +301,11 @@ class GeometryModel:
     def _build_index(self) -> None:
         self._index_geom_ids = list(self.geometries.keys())
         self.index = STRtree([self.geometries[gid] for gid in self._index_geom_ids])
+        self._index_stale = False
+
+    def _ensure_index(self) -> None:
+        if self.index is None or self._index_stale:
+            self._build_index()
 
     def _build_incidence(self) -> None:
         ids = self._index_geom_ids
@@ -321,7 +344,81 @@ class GeometryModel:
             return
         incs.append(Incidence(gid, self.ranks[gid], _role(geom, x, y, tol)))
 
+    # -- writing generated geometry -----------------------------------------
+
+    def add_geometry(
+        self,
+        gid: GeomId,
+        geom: BaseGeometry,
+        rank: int,
+        plane: PlaneId,
+        reaction_type: str = "point",
+        crossings: Optional[dict[NodeId, GeomId]] = None,
+    ) -> None:
+        """
+        Write a generated geometry (e.g. a joist produced by a joist array) into
+        the model.
+
+        ``crossings`` maps each canonical node the new geometry meets (already
+        obtained from ``self.nodes``) to the geometry it meets there; incidence
+        is recorded for both sides.  Crossings are *not* recomputed: the caller
+        constructed the geometry from those nodes.
+        """
+        if gid in self.geometries:
+            raise ValueError(f"Geometry id {gid!r} already exists in the model.")
+        self.ranks[gid] = rank
+        self.planes[gid] = plane
+        self.reaction_types[gid] = reaction_type
+        self.geometries[gid] = geom
+        self.geom_nodes[gid] = set()
+        self._index_stale = True
+        tol = self.node_abs_tol
+        for node_id, other_gid in (crossings or {}).items():
+            if node_id not in self.nodes:
+                raise KeyError(f"Node {node_id} is not in the registry.")
+            x, y = self.nodes.coord[node_id]
+            self.geom_nodes[gid].add(node_id)
+            self.geom_nodes[other_gid].add(node_id)
+            incs = self.incidence.setdefault(node_id, [])
+            self._touch(incs, gid, geom, x, y, tol)
+            self._touch(incs, other_gid, self.geometries[other_gid], x, y, tol)
+
     # -- queries ------------------------------------------------------------
+
+    def source_geometry(self, gid: GeomId) -> BaseGeometry:
+        """The element's own geometry: the polygon for walls, else the index geometry."""
+        return self.polygons.get(gid, self.geometries[gid])
+
+    def is_bearing_support(self, gid: GeomId) -> bool:
+        """
+        True if a joist can bear on ``gid``: a line (beam) or a linear-reaction
+        polygon (wall, indexed by its centerline).  Point-reaction polygons
+        (columns/posts) are not joist supports.
+        """
+        if gid in self.polygons:
+            return self.reaction_types.get(gid) == "linear"
+        return self.geometries[gid].geom_type == "LineString"
+
+    def query_supports(
+        self, region: BaseGeometry, plane: PlaneId, rank: int
+    ) -> list[GeomId]:
+        """
+        Geometry ids that can support a member of ``rank`` on ``plane`` and whose
+        index geometry (wall centerline / beam line) intersects ``region``.
+
+        Returned in model insertion order so results are deterministic.
+        """
+        self._ensure_index()
+        hits = set(int(i) for i in self.index.query(region, predicate="intersects"))
+        out = []
+        for pos, gid in enumerate(self._index_geom_ids):
+            if pos not in hits:
+                continue
+            if self.planes[gid] != plane or not self.ranks[gid] > rank:
+                continue
+            if self.is_bearing_support(gid):
+                out.append(gid)
+        return out
 
     def incident_geoms(self, node_id: NodeId) -> list[Incidence]:
         return self.incidence.get(node_id, [])

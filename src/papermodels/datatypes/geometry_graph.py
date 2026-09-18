@@ -6,6 +6,7 @@ from decimal import Decimal
 import pathlib
 import networkx as nx
 import hashlib
+import inspect
 import json
 from warnings import warn
 
@@ -20,7 +21,9 @@ from ..geometry import geom_ops as geom
 from ..datatypes.element import (
     Correspondent,
     Intersection,
+    NODE_ABS_TOL,
 )
+from ..datatypes.geometry_model import GeometryModel
 from ..paper.annotations import (
     Annotation,
     scale_annotations,
@@ -88,6 +91,9 @@ class GeometryGraph(nx.DiGraph):
         self.omitted = {}
         self.cantilever_abs_tol: Optional[float] = cantilever_abs_tol
         self.suppress_warnings = suppress_warnings
+        # Spatial index + canonical node registry over the final element
+        # geometry; see build_geometry_model.
+        self.geometry_model: Optional[GeometryModel] = None
 
     @property
     def collector_elements(self):
@@ -190,6 +196,7 @@ class GeometryGraph(nx.DiGraph):
             g.nodes[node]["element"].element_type = "transfer"
 
         if not process_gravity_frame:
+            g.build_geometry_model()
             return g
 
         g.align_frames_to_centroids()
@@ -197,8 +204,31 @@ class GeometryGraph(nx.DiGraph):
         g.remove_excess_correspondent_load_paths()
         g.add_intersection_indexes_below()
         g.add_intersection_indexes_above()
+        g.build_geometry_model()
 
         return g
+
+    def build_geometry_model(self) -> GeometryModel:
+        """
+        Builds (or rebuilds) self.geometry_model from the graph's current element
+        geometry. It must run after the gravity-frame processing, which moves
+        transfer-element geometry (aligning to centroids, trimming cantilevers).
+
+        The model's node registry is seeded with every canonical intersection
+        coordinate already stored on the elements, so crossings computed later
+        against the model (e.g. by a joist array) reuse those exact coordinates.
+        """
+        elements = [self.nodes[n]["element"] for n in self.nodes]
+        seed_points = []
+        for element in elements:
+            for intersection in (element.intersections_below or []) + (
+                element.intersections_above or []
+            ):
+                seed_points.extend(_node_points(intersection.intersecting_region))
+        self.geometry_model = GeometryModel.from_elements(
+            elements, node_abs_tol=NODE_ABS_TOL, seed_points=seed_points
+        )
+        return self.geometry_model
 
     def align_frames_to_centroids(self):
         """
@@ -744,11 +774,16 @@ class GeometryGraph(nx.DiGraph):
                 # are drawn. Unconnected elements have no precedents therefore they are (currently)
                 # being categorized as collectors. However, I think incompatible geometries
                 # should simply be ignored and not included as part of the processing.
+                constructor_kwargs = dict(kwargs)
+                if _accepts_kwarg(element_constructor, "geometry_model"):
+                    if self.geometry_model is None:
+                        self.build_geometry_model()
+                    constructor_kwargs.setdefault("geometry_model", self.geometry_model)
                 callable_instance = element_constructor(
                     node_element,
                     cantilever_tolerance=self.cantilever_abs_tol,
                     *args,
-                    **kwargs,
+                    **constructor_kwargs,
                 )
                 new_elem = callable_instance()
                 node_attrs["element"] = new_elem
@@ -1295,6 +1330,32 @@ class GeometryGraph(nx.DiGraph):
             hashes.append(element_hash)
         graph_hash = hashlib.sha256(str(tuple(hashes)).encode()).hexdigest()
         self.node_hash = graph_hash
+
+
+def _node_points(region) -> list[tuple[float, float]]:
+    """
+    The node coordinates of an intersection region: a Point, or the endpoints of
+    a LineString (matching element._canonicalize_region). Other regions have no
+    canonical nodes.
+    """
+    if region is None or region.is_empty:
+        return []
+    if region.geom_type == "Point":
+        return [(region.x, region.y)]
+    if region.geom_type == "LineString":
+        coords = list(region.coords)
+        return [tuple(coords[0][:2]), tuple(coords[-1][:2])]
+    return []
+
+
+def _accepts_kwarg(func: callable, name: str) -> bool:
+    try:
+        params = inspect.signature(func).parameters
+    except (TypeError, ValueError):
+        return False
+    return name in params or any(
+        p.kind is inspect.Parameter.VAR_KEYWORD for p in params.values()
+    )
 
 
 def get_local_coords(
