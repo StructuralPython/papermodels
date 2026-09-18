@@ -2,6 +2,8 @@ from papermodels.datatypes.annotation import Annotation, A0, A1
 from papermodels.paper.annotations import _annotation_to_wkt
 from papermodels.paper import annotations as an
 from papermodels.paper import pdf
+from papermodels.paper.plot import _dash_linestyle
+import pikepdf
 import numpy as np
 import numpy.testing as npt
 from pytest import fixture
@@ -214,3 +216,37 @@ def test_align_annotations_to_pages(three_page_annots):
     npt.assert_array_almost_equal(
         np.array(frame_geom_1.coords[0]), np.array(frame_geom_3.coords[0]), decimal=0
     )
+
+
+def test_get_dash_pattern_from_border_style():
+    dashed = pikepdf.Dictionary(BS=pikepdf.Dictionary(S=pikepdf.Name.D, D=[4, 3, 16, 3]))
+    default_dash = pikepdf.Dictionary(BS=pikepdf.Dictionary(S=pikepdf.Name.D))
+    solid = pikepdf.Dictionary(BS=pikepdf.Dictionary(S=pikepdf.Name.S))
+    assert pdf.get_dash_pattern(dashed) == (4.0, 3.0, 16.0, 3.0)
+    assert pdf.get_dash_pattern(default_dash) == (3.0,)
+    assert pdf.get_dash_pattern(solid) is None
+    # /BS is authoritative over the appearance stream
+    assert pdf.get_dash_pattern(solid, "[4 4] 0 d") is None
+
+
+def test_get_dash_pattern_from_content_stream():
+    no_bs = pikepdf.Dictionary()
+    assert pdf.get_dash_pattern(no_bs, "1 w [2 2] 0 d 0 0 m 10 10 l S") == (2.0, 2.0)
+    # All of the ways editors encode a solid line normalize to None
+    assert pdf.get_dash_pattern(no_bs, "1 w [] 0 d 0 0 m 10 10 l S") is None
+    assert pdf.get_dash_pattern(no_bs, "1 w 0 0 m 10 10 l S") is None
+    assert pdf.get_dash_pattern(no_bs, None) is None
+
+
+def test_load_pdf_annotations_line_types():
+    path = pathlib.Path(__file__).parent
+    annots = pdf.load_pdf_annotations(path / "test_data" / "three-pages-on-one.pdf")
+    line_types = {annot.line_type for annot in annots}
+    assert line_types == {None, (3.0, 3.0), (4.0, 4.0)}
+
+
+def test_dash_linestyle():
+    assert _dash_linestyle(None, 1) == "solid"
+    assert _dash_linestyle((4.0, 4.0), 2) == (0, (2.0, 2.0))
+    assert _dash_linestyle((3.0,), 1) == (0, (3.0, 3.0))
+    assert _dash_linestyle((4.0, 4.0), 0) == (0, (4.0, 4.0))
