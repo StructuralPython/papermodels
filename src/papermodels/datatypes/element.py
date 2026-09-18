@@ -12,6 +12,8 @@ from ..paper.annotations import (
     tag_parsed_annotations,
 )
 from ..geometry import geom_ops
+from ..geometry import joist_array
+from ..geometry.load_projection import project_loading_areas
 from .geometry_model import NodeRegistry
 import math
 import json
@@ -39,6 +41,7 @@ ELEMENT_ATTRS = {
     "page_label",
     "reaction_type",
     "extent_line",
+    "joist_container",
 }
 
 
@@ -120,12 +123,27 @@ class Element:
     reaction_type: str = "point"
     kwargs: Optional[dict] = None
     extent_line: Optional[LineString] = None
+    joist_container: Optional[Polygon] = None
 
     @property
     def extent_polygon(self):
+        """
+        The region swept by the joist prototype along its extent line (in the
+        prototype's own frame, so it is correct for any orientation).
+        """
         if self.extent_line is not None and self.geometry.geom_type == "LineString":
-            return geom_ops.create_extent_polygon(self.geometry, self.extent_line)
+            return joist_array.prototype_extent_region(self.geometry, self.extent_line)
         return None
+
+    @property
+    def array_region(self):
+        """
+        The region a joist array spans: the joist container if one was drawn,
+        else the extent polygon, else None.
+        """
+        if self.joist_container is not None and self.geometry.geom_type == "LineString":
+            return self.joist_container
+        return self.extent_polygon
 
     def __post_init__(self):
         if self.geometry.geom_type == "LineString" and len(self.geometry.coords) != 2:
@@ -229,7 +247,8 @@ class Element:
                 reaction_type=annot_attrs.get("reaction_type", "point"),
                 trib_area=matching_trib_poly,
                 kwargs=available_kwargs,
-                extent_line=annot_attrs["extent_line"],
+                extent_line=annot_attrs.get("extent_line"),
+                joist_container=annot_attrs.get("joist_container"),
             )
             elements.append(element)
         return elements
@@ -250,8 +269,8 @@ class Element:
 
         If 'relative' == False, then the values returned are absolute Point objects.
         """
-        # When we have collector extents and an extent_polygon
-        if self.trib_area is None and self.extent_polygon is not None:
+        # When we have collector extents and an array region (extent/container)
+        if self.trib_area is None and self.array_region is not None:
             tagged_extents = {}
             for ib in self.intersections_below:
                 region_start, region_end = geom_ops.get_start_end_nodes(
@@ -895,7 +914,7 @@ class LoadedElement(Element):
         """
         distributed_loads = []
         if self.geometry.geom_type == "LineString":
-            raw_dist_loads = ld.get_distributed_loads_from_projected_polygons(
+            raw_dist_loads = project_loading_areas(
                 self.geometry, self.applied_loading_areas
             )
             polygon_areas = geom_ops.calculate_trapezoid_area_sums(raw_dist_loads)
@@ -920,8 +939,9 @@ class LoadedElement(Element):
                             area_ratio = area_dist_load / total_polygon_area
                         # THIS GIVES THE CORRECT TRAPEZOID RATIO FOR COLLECTORTRIBMODEL
                         elif self.reaction_type == "linear":
-                            # In the CollectorTribModel the trib area reflects the size of a whole
-                            # spread of joists which will be reduced down to a reaction over a unit length.
+                            # A linear-reaction collector's trib area reflects the size of a whole
+                            # spread of joists (e.g. a user-drawn trib area with no joist model
+                            # assigned) which will be reduced down to a reaction over a unit length.
                             # In this case, we need an area ratio to reflect the percentage of area that
                             # an area load covers in relation to the total trib area.
                             area_ratio = (
@@ -1176,15 +1196,19 @@ def get_geometry_intersections(
         i_page = i_annot.page
         i_geom = i_attrs["geometry"]
         i_tag = i_attrs["tag"]
-        i_extent_line = i_attrs["extent_line"]
-        i_extent_poly = geom_ops.create_extent_polygon(i_geom, i_extent_line)
+        i_region = _array_region(i_geom, i_attrs)
+        i_frame = (
+            joist_array.ArrayFrame.from_prototype(i_geom)
+            if i_region is not None
+            else None
+        )
         i_attrs.setdefault("intersections_below", [])
         i_attrs.setdefault("intersections_above", [])
         if i_geom.is_empty:
             continue
-        # Query by the extent polygon when present (it reaches beyond the raw
-        # geometry), otherwise by the geometry itself.
-        query_geom = i_extent_poly if i_extent_poly is not None else i_geom
+        # Query by the array region (extent polygon / joist container) when
+        # present (it reaches beyond the raw geometry), else by the geometry.
+        query_geom = i_region if i_region is not None else i_geom
         candidate_positions = sorted(index_positions[k] for k in tree.query(query_geom))
         for j_pos in candidate_positions:
             j_annot = annots[j_pos]
@@ -1207,15 +1231,16 @@ def get_geometry_intersections(
                 # view (stored on i) and the "above" view (stored on j) are two
                 # perspectives on a single physical crossing, so they must share
                 # the same intersecting region and overlap rather than each being
-                # evaluated independently. Use the extent polygon if it exists.
-                if (
-                    i_extent_poly is not None
-                    and check_eligible_collector_extent_polygon_intersection(
+                # evaluated independently. A joist array (extent line or joist
+                # container) lands on the support along its line over the
+                # stations where the support is inside the array region.
+                if i_region is not None:
+                    if not check_eligible_collector_extent_polygon_intersection(
                         j_geom.geom_type, j_attrs["reaction_type"]
-                    )
-                ):
-                    crossing = geom_ops.get_intersection(
-                        i_geom, j_geom, j_tag, i_extent_poly
+                    ):
+                        continue
+                    crossing = _array_crossing(
+                        i_frame, i_region, j_geom, j_tag, node_registry
                     )
                 else:
                     crossing = geom_ops.get_intersection(i_geom, j_geom, j_tag)
@@ -1249,6 +1274,51 @@ def get_geometry_intersections(
                 )
 
     return intersected_annotations
+
+
+def _array_region(geometry, annot_attrs: dict):
+    """The joist-array region of an annotation: its container, else extent polygon."""
+    if geometry.geom_type != "LineString":
+        return None
+    container = annot_attrs.get("joist_container")
+    if container is not None:
+        return container
+    extent_line = annot_attrs.get("extent_line")
+    if extent_line is not None:
+        return joist_array.prototype_extent_region(geometry, extent_line)
+    return None
+
+
+def _array_crossing(frame, region, j_geom, j_tag, registry):
+    """
+    The (region, other_geometry, other_tag, overlap) crossing of a joist array
+    with support ``j_geom``, computed by the same station logic the
+    JoistArrayModel uses (joist_array.region_support_crossing) so the graph and
+    the array agree on where each support is borne.  Walls are borne along
+    their centerline; the overlap is the part of the support inside the region.
+    """
+    if j_geom.geom_type == "Polygon":
+        line = geom_ops.get_wall_centerline(j_geom)
+    else:
+        line = j_geom
+    if len(line.coords) != 2:
+        return None
+    support = joist_array.Support(j_tag, line, j_geom)
+    s0, s1 = frame.s_range(line)
+    if s1 - s0 <= joist_array.EPS:  # parallel to the joists: cannot bear them
+        return None
+    region = joist_array.region_support_crossing(frame, region, support, registry)
+    if region is None:
+        return None
+    overlap = j_geom.intersection(_frame_band(frame, region))
+    return region, j_geom, j_tag, overlap if not overlap.is_empty else region
+
+
+def _frame_band(frame, crossing: LineString):
+    """A band across the joists covering the stations of ``crossing``."""
+    s0, s1 = frame.s_range(crossing)
+    t0, t1 = frame.t_range(crossing)
+    return frame.band(s0, s1, t0 - 1e4, t1 + 1e4)
 
 
 def check_eligible_polygon_intersection(i_tag, j_tag) -> bool:

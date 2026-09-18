@@ -637,85 +637,6 @@ def find_extent_intersections(
     return acc
 
 
-def create_extent_polygon(
-    element_geom: LineString, extent_geom: Optional[LineString] = None
-) -> Polygon:
-    """
-    Returns a Polygon representing the bounding box of the union
-    of 'element_geom' and 'extent_geom'
-    """
-    if extent_geom is None:
-        return None
-    return box(*(union(element_geom, extent_geom).bounds))
-
-
-def split_polygon(
-    polygon: Polygon, joist_orientation: str, split_points: list[tuple[float, float]]
-) -> list[Polygon]:
-    split_locations = []
-    for split_point in split_points:
-        if joist_orientation == "vertical":
-            split_location = split_point[0]
-        elif joist_orientation == "horizontal":
-            split_location = split_point[1]
-        if Point(split_point).within(polygon):
-            split_locations.append(split_location)
-    polygons = polygon_splitter(polygon.bounds, split_locations, joist_orientation)
-    return polygons
-
-
-def polygon_splitter(
-    poly_bounds: tuple[float, float, float, float],
-    split_locations: list[float],
-    joist_orientation: str,
-) -> list[tuple[float, float, float, float]]:
-    """
-    Returns a list of box bounds describing the sub-boxes remaining after splitting
-    """
-    xmin, ymin, xmax, ymax = poly_bounds
-    sub_polys = []
-    if joist_orientation == "horizontal":
-        origin = ymin
-        for sl in split_locations:
-            sub_poly = box(xmin, origin, xmax, sl)
-            sub_polys.append(sub_poly)
-            origin = sl
-        else:
-            sub_poly = box(xmin, origin, xmax, ymax)
-            sub_polys.append(sub_poly)
-        if sub_polys:
-            return sub_polys
-        return [box(xmin, ymin, xmax, ymax)]
-    elif joist_orientation == "vertical":
-        origin = xmin
-        for sl in split_locations:
-            sub_poly = box(origin, ymin, sl, ymax)
-            sub_polys.append(sub_poly)
-            origin = sl
-        else:
-            sub_poly = box(origin, ymin, xmax, ymax)
-            sub_polys.append(sub_poly)
-        if sub_polys:
-            return sub_polys
-        return [box(xmin, ymin, xmax, ymax)]
-
-
-def translate_joist_to_point(
-    joist_geom: LineString, joist_orientation: str, intersection_point: Point
-) -> LineString:
-    """
-    Returns a LineString representing 'joist_geom' translated so that it intersects with 'intersection_point'
-    """
-    point_i, point_j = joist_geom.coords
-    ix, iy = point_i
-    jx, jy = point_j
-    ipx, ipy = intersection_point.coords[0]
-    if joist_orientation == "horizontal":
-        return LineString([(ix, ipy), (jx, ipy)])
-    elif joist_orientation == "vertical":
-        return LineString([(ipx, iy), (ipx, jy)])
-
-
 def get_system_bounds(
     joist_prototype: LineString,
     joist_supports: list[LineString],
@@ -784,38 +705,6 @@ def get_magnitude(bounds: tuple[float, float, float, float]) -> float:
     delta_x = maxx - minx
     magnitude = (delta_y**2 + delta_x**2) ** 0.5
     return magnitude
-
-
-def get_joist_locations(
-    start_edge: LineString,
-    end_edge: LineString,
-    spacing: float,
-    initial_offset: float,
-    joist_at_start: bool,
-) -> list[float]:
-    """
-    Returns a list of location offsets (starting from 0.0)
-    """
-    distance = start_edge.distance(end_edge)
-    distance_remaining = distance
-    joist_locs = []
-    if joist_at_start:
-        joist_locs.append(0.0)
-        if initial_offset:
-            joist_locs.append(initial_offset)
-            distance_remaining -= initial_offset
-    else:
-        if initial_offset:
-            joist_locs.append(initial_offset)
-            distance_remaining -= initial_offset
-    while (
-        distance_remaining > 1.5 * spacing
-    ):  # Use 1.5*spacing instead of 1.0*spacing to prevent "sliver joists" at the end
-        distance_remaining -= spacing
-        joist_locs.append(distance - distance_remaining)
-    else:
-        joist_locs.append(distance)
-    return joist_locs
 
 
 def get_direction_vector(ls: LineString) -> np.ndarray:
@@ -888,29 +777,6 @@ def order_nodes_positive(points: list[Point]) -> tuple[Point]:
             sorted(points, key=lambda x: x.coords[0][1]), key=lambda x: x.coords[0][0]
         )
     )
-
-
-def relate_point_to_line(point: Point, line: LineString) -> tuple:
-    """
-    REturns a tuple of ('left'/'right', 'above'/'below') to describe
-    where teh point is in relation to the line
-    """
-    try:
-        slope, intercept = ld.get_slope_and_intercept(*line.coords)
-    except ZeroDivisionError:
-        slope = 1
-        intercept = float("inf")
-    xp, yp = point.coords[0]
-    yl = slope * xp + intercept
-    delta_y = yl - yp
-    if delta_y > 0 and slope >= 0:
-        return ("right", "below")
-    elif delta_y > 0 and slope < 0:
-        return ("left", "below")
-    elif delta_y < 0 and slope >= 0:
-        return ("left", "above")
-    elif delta_y < 0 and slope < 0:
-        return ("right", "above")
 
 
 def project_node(node: Point, vector: np.ndarray, magnitude: float):

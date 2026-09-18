@@ -6,6 +6,7 @@ from decimal import Decimal
 import pathlib
 import networkx as nx
 import hashlib
+import inspect
 import json
 from warnings import warn
 
@@ -20,7 +21,9 @@ from ..geometry import geom_ops as geom
 from ..datatypes.element import (
     Correspondent,
     Intersection,
+    NODE_ABS_TOL,
 )
+from ..datatypes.geometry_model import GeometryModel
 from ..paper.annotations import (
     Annotation,
     scale_annotations,
@@ -30,6 +33,8 @@ from ..paper.annotations import (
     tag_parsed_annotations,
     assign_page_id_to_annotations,
     annotation_to_shapely,
+    is_region_markup,
+    is_joist_container,
 )
 from ..paper.plot import plot_annotations, plot_elements
 from ..paper import pdf
@@ -88,6 +93,9 @@ class GeometryGraph(nx.DiGraph):
         self.omitted = {}
         self.cantilever_abs_tol: Optional[float] = cantilever_abs_tol
         self.suppress_warnings = suppress_warnings
+        # Spatial index + canonical node registry over the final element
+        # geometry; see build_geometry_model.
+        self.geometry_model: Optional[GeometryModel] = None
 
     @property
     def collector_elements(self):
@@ -190,6 +198,7 @@ class GeometryGraph(nx.DiGraph):
             g.nodes[node]["element"].element_type = "transfer"
 
         if not process_gravity_frame:
+            g.build_geometry_model()
             return g
 
         g.align_frames_to_centroids()
@@ -197,8 +206,31 @@ class GeometryGraph(nx.DiGraph):
         g.remove_excess_correspondent_load_paths()
         g.add_intersection_indexes_below()
         g.add_intersection_indexes_above()
+        g.build_geometry_model()
 
         return g
+
+    def build_geometry_model(self) -> GeometryModel:
+        """
+        Builds (or rebuilds) self.geometry_model from the graph's current element
+        geometry. It must run after the gravity-frame processing, which moves
+        transfer-element geometry (aligning to centroids, trimming cantilevers).
+
+        The model's node registry is seeded with every canonical intersection
+        coordinate already stored on the elements, so crossings computed later
+        against the model (e.g. by a joist array) reuse those exact coordinates.
+        """
+        elements = [self.nodes[n]["element"] for n in self.nodes]
+        seed_points = []
+        for element in elements:
+            for intersection in (element.intersections_below or []) + (
+                element.intersections_above or []
+            ):
+                seed_points.extend(_node_points(intersection.intersecting_region))
+        self.geometry_model = GeometryModel.from_elements(
+            elements, node_abs_tol=NODE_ABS_TOL, seed_points=seed_points
+        )
+        return self.geometry_model
 
     def align_frames_to_centroids(self):
         """
@@ -479,7 +511,9 @@ class GeometryGraph(nx.DiGraph):
                             )
                             sub_id = subelem.tag
                             try:
-                                subextents = subelem.get_collector_extents()
+                                subextents = _precomputed_extents(subelem)
+                                if subextents is None:
+                                    subextents = subelem.get_collector_extents()
                             except geom.GeometryError:
                                 self.omitted.update({sub_id: subelem})
                                 if not self.suppress_warnings:
@@ -744,11 +778,16 @@ class GeometryGraph(nx.DiGraph):
                 # are drawn. Unconnected elements have no precedents therefore they are (currently)
                 # being categorized as collectors. However, I think incompatible geometries
                 # should simply be ignored and not included as part of the processing.
+                constructor_kwargs = dict(kwargs)
+                if _accepts_kwarg(element_constructor, "geometry_model"):
+                    if self.geometry_model is None:
+                        self.build_geometry_model()
+                    constructor_kwargs.setdefault("geometry_model", self.geometry_model)
                 callable_instance = element_constructor(
                     node_element,
                     cantilever_tolerance=self.cantilever_abs_tol,
                     *args,
-                    **kwargs,
+                    **constructor_kwargs,
                 )
                 new_elem = callable_instance()
                 node_attrs["element"] = new_elem
@@ -803,6 +842,8 @@ class GeometryGraph(nx.DiGraph):
 
         load_entries = {}
         trib_area_entries = {}
+        extent_entries = {}
+        container_entries = {}
         structural_element_entries = {}
         parsed_annotations = {}
         raw_annotations = {}
@@ -821,7 +862,7 @@ class GeometryGraph(nx.DiGraph):
             annot_attrs["page_label"] = scaled_annot.page
             annot_attrs["tag"] = existing_annot_tag
 
-            if "extent" in annot_attrs["type"]:
+            if is_region_markup(annot_attrs):
                 parsed_annotations.update({scaled_annot: annot_attrs})
             else:
                 annot_attrs.setdefault("reaction_type", "point")
@@ -846,9 +887,21 @@ class GeometryGraph(nx.DiGraph):
                 trib_area_entries.update({scaled_annot: annot_attrs})
             elif "type" not in annot_attrs:
                 continue
+            elif is_joist_container(annot_attrs):
+                container_entries.update({scaled_annot: annot_attrs})
+            elif "extent" in annot_attrs["type"].lower():
+                extent_entries.update({scaled_annot: annot_attrs})
             else:
                 structural_element_entries.update({scaled_annot: annot_attrs})
 
+        structural_element_entries = correlate_extents(
+            structural_element_entries, extent_entries
+        )
+        structural_element_entries = correlate_containers(
+            structural_element_entries,
+            container_entries,
+            suppress_warnings=suppress_warnings,
+        )
         elements = Element.from_parsed_annotations(
             structural_element_entries, trib_area_entries
         )
@@ -1056,6 +1109,7 @@ class GeometryGraph(nx.DiGraph):
         load_entries = {}
         trib_area_entries = {}
         extent_entries = {}
+        container_entries = {}
         structural_element_entries = {}
         parsed_annotations_acc = {}
         raw_annotations_acc = {}
@@ -1079,6 +1133,8 @@ class GeometryGraph(nx.DiGraph):
                     load_entries.update({annot: annot_attrs})
                 elif "trib area" in annot_attrs.get("type", "").lower():
                     trib_area_entries.update({annot: annot_attrs})
+                elif is_joist_container(annot_attrs):
+                    container_entries.update({annot: annot_attrs})
                 elif "extent" in annot_attrs.get("type", "").lower():
                     extent_entries.update({annot: annot_attrs})
                 else:
@@ -1086,6 +1142,11 @@ class GeometryGraph(nx.DiGraph):
                     structural_element_entries.update({annot: annot_attrs})
             structural_element_entries = correlate_extents(
                 structural_element_entries, extent_entries
+            )
+            structural_element_entries = correlate_containers(
+                structural_element_entries,
+                container_entries,
+                suppress_warnings=suppress_warnings,
             )
         tag_counter = Counter(tag_checker)
         tag_counter.pop(None)  # Exclude None tags from the check
@@ -1297,6 +1358,44 @@ class GeometryGraph(nx.DiGraph):
         self.node_hash = graph_hash
 
 
+def _node_points(region) -> list[tuple[float, float]]:
+    """
+    The node coordinates of an intersection region: a Point, or the endpoints of
+    a LineString (matching element._canonicalize_region). Other regions have no
+    canonical nodes.
+    """
+    if region is None or region.is_empty:
+        return []
+    if region.geom_type == "Point":
+        return [(region.x, region.y)]
+    if region.geom_type == "LineString":
+        coords = list(region.coords)
+        return [tuple(coords[0][:2]), tuple(coords[-1][:2])]
+    return []
+
+
+def _precomputed_extents(element: Element) -> Optional[dict[str, tuple]]:
+    """
+    The collector extents already attached to a subelement's intersections
+    (JoistArrayModel computes them from its trib bands), or None if any are
+    missing and they must be derived with Element.get_collector_extents.
+    """
+    intersections = element.intersections_below or []
+    if not intersections or any(ib.other_extents is None for ib in intersections):
+        return None
+    return {ib.other_tag: ib.other_extents for ib in intersections}
+
+
+def _accepts_kwarg(func: callable, name: str) -> bool:
+    try:
+        params = inspect.signature(func).parameters
+    except (TypeError, ValueError):
+        return False
+    return name in params or any(
+        p.kind is inspect.Parameter.VAR_KEYWORD for p in params.values()
+    )
+
+
 def get_local_coords(
     start_coord: Point | tuple[float, float],
     dependent_intersections: list[Intersection],
@@ -1362,3 +1461,69 @@ def correlate_extents(
             annot = element_annot_keys[idx]
             element_annots_copy[annot]["extent_line"] = matched_extent
     return element_annots_copy
+
+
+def correlate_containers(
+    element_annots: dict[Annotation, dict],
+    container_annots: dict[Annotation, dict],
+    suppress_warnings: bool = False,
+) -> dict:
+    """
+    Returns a copy of 'element_annots' in which each joist prototype (a rank-0
+    LineString) drawn inside a joist container polygon has that polygon stored
+    under 'joist_container'.
+
+    A prototype belongs to the container holding most of its length (on the
+    same page). Warns when a container holds no prototype or more than one
+    (a container describes one array), and when a prototype has both an extent
+    line and a container (the container is used).
+    """
+    element_annots_copy = deepcopy(element_annots)
+    containers_by_page: dict = {}
+    for annot, attrs in container_annots.items():
+        if attrs["geometry"].geom_type != "Polygon":
+            _warn_unless(
+                suppress_warnings,
+                f"A joist container must be a polygon; ignoring the {attrs['geometry'].geom_type} "
+                f"on page {annot.page}.",
+            )
+            continue
+        containers_by_page.setdefault(annot.page, []).append(attrs["geometry"])
+
+    claimed: dict[int, list] = {}
+    for annot, attrs in element_annots_copy.items():
+        geometry = attrs["geometry"]
+        if geometry.geom_type != "LineString" or attrs.get("rank") != 0:
+            continue
+        best, best_share = None, 0.5
+        for container in containers_by_page.get(annot.page, []):
+            share = geometry.intersection(container).length / geometry.length
+            if share > best_share:
+                best, best_share = container, share
+        if best is None:
+            continue
+        attrs["joist_container"] = best
+        claimed.setdefault(id(best), []).append(annot)
+        if attrs.get("extent_line") is not None:
+            _warn_unless(
+                suppress_warnings,
+                f"A joist prototype on page {annot.page} has both an extent line and a "
+                "joist container; the container is used.",
+            )
+
+    for page, containers in containers_by_page.items():
+        for container in containers:
+            count = len(claimed.get(id(container), []))
+            if count != 1:
+                x, y = container.representative_point().coords[0]
+                _warn_unless(
+                    suppress_warnings,
+                    f"The joist container near ({x:.2f}, {y:.2f}) on page {page} holds "
+                    f"{count} joist prototypes; it should hold exactly one.",
+                )
+    return element_annots_copy
+
+
+def _warn_unless(suppress: bool, message: str) -> None:
+    if not suppress:
+        warn(message)

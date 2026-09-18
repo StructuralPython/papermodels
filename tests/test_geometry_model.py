@@ -272,3 +272,109 @@ def test_build_is_idempotent():
     # Identical node ids and canonical coordinates both times.
     assert m1.nodes.coord == m2.nodes.coord
     assert m1.topology_signature() == m2.topology_signature()
+
+
+# --------------------------------------------------------------------------
+# Support queries and generated geometry (used by JoistArrayModel)
+# --------------------------------------------------------------------------
+
+
+def _support_scene():
+    wall = _Elem(
+        "WT", box(0, -0.25, 10, 0.25), rank=2, reaction_type="linear"
+    )  # centerline y=0
+    beam = _Elem("FB", LineString([(0, 5), (10, 5)]), rank=1)
+    column = _Elem("CT", box(4.9, 2.4, 5.1, 2.6), rank=3, reaction_type="point")
+    other_plane = _Elem("FB_P1", LineString([(0, 3), (10, 3)]), rank=1, plane_id=1)
+    joist = _Elem("J", LineString([(5, -1), (5, 6)]), rank=0)
+    return [wall, beam, column, other_plane, joist]
+
+
+def test_query_supports_filters_plane_rank_and_columns():
+    model = GeometryModel.from_elements(_support_scene())
+    region = box(4, -1, 6, 6)
+    assert model.query_supports(region, plane=0, rank=0) == ["WT", "FB"]
+    # Rank filter: nothing above rank 2 bears a joist here (column excluded)
+    assert model.query_supports(region, plane=0, rank=2) == []
+    assert model.query_supports(region, plane=1, rank=0) == ["FB_P1"]
+
+
+def test_query_supports_uses_wall_centerline_not_polygon():
+    model = GeometryModel.from_elements(_support_scene())
+    # Region touches the wall polygon's face (y=0.2) but not its centerline (y=0)
+    assert "WT" not in model.query_supports(box(4, 0.1, 6, 0.2), plane=0, rank=0)
+    assert model.source_geometry("WT").geom_type == "Polygon"
+    assert model.geometries["WT"].geom_type == "LineString"
+
+
+def test_seed_points_are_reused_first_point_wins():
+    seed = (5.0 + 4e-7, 5.0)  # within node_abs_tol of the J/FB crossing
+    model = GeometryModel.from_elements(
+        _support_scene(), node_abs_tol=1e-6, seed_points=[seed]
+    )
+    (node,) = model.intersections_below("J")["FB"]
+    assert model.nodes.coord[node] == seed
+
+
+def test_shared_registry_is_used():
+    reg = NodeRegistry(1e-6)
+    model = GeometryModel.from_elements(_support_scene(), node_abs_tol=1e-6, nodes=reg)
+    assert model.nodes is reg and len(reg) > 0
+
+
+def test_add_geometry_records_incidence_and_reindexes():
+    model = GeometryModel.from_elements(_support_scene(), node_abs_tol=1e-6)
+    before = model.query_supports(box(7, -1, 8, 6), plane=0, rank=0)
+    n_wall = model.nodes.get_or_create((7.5, 0.0))
+    n_beam = model.nodes.get_or_create((7.5, 5.0))
+    model.add_geometry(
+        "J-1",
+        LineString([(7.5, 0.0), (7.5, 5.0)]),
+        rank=0,
+        plane=0,
+        crossings={n_wall: "WT", n_beam: "FB"},
+    )
+    assert model.intersections_below("J-1") == {"WT": {n_wall}, "FB": {n_beam}}
+    assert "J-1" in model.intersections_above("WT")
+    # Generated joists (rank 0) never become supports; index rebuilt lazily
+    assert model.query_supports(box(7, -1, 8, 6), plane=0, rank=0) == before
+    assert "J-1" in model._index_geom_ids
+    with pytest.raises(ValueError):
+        model.add_geometry("J-1", LineString([(0, 0), (1, 1)]), rank=0, plane=0)
+
+
+def test_graph_geometry_model_holds_every_intersection_node():
+    graph = GeometryGraph.from_pdf_file(
+        TEST_DATA / "intersections.pdf", scale=QUARTER_INCH_SCALE
+    )
+    model = graph.geometry_model
+    assert model is not None
+    assert set(model.geometries) == set(graph.nodes)
+    coords = set(model.nodes.coord.values())
+    for n in graph.nodes:
+        for ib in graph.nodes[n]["element"].intersections_below or []:
+            region = ib.intersecting_region
+            if region.geom_type == "Point":
+                assert (region.x, region.y) in coords
+
+
+def test_remove_generated_replaces_previous_generation():
+    model = GeometryModel.from_elements(_support_scene(), node_abs_tol=1e-6)
+    edges_before = model.intersection_edges()
+    n_wall = model.nodes.get_or_create((7.5, 0.0))
+    n_beam = model.nodes.get_or_create((7.5, 5.0))
+    model.add_geometry(
+        "J-0",
+        LineString([(7.5, 0.0), (7.5, 5.0)]),
+        rank=0,
+        plane=0,
+        crossings={n_wall: "WT", n_beam: "FB"},
+        parent="J",
+    )
+    assert model.generated == {"J": ["J-0"]}
+    model.remove_generated("J")
+    assert "J-0" not in model.geometries and model.generated == {}
+    assert model.intersection_edges() == edges_before
+    assert n_wall not in model.geom_nodes["WT"]
+    # Regenerating under the same id is allowed after removal
+    model.add_geometry("J-0", LineString([(7.5, 0.0), (7.5, 5.0)]), rank=0, plane=0)

@@ -228,11 +228,10 @@ def get_element_plotting_attributes(
     if element.reaction_type == "linear":
         is_linear = True
     if element.trib_area:
-        trib_coords = element.trib_area.exterior.coords
-        trib_xy = np.array(list(zip(*trib_coords)))
-    if element.extent_polygon:
-        extent_coords = element.extent_polygon.exterior.coords
-        extent_xy = np.array(list(zip(*extent_coords)))
+        trib_xy = _exterior_xy(element.trib_area)
+    array_region = getattr(element, "array_region", element.extent_polygon)
+    if array_region:
+        extent_xy = _exterior_xy(array_region)
 
     xy = np.array(list(zip(*coords)))
     tag = element.tag
@@ -401,3 +400,15 @@ def xy_vertices(vertices: str, dpi: float, close=False) -> list[list[float]]:
             x.append(float(ordinate))
     scaled_vertices = np.asarray([x, y]) * dpi / 72
     return scaled_vertices
+
+
+def _exterior_xy(area) -> np.ndarray:
+    """
+    Exterior coordinates of an areal geometry as a 2 x n array. For a
+    multi-part area (e.g. a trib band clipped by a non-convex joist container)
+    the largest part is used.
+    """
+    if hasattr(area, "geoms"):
+        parts = [g for g in area.geoms if g.geom_type == "Polygon"]
+        area = max(parts, key=lambda g: g.area)
+    return np.array(list(zip(*area.exterior.coords)))
