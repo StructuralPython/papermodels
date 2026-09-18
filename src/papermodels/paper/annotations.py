@@ -112,7 +112,7 @@ def parse_annotations(
 
             # Run tests for this first
             # annot_attrs["rank"] = int(annot_attributes["rank"])
-            if "extent" in annot_attrs["type"]:
+            if is_region_markup(annot_attrs):
                 parsed_annotations.update({annot: annot_attrs})
             else:
                 annot_attrs.setdefault("reaction_type", "point")
@@ -126,6 +126,20 @@ def parse_annotations(
                     ).length
                 parsed_annotations.update({annot: annot_attrs | annot_kwargs})
     return parsed_annotations
+
+
+def is_region_markup(annot_attrs: dict) -> bool:
+    """
+    True for markup that describes where a joist array spans rather than a
+    structural element: extent lines and joist containers. These carry no
+    reaction type.
+    """
+    markup_type = str(annot_attrs.get("type", "")).lower()
+    return "extent" in markup_type or "container" in markup_type
+
+
+def is_joist_container(annot_attrs: dict) -> bool:
+    return "container" in str(annot_attrs.get("type", "")).lower()
 
 
 def tag_parsed_annotations(

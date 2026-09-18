@@ -487,7 +487,9 @@ class JoistArrayModel:
                 continue
             if any(sup.gid == gid for sup in supports):
                 continue
-            supports.append(ja.Support(gid, model.geometries[gid]))
+            supports.append(
+                ja.Support(gid, model.geometries[gid], model.source_geometry(gid))
+            )
         return ja.usable_supports(self.frame, supports)
 
     def _supports_at_prototype(self) -> list[ja.Support]:
@@ -565,7 +567,7 @@ class JoistArrayModel:
         model = self.geometry_model
         found = model.query_supports(region, self.plane_id, self.element.rank or 0)
         candidates = [
-            ja.Support(gid, model.geometries[gid])
+            ja.Support(gid, model.geometries[gid], model.source_geometry(gid))
             for gid in found
             if gid not in linked and gid not in model.generated.get(self.id, [])
         ]

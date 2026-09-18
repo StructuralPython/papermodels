@@ -157,6 +157,17 @@ def extent_region(
     return frame.band(s0, s1, t_range[0], t_range[1])
 
 
+def prototype_extent_region(prototype: LineString, extent_line: LineString) -> Polygon:
+    """
+    The region a joist prototype sweeps along its extent line: the prototype's
+    t-range over the extent line's station range, in the prototype's frame.
+    Replaces ``geom_ops.create_extent_polygon`` (an axis-aligned bounding box,
+    wrong for any tilted prototype).
+    """
+    frame = ArrayFrame.from_prototype(prototype)
+    return extent_region(frame, frame.t_range(prototype), extent_line)
+
+
 def fixed_region(
     frame: ArrayFrame,
     support_a: LineString,
@@ -264,6 +275,14 @@ def support_rectangularity(polygon: Polygon) -> float:
 class Support:
     gid: str
     line: LineString  # beam line or wall centerline (2 points)
+    # The support as drawn (the wall polygon); defaults to ``line``.  Presence in
+    # a region is judged on this, so a region drawn to a wall's face still
+    # catches the wall even though its centerline lies just outside.
+    source: Optional[BaseGeometry] = None
+
+    @property
+    def geometry(self) -> BaseGeometry:
+        return self.source if self.source is not None else self.line
 
 
 def _t_on_line(frame: ArrayFrame, line: LineString, s: float) -> float:
@@ -356,20 +375,55 @@ def usable_supports(frame: ArrayFrame, supports: list[Support]) -> list[Support]
 def support_spans(
     frame: ArrayFrame, supports: list[Support], region: BaseGeometry
 ) -> dict[str, list[tuple[float, float]]]:
-    """Per support, the station ranges over which it lies inside ``region``."""
+    """
+    Per support, the station ranges over which it lies inside ``region``: the
+    stations of its drawn geometry inside the region, bounded by the stations
+    of its line (so crossings never extrapolate past the centerline's ends).
+    """
     spans: dict[str, list[tuple[float, float]]] = {}
     for sup in supports:
-        piece = sup.line.intersection(region)
-        pieces = (
-            list(piece.geoms)
-            if piece.geom_type == "MultiLineString"
-            else ([piece] if piece.geom_type == "LineString" else [])
-        )
-        for p in pieces:
-            if p.is_empty or p.length <= EPS:
-                continue
-            spans.setdefault(sup.gid, []).append(frame.s_range(p))
+        line_lo, line_hi = frame.s_range(sup.line)
+        for piece in _parts(sup.geometry.intersection(region)):
+            lo, hi = frame.s_range(piece)
+            lo, hi = max(lo, line_lo), min(hi, line_hi)
+            if hi - lo > EPS:
+                spans.setdefault(sup.gid, []).append((lo, hi))
     return spans
+
+
+def _parts(geom: BaseGeometry) -> list[BaseGeometry]:
+    """The non-empty line/polygon parts of an intersection result."""
+    if geom.is_empty:
+        return []
+    if geom.geom_type in ("LineString", "Polygon"):
+        return [geom]
+    if hasattr(geom, "geoms"):
+        return [p for g in geom.geoms for p in _parts(g)]
+    return []
+
+
+def region_support_crossing(
+    frame: ArrayFrame,
+    region: BaseGeometry,
+    support: Support,
+    registry=None,
+) -> Optional[LineString]:
+    """
+    Where an array spanning ``region`` lands on ``support``: the part of the
+    support's line over the stations where the support is in the region, with
+    its end nodes snapped through ``registry``.  None if the support is not in
+    the region.  Used by the graph build (the parent element's intersection)
+    so it agrees exactly with the spans the joist array uses.
+    """
+    spans = support_spans(frame, [support], region).get(support.gid)
+    if not spans:
+        return None
+    lo = min(a for a, _ in spans)
+    hi = max(b for _, b in spans)
+    ends = [_crossing_xy(frame, support.line, s) for s in (lo, hi)]
+    if registry is not None:
+        ends = [registry.coord[registry.get_or_create(xy)] for xy in ends]
+    return LineString(ends)
 
 
 def classify_intervals(
@@ -653,8 +707,16 @@ def trib_bands(
     out = []
     for i in range(len(stations)):
         band = frame.band(bounds[i], bounds[i + 1], t_lo - 1.0, t_hi + 1.0)
-        out.append(band.intersection(region))
+        out.append(_areal(band.intersection(region)))
     return out
+
+
+def _areal(geom: BaseGeometry) -> BaseGeometry:
+    """Only the polygonal parts of a clip result (a Polygon or MultiPolygon)."""
+    polys = [p for p in _parts(geom) if p.geom_type == "Polygon" and p.area > 0]
+    if not polys:
+        return Polygon()
+    return polys[0] if len(polys) == 1 else MultiPolygon(polys)
 
 
 # --------------------------------------------------------------------------

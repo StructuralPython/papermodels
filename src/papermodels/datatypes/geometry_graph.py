@@ -33,6 +33,8 @@ from ..paper.annotations import (
     tag_parsed_annotations,
     assign_page_id_to_annotations,
     annotation_to_shapely,
+    is_region_markup,
+    is_joist_container,
 )
 from ..paper.plot import plot_annotations, plot_elements
 from ..paper import pdf
@@ -840,6 +842,8 @@ class GeometryGraph(nx.DiGraph):
 
         load_entries = {}
         trib_area_entries = {}
+        extent_entries = {}
+        container_entries = {}
         structural_element_entries = {}
         parsed_annotations = {}
         raw_annotations = {}
@@ -858,7 +862,7 @@ class GeometryGraph(nx.DiGraph):
             annot_attrs["page_label"] = scaled_annot.page
             annot_attrs["tag"] = existing_annot_tag
 
-            if "extent" in annot_attrs["type"]:
+            if is_region_markup(annot_attrs):
                 parsed_annotations.update({scaled_annot: annot_attrs})
             else:
                 annot_attrs.setdefault("reaction_type", "point")
@@ -883,9 +887,21 @@ class GeometryGraph(nx.DiGraph):
                 trib_area_entries.update({scaled_annot: annot_attrs})
             elif "type" not in annot_attrs:
                 continue
+            elif is_joist_container(annot_attrs):
+                container_entries.update({scaled_annot: annot_attrs})
+            elif "extent" in annot_attrs["type"].lower():
+                extent_entries.update({scaled_annot: annot_attrs})
             else:
                 structural_element_entries.update({scaled_annot: annot_attrs})
 
+        structural_element_entries = correlate_extents(
+            structural_element_entries, extent_entries
+        )
+        structural_element_entries = correlate_containers(
+            structural_element_entries,
+            container_entries,
+            suppress_warnings=suppress_warnings,
+        )
         elements = Element.from_parsed_annotations(
             structural_element_entries, trib_area_entries
         )
@@ -1093,6 +1109,7 @@ class GeometryGraph(nx.DiGraph):
         load_entries = {}
         trib_area_entries = {}
         extent_entries = {}
+        container_entries = {}
         structural_element_entries = {}
         parsed_annotations_acc = {}
         raw_annotations_acc = {}
@@ -1116,6 +1133,8 @@ class GeometryGraph(nx.DiGraph):
                     load_entries.update({annot: annot_attrs})
                 elif "trib area" in annot_attrs.get("type", "").lower():
                     trib_area_entries.update({annot: annot_attrs})
+                elif is_joist_container(annot_attrs):
+                    container_entries.update({annot: annot_attrs})
                 elif "extent" in annot_attrs.get("type", "").lower():
                     extent_entries.update({annot: annot_attrs})
                 else:
@@ -1123,6 +1142,11 @@ class GeometryGraph(nx.DiGraph):
                     structural_element_entries.update({annot: annot_attrs})
             structural_element_entries = correlate_extents(
                 structural_element_entries, extent_entries
+            )
+            structural_element_entries = correlate_containers(
+                structural_element_entries,
+                container_entries,
+                suppress_warnings=suppress_warnings,
             )
         tag_counter = Counter(tag_checker)
         tag_counter.pop(None)  # Exclude None tags from the check
@@ -1437,3 +1461,69 @@ def correlate_extents(
             annot = element_annot_keys[idx]
             element_annots_copy[annot]["extent_line"] = matched_extent
     return element_annots_copy
+
+
+def correlate_containers(
+    element_annots: dict[Annotation, dict],
+    container_annots: dict[Annotation, dict],
+    suppress_warnings: bool = False,
+) -> dict:
+    """
+    Returns a copy of 'element_annots' in which each joist prototype (a rank-0
+    LineString) drawn inside a joist container polygon has that polygon stored
+    under 'joist_container'.
+
+    A prototype belongs to the container holding most of its length (on the
+    same page). Warns when a container holds no prototype or more than one
+    (a container describes one array), and when a prototype has both an extent
+    line and a container (the container is used).
+    """
+    element_annots_copy = deepcopy(element_annots)
+    containers_by_page: dict = {}
+    for annot, attrs in container_annots.items():
+        if attrs["geometry"].geom_type != "Polygon":
+            _warn_unless(
+                suppress_warnings,
+                f"A joist container must be a polygon; ignoring the {attrs['geometry'].geom_type} "
+                f"on page {annot.page}.",
+            )
+            continue
+        containers_by_page.setdefault(annot.page, []).append(attrs["geometry"])
+
+    claimed: dict[int, list] = {}
+    for annot, attrs in element_annots_copy.items():
+        geometry = attrs["geometry"]
+        if geometry.geom_type != "LineString" or attrs.get("rank") != 0:
+            continue
+        best, best_share = None, 0.5
+        for container in containers_by_page.get(annot.page, []):
+            share = geometry.intersection(container).length / geometry.length
+            if share > best_share:
+                best, best_share = container, share
+        if best is None:
+            continue
+        attrs["joist_container"] = best
+        claimed.setdefault(id(best), []).append(annot)
+        if attrs.get("extent_line") is not None:
+            _warn_unless(
+                suppress_warnings,
+                f"A joist prototype on page {annot.page} has both an extent line and a "
+                "joist container; the container is used.",
+            )
+
+    for page, containers in containers_by_page.items():
+        for container in containers:
+            count = len(claimed.get(id(container), []))
+            if count != 1:
+                x, y = container.representative_point().coords[0]
+                _warn_unless(
+                    suppress_warnings,
+                    f"The joist container near ({x:.2f}, {y:.2f}) on page {page} holds "
+                    f"{count} joist prototypes; it should hold exactly one.",
+                )
+    return element_annots_copy
+
+
+def _warn_unless(suppress: bool, message: str) -> None:
+    if not suppress:
+        warn(message)
