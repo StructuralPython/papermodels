@@ -594,7 +594,7 @@ requires-dist = [
     { name = "numpy" },
     { name = "numpy", specifier = ">=2.0.0" },
     { name = "parse" },
-    { name = "pikepdf", specifier = "==10.0.2" },
+    { name = "pikepdf", specifier = ">=10.0.2,<10.1" },
     { name = "pygraphviz", marker = "extra == 'graphviz'", specifier = ">=1.14" },
     { name = "rich", specifier = ">=14.2.0" },
     { name = "shapely", specifier = ">=2.0.0" },
