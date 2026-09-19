@@ -11,7 +11,7 @@ dependencies = [
     "shapely >= 2.0.0",
     "matplotlib",
     "numpy >= 2.0.0",
-    "pikepdf==10.0.2",
+    "pikepdf>=10.0.2,<10.1",
     "parse",
     "networkx",
     "numpy",
