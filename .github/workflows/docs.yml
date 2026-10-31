@@ -2,7 +2,7 @@ name: Build docs and publish to Bunny.net
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "docs/sphinx-site" ]  # TEMP: test deploy from PR branch
   pull_request:
     branches: [ "main" ]
 
