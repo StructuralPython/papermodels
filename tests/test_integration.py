@@ -256,3 +256,17 @@ def test_trib_areas_basic_loads(trib_areas_basic_loaded_elements):
     assert dl[2]["end_loc"] == 10.132
     assert dl[3]["start_loc"] == 10.132
     assert dl[3]["end_loc"] == 12.113
+
+
+def test_collector_with_correspondents_above_added_later():
+    # Regression: a collector whose correspondents above are added to the graph
+    # after it used to raise KeyError: 'element' in from_elements.
+    graph = GeometryGraph.from_pdf_file(
+        TEST_DATA / "multi-page-plan.pdf",
+        scale=Decimal(1 / 72 * 4),
+        suppress_warnings=True,
+    )
+    graph.assign_collector_behaviour(JoistArrayModel, spacing=1.0)
+    loaded_elements = graph.create_loaded_elements()
+    assert all("element" in graph.nodes[n] for n in graph.nodes)
+    assert "FB0.2" in loaded_elements

@@ -1,3 +1,11 @@
+"""
+The GeometryGraph: a directed load-path graph built from marked-up drawings.
+
+Nodes are :class:`~papermodels.datatypes.element.Element` tags and edges point
+from a supported element to the element that supports it, so load flows in
+edge direction from the collectors (rank 0) down to the foundations.
+"""
+
 from __future__ import annotations
 from typing import Optional, TypeAlias, Callable
 from collections import Counter
@@ -50,6 +58,14 @@ Rule: TypeAlias = Callable
 def TRANSFER_LINES_CANNOT_INTERSECT_WITH_LINEAR_POLYGONS(
     e: Element, inter: Intersection
 ):
+    """
+    Intersection rule: returns False when a transfer (rank > 0) line meets a polygon
+    with a "linear" reaction type, in either direction. Used as a predicate to drop
+    intersections that should not form load paths.
+
+    'e': The Element being checked.
+    'inter': An Intersection on 'e'.
+    """
     return not (
         (
             e.rank > 0
@@ -99,6 +115,9 @@ class GeometryGraph(nx.DiGraph):
 
     @property
     def collector_elements(self):
+        """
+        Tags of rank-0 elements with no predecessors: the elements that collect load directly from area loads.
+        """
         return [
             node_name
             for node_name in self.nodes
@@ -108,12 +127,17 @@ class GeometryGraph(nx.DiGraph):
 
     @property
     def transfer_elements(self):
+        """Tags of elements that receive load from at least one other element."""
         return [
             node_name for node_name in self.nodes if list(self.predecessors(node_name))
         ]
 
     @property
     def orphaned_elements(self):
+        """
+        Tags of elements that are not adequately supported: lines with fewer than two
+        supports and polygons with no supports.
+        """
         return [
             node_name
             for node_name in self.nodes
@@ -129,6 +153,7 @@ class GeometryGraph(nx.DiGraph):
 
     @property
     def contiguous_elements(self):
+        """Tags of all elements that are not orphaned."""
         orphans = self.orphaned_elements
         return [node_name for node_name in self.nodes if node_name not in orphans]
 
@@ -186,7 +211,10 @@ class GeometryGraph(nx.DiGraph):
                         g.add_edge(element.tag, j_tag, edge_type="intersection")
                         filtered_intersections.append(intersection)
                 element.intersections_below = filtered_intersections
-            if element.tag in g.collector_elements:
+            # Check only this element: the graph can hold placeholder nodes (no
+            # "element" yet) for tags referenced by edges but not added so far.
+            is_collector = not list(g.predecessors(element.tag)) and element.rank == 0
+            if is_collector:
                 for correspondent in element.correspondents_above:
                     j_tag = correspondent.other_tag
                     g.add_edge(j_tag, element.tag, edge_type="correspondent")
@@ -441,6 +469,14 @@ class GeometryGraph(nx.DiGraph):
                             self.remove_edge(element.tag, dep)
 
     def add_intersection_indexes_below(self):
+        """
+        Assigns each element's supports a local reaction index and transfer extents.
+
+        Walks the graph in topological order and rewrites each element's
+        'intersections_below' and 'correspondents_below' so that every support records
+        its reaction index on this element. Orphaned line elements are skipped with a
+        warning (unless warnings are suppressed).
+        """
         sorted_nodes = nx.topological_sort(self)
         orphaned_nodes = self.orphaned_elements
         self.omitted = {}  # Used when generated collectors only have one support
@@ -613,6 +649,13 @@ class GeometryGraph(nx.DiGraph):
             self.nodes[elem]["element"].subelements = filtered_subelements
 
     def add_intersection_indexes_above(self):
+        """
+        Records, on each transfer element, which reaction of each element above it
+        delivers load to it.
+
+        Must run after :meth:`add_intersection_indexes_below`, whose reaction indexes
+        it reads.
+        """
         sorted_nodes = nx.topological_sort(self)
         transfer_elements = self.transfer_elements
         for node in transfer_elements:
@@ -1400,6 +1443,10 @@ def get_local_coords(
     start_coord: Point | tuple[float, float],
     dependent_intersections: list[Intersection],
 ) -> list[tuple[float, str]]:
+    """
+    Returns (distance, tag) tuples giving the distance from 'start_coord' to each of
+    the 'dependent_intersections'.
+    """
     start_coord = Point(start_coord)
     intersection_below_local_coords = []
     for intersection in dependent_intersections:
@@ -1413,6 +1460,10 @@ def get_local_coords(
 def get_dependent_intersections(
     element: Element, graph_dependents: list[str]
 ) -> list[Intersection]:
+    """
+    Returns the intersections below 'element' whose other element is one of the
+    tags in 'graph_dependents'.
+    """
     acc = []
     for intersection in element.intersections_below:
         if intersection.other_tag in graph_dependents:
@@ -1423,6 +1474,10 @@ def get_dependent_intersections(
 def get_dependent_correspondents(
     element: Element, graph_dependents: list[str]
 ) -> list[Correspondent]:
+    """
+    Returns the correspondents below 'element' whose other element is one of the
+    tags in 'graph_dependents'.
+    """
     dependent_correspondents = [
         correspondent
         for correspondent in element.correspondents_below

@@ -458,6 +458,9 @@ class GeometryModel:
         return out
 
     def incident_geoms(self, node_id: NodeId) -> list[Incidence]:
+        """
+        Returns the incidences (geometries touching the node) recorded for 'node_id', or an empty list.
+        """
         return self.incidence.get(node_id, [])
 
     def intersections_below(self, gid: GeomId) -> dict[GeomId, set[NodeId]]:

@@ -1,3 +1,7 @@
+"""
+Read DXF drawings into Annotations, treating each DXF layer as an annotation's text.
+"""
+
 from __future__ import annotations
 from copy import deepcopy
 from typing import Optional, Any, Union
@@ -42,6 +46,14 @@ def load_dxf_annotations(
     page_idx: int = 0,
     polygonize_layers: Optional[list[str]] = None,
 ) -> list[Annotation]:
+    """
+    Returns a list of Annotations read from the DXF file at 'dxf_path'.
+
+    'dxf_path': Path-like object representing the path to the DXF file to open.
+    'page_idx': The page index to assign to the resulting Annotations.
+    'polygonize_layers': Names of layers whose linework should be converted into
+        polygons.
+    """
     dxf_entities = dxf_file_to_dxf_entities(
         dxf_path, page_idx, polygonize_layers=polygonize_layers
     )
@@ -235,6 +247,7 @@ def parse_block_coordinates(entity):
 
 
 def parse_line_coords(entity: ezdxf.entities.DXFGraphic):
+    """Returns a DXF LINE entity as a LineString snapped to a 1e-3 grid."""
     coords = [
         (entity.dxf.start[0], entity.dxf.start[1]),
         (entity.dxf.end[0], entity.dxf.end[1]),
@@ -245,6 +258,7 @@ def parse_line_coords(entity: ezdxf.entities.DXFGraphic):
 def parse_polyline_coords(entity: ezdxf.entities.DXFGraphic):
     # point_pairs = zip(entity.get_points(), entity.get_points()[1:])
     # coords = [[(p[0][0], p[0][1]), (p[1][0], p[1][1])] for p in point_pairs]
+    """Returns a DXF polyline entity as a Polygon snapped to a 1e-3 grid."""
     coords = [(p[0], p[1]) for p in entity.get_points()]
 
     return shp.set_precision(shp.Polygon(coords), grid_size=1e-3)

@@ -8,6 +8,10 @@ When an FE model is not used, what do engineers do? We commonly track loads by h
 
 papermodels is a software tool to "automate" the process of tracking loads by hand.
 
+**Documentation:** https://papermodels.structuralpython.com
+
+To build the docs locally: `uv sync --group docs` then `uv run sphinx-build -b html docs docs/_build/html`.
+
 ## Road map
 
 ### Pre-processing
@@ -46,34 +50,25 @@ The below will parse annotations from the PDF (provided that there are legend en
 
 ```python
 from decimal import Decimal
-from papermodels.paper.pdf import load_pdf_annotations
 from papermodels.datatypes.geometry_graph import GeometryGraph
 from papermodels.datatypes.joist_models import JoistArrayModel
 
 graph = GeometryGraph.from_pdf_file("sketch_to_scale.pdf", scale=Decimal(1 / 72 * 4))
-graph.generate_subelements(JoistArrayModel.create_subelements, spacing=1.3333)
-les = graph.create_loaded_elements()
+graph.assign_collector_behaviour(JoistArrayModel, spacing=1.0)
+les = graph.create_loaded_elements()  # dict of LoadedElement, keyed by tag
 
-graph.plot()
+graph.plot_annotations(1)
+graph.plot_connectivity()
 ```
 
 The `LoadedElement`s can then be dumped to disk for further processing:
 
 ```python
 import pathlib
-output_dir = pathlib.Path("model_files")
+output_dir = pathlib.Path("model_files") / "json"
+output_dir.mkdir(parents=True, exist_ok=True)
 
-file_format = "toml" # also try "json"
-
-for loaded_element in les:
-    if file_format == "toml":
-        output_toml = output_dir / "toml"
-        output_toml.mkdir(parents=True, exist_ok=True)
-        with open(output_dir / "toml" / f"{loaded_element.tag}.toml", "wb") as file:
-            loaded_element.dump_toml(file)
-    elif file_format == "json":
-        output_json = output_dir / "json"
-        output_json.mkdir(parents=True, exist_ok=True)
-        with open(output_dir / "json" / f"{loaded_element.tag}.json", "w") as file:
-            loadeded_element.dump_json(file)
+for tag, loaded_element in les.items():
+    with open(output_dir / f"{tag}.json", "w") as file:
+        loaded_element.dump_json(file)
 ```

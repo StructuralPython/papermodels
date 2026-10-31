@@ -1,3 +1,5 @@
+"""The Annotation data type, a format-independent record of a single drawing markup."""
+
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any
@@ -5,6 +7,27 @@ from typing import Any
 
 @dataclass(frozen=True)
 class Annotation:
+    """
+    A single drawing markup, independent of the file format it was read from.
+
+    'page': The page index the annotation appears on.
+    'object_type': The markup type, e.g. "Line", "PolyLine", "Polygon", "Square".
+    'text': The annotation's text content. For DXF sources this is the layer name.
+    'vertices': Flat list of coordinates, [x0, y0, x1, y1, ...], in PDF points.
+    'line_color': RGB line color, each component in [0, 1].
+    'fill_color': RGB fill color, each component in [0, 1].
+    'line_type': The dash pattern of the line, or None for a solid line.
+    'line_weight': Line weight in points.
+    'line_opacity': Line opacity in [0, 1].
+    'fill_opacity': Fill opacity in [0, 1].
+    'matrix': The six-term affine transformation matrix of the annotation.
+    'local_id': Index of the annotation within its source page.
+
+    Two annotations compare equal when all of their geometric and visual
+    properties match; 'local_id' is not compared. This is what allows a legend
+    entry to be matched to the markups that share its appearance.
+    """
+
     page: int
     object_type: str
     text: str  # in dxf this is the layer

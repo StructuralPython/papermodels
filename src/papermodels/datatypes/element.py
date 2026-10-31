@@ -1,3 +1,13 @@
+"""
+Structural elements and the routines that connect them.
+
+An :class:`Element` is a single 2D geometry (a line for beams and joists, a
+polygon for walls, columns and other bearing elements) together with its
+intersections on the same plane and its correspondents on adjacent planes. A
+:class:`LoadedElement` adds applied loads and can be exported as a structural
+model (TOML or JSON) for downstream analysis.
+"""
+
 from copy import deepcopy
 from dataclasses import dataclass
 from typing import Optional, Union, NamedTuple
@@ -17,7 +27,6 @@ from ..geometry.load_projection import project_loading_areas
 from .geometry_model import NodeRegistry
 import math
 import json
-
 
 Geometry = Union[LineString, Polygon]
 
@@ -255,10 +264,16 @@ class Element:
 
     @property
     def supporting_geometries(self):
-        acc = []
-        for intersection_tuple in self.intersections.values():
-            acc.append(intersection_tuple[1])
-        return acc
+        """
+        The geometries of the elements that support this Element: those it
+        intersects below on its own plane, followed by those it corresponds with
+        on the plane below.
+        """
+        intersections = self.intersections_below or []
+        correspondents = self.correspondents_below or []
+        return [inter.other_geometry for inter in intersections] + [
+            corr.other_geometry for corr in correspondents
+        ]
 
     def get_collector_extents(self, relative: bool = True) -> dict[str, tuple]:
         """
@@ -532,24 +547,23 @@ E00 = Element(
 
 @dataclass
 class LoadedElement(Element):
+    """
+    An Element with loads applied to it, ready to be exported as a structural model.
+
+    'loading_geoms': A list of load_distribution LoadingGeometry objects (area
+        loads with their occupancy and load components) that may apply to this
+        Element.
+    'applied_loading_areas': A list of (Polygon, LoadingGeometry) tuples for the
+        loading areas that intersect this Element's trib area. The Polygon is the
+        intersecting region. Computed during initialization; the designer is not
+        expected to populate this parameter.
+
+    Typically created via :meth:`LoadedElement.from_element_with_loads` or
+    :meth:`papermodels.datatypes.geometry_graph.GeometryGraph.create_loaded_elements`.
+    """
+
     loading_geoms: Optional[ld.LoadingGeometry] = None
     applied_loading_areas: Optional[list[tuple[Polygon, npt.ArrayLike]]] = None
-
-    """
-    'loading_areas' - A list of tuples. Each tuple consists of a Polygon and a dict of
-        attributes associated with that Polygon. If no attributes are desired,
-        pass a tuple with an empty dict.
-    'applied_loading_areas' - A dict of Polygon/attributes that intersect with the
-        trib area of this Element. The Polygons in the dict represent the intersecting
-        area of the loading area and the trib area. These are computed from the provided
-        'loading_areas' during initialization. The designer is not expected to populate
-        this parameter.
-    'model' - A dictionary that describes the LoadedElement in terms of a structural
-        element. Populated during initialization. The designer is not expected to populate
-        this parameter.
-
-
-    """
 
     def __post_init__(self):
         """
@@ -867,7 +881,16 @@ class LoadedElement(Element):
         transfer_reaction_index: int,
         direction: str = "gravity",
     ):
+        """
+        Returns a dict describing a point load transferred onto this element.
 
+        'transfer_location': The location of the load along the element.
+        'magnitude': The magnitude of the load.
+        'transfer_source': The tag of the element the load is transferred from.
+        'transfer_reaction_index': The index of the reaction on the source element
+            that produces this load.
+        'direction': The load direction. Default "gravity".
+        """
         return {
             "location": transfer_location,
             "magnitude": magnitude,
@@ -891,7 +914,20 @@ class LoadedElement(Element):
         applied_area: float,
         direction: str,
     ):
+        """
+        Returns a dict describing a linearly varying distributed load on this element.
 
+        'start_location', 'end_location': The start and end of the load along the element.
+        'start_magnitude', 'end_magnitude': The load intensity at the start and end.
+        'transfer_source': The tag of the element (or loading area) the load comes from.
+        'transfer_reaction_index': The index of the reaction on the source element.
+        'transfer_source_start_extent', 'transfer_source_end_extent': The extents of the
+            load on the source element.
+        'occupancy': The occupancy of the originating loading area.
+        'load_components': The load components (e.g. dead, live) of the loading area.
+        'applied_area': The loaded area that produces this load.
+        'direction': The load direction.
+        """
         return {
             "transfer_source": transfer_source,
             "transfer_reaction_index": transfer_reaction_index,
@@ -972,7 +1008,7 @@ class LoadedElement(Element):
 
     def dump_json(self, fp, precision=3):
         """
-        Dumps the .model attribute to a TOML file
+        Writes .model(precision) to the open text file 'fp' as indented JSON.
         """
         json.dump(self.model(precision), fp, indent=2)
         return fp
@@ -1674,5 +1710,5 @@ def get_normalized_coordinate(element: Element, intersection_point: Point) -> fl
 
 
 def get_structured_model_data(element: Element) -> dict:
-    """ """
+    """Not yet implemented. Placeholder for returning an Element's structured model data."""
     pass

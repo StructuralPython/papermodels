@@ -131,3 +131,7 @@ dmypy.json
 # Pyre type checker
 .pyre/
 Examples/Example 2/models/CB0.0.toml
+
+# Sphinx docs
+docs/_build/
+docs/examples/notebooks/

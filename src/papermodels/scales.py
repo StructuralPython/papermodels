@@ -1,9 +1,27 @@
+"""
+Drawing scales for converting PDF point coordinates into model units.
+
+PDF annotation coordinates are measured in points (1 point == 1/72 inch). Each
+constant in this module is a :class:`Scale` whose factor converts points on a
+plotted sheet into real-world units at that drawing scale: the ``SCALE_1_TO_*``
+constants yield millimetres and the ``SCALE_1_TO_*_M`` constants yield metres.
+"""
+
 from decimal import Decimal
 
 Decimal()
 
 
 class Scale(Decimal):
+    """
+    A Decimal conversion factor with a human-readable name.
+
+    Behaves exactly like a Decimal in arithmetic, so it can be passed anywhere a
+    'scale' is accepted, e.g. ``GeometryGraph.from_pdf_file(path, scale=SCALE_1_TO_100)``.
+
+    'factor': The multiplier from PDF points to model units.
+    'name': A descriptive name, e.g. "1:100 Scale".
+    """
 
     def __new__(cls, factor, name):
         instance = super().__new__(cls, factor)
