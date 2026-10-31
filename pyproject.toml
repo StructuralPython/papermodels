@@ -24,6 +24,7 @@ dependencies = [
 
 [project.urls]
 Home = "https://github.com/structuralpython/papermodels"
+Documentation = "https://papermodels.structuralpython.com"
 
 [project.optional-dependencies]
 graphviz = [
@@ -36,4 +37,11 @@ dev = [
     "ipykernel>=6.30.1",
     "pytest",
     "pytest-check>=2.5.4",
+]
+docs = [
+    "sphinx>=8.1",
+    "shibuya>=2025.1",
+    "myst-nb>=1.1",
+    "sphinx-copybutton>=0.5",
+    "sphinx-design>=0.6",
 ]

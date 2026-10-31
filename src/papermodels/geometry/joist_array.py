@@ -62,12 +62,29 @@ MODE_CONTAINER = "container"  # ends from the container boundary
 
 @dataclass(frozen=True)
 class ArrayFrame:
+    """
+    The local frame of a joist array.
+
+    'origin': The midpoint of the joist prototype.
+    'u': Unit vector along the joist.
+    'n': Unit normal to the joist (the array axis), oriented by the dominant-axis
+        rule described in the module docstring.
+
+    A point at joist position 't' and station 's' is ``origin + t*u + s*n``.
+    """
+
     origin: np.ndarray
     u: np.ndarray  # along the joist
     n: np.ndarray  # array axis
 
     @classmethod
     def from_prototype(cls, prototype: LineString) -> "ArrayFrame":
+        """
+        Returns the ArrayFrame for a two-point joist 'prototype' line. The result is the
+        same whichever end the prototype was drawn from.
+
+        Raises GeometryError if the prototype has zero length.
+        """
         coords = list(prototype.coords)
         p0 = np.asarray(coords[0][:2], dtype=float)
         p1 = np.asarray(coords[-1][:2], dtype=float)
@@ -94,22 +111,31 @@ class ArrayFrame:
         return float(v @ self.u), float(v @ self.n)
 
     def xy(self, t: float, s: float) -> tuple[float, float]:
+        """Returns the global (x, y) coordinates of frame position ('t', 's')."""
         p = self.origin + t * self.u + s * self.n
         return float(p[0]), float(p[1])
 
     def line(self, s: float, t0: float, t1: float) -> LineString:
+        """Returns the joist line at station 's' running from 't0' to 't1'."""
         return LineString([self.xy(t0, s), self.xy(t1, s)])
 
     def band(self, s0: float, s1: float, t0: float, t1: float) -> Polygon:
+        """
+        Returns the rectangle covering stations 's0' to 's1' and joist positions 't0' to 't1'.
+        """
         return Polygon(
             [self.xy(t0, s0), self.xy(t1, s0), self.xy(t1, s1), self.xy(t0, s1)]
         )
 
     def s_range(self, geom: BaseGeometry) -> tuple[float, float]:
+        """Returns the (min, max) station covered by the coordinates of 'geom'."""
         ss = [self.ts(c)[1] for c in _all_coords(geom)]
         return min(ss), max(ss)
 
     def t_range(self, geom: BaseGeometry) -> tuple[float, float]:
+        """
+        Returns the (min, max) joist position covered by the coordinates of 'geom'.
+        """
         tt = [self.ts(c)[0] for c in _all_coords(geom)]
         return min(tt), max(tt)
 
@@ -273,6 +299,15 @@ def support_rectangularity(polygon: Polygon) -> float:
 
 @dataclass(frozen=True)
 class Support:
+    """
+    A straight support line that joists in an array can bear on.
+
+    'gid': The tag of the supporting element.
+    'line': The two-point support line (a beam line, or a wall centerline).
+    'source': The support as drawn (e.g. the wall polygon). Presence in an array
+        region is judged on this geometry. Defaults to 'line'.
+    """
+
     gid: str
     line: LineString  # beam line or wall centerline (2 points)
     # The support as drawn (the wall polygon); defaults to ``line``.  Presence in
@@ -282,6 +317,7 @@ class Support:
 
     @property
     def geometry(self) -> BaseGeometry:
+        """The geometry used for presence tests: 'source' if given, else 'line'."""
         return self.source if self.source is not None else self.line
 
 
@@ -349,12 +385,21 @@ def common_s_range(
 
 @dataclass
 class Interval:
+    """
+    A range of stations, 's0' to 's1', over which the set of supports present is
+    constant.
+
+    'present': The tags of the supports present, ordered by joist position 't' at
+        the interval's midpoint.
+    """
+
     s0: float
     s1: float
     present: tuple[str, ...]  # support gids present, ordered by t at the midpoint
 
     @property
     def count(self) -> int:
+        """The number of supports present in this interval."""
         return len(self.present)
 
 
@@ -506,6 +551,16 @@ def target_stations(
 
 @dataclass
 class StationEvent:
+    """
+    A record of a target station that could not be used as is.
+
+    'kind': "relocated" (moved to the nearest valid station), "dropped" (no valid
+        station was found) or "span_jump" (the set of supports changed).
+    'target': The original target station.
+    'final': The station actually used, if any.
+    'detail': A human-readable explanation.
+    """
+
     kind: str  # "relocated" | "dropped" | "span_jump"
     target: float
     final: Optional[float] = None
@@ -609,6 +664,15 @@ def _nearest_valid(t, idx, intervals, left, right, lo, hi, min_bearing):
 
 @dataclass
 class Crossing:
+    """
+    The point where a joist meets one of its supports.
+
+    'gid': The tag of the support.
+    'node_id': The canonical node id in the shared NodeRegistry, if registered.
+    'xy': The global coordinates of the crossing.
+    't': The joist position of the crossing in the array frame.
+    """
+
     gid: str
     node_id: Optional[int]
     xy: tuple[float, float]
@@ -617,6 +681,18 @@ class Crossing:
 
 @dataclass
 class GeneratedJoist:
+    """
+    One joist produced by a joist array.
+
+    'target': The station the joist was requested at by the spacing.
+    'station': The station it was actually placed at (differs from 'target' when
+        relocated).
+    'geometry': The joist line.
+    'crossings': The joist's support crossings, ordered by 't' (end A first).
+    'trib_area': The joist's tributary area: the band between the midpoints to its
+        neighbouring joists, clipped to the array region.
+    """
+
     target: float
     station: float
     geometry: LineString
@@ -730,6 +806,17 @@ def _areal(geom: BaseGeometry) -> BaseGeometry:
 
 @dataclass
 class ArrayResult:
+    """
+    The full result of generating a joist array.
+
+    'frame': The ArrayFrame of the array.
+    'region': The array region R.
+    's_range': The (min, max) station of the region.
+    'intervals': The support-presence intervals across the region.
+    'joists': The generated joists, in station order.
+    'events': StationEvents for any relocated or dropped stations.
+    """
+
     frame: ArrayFrame
     region: BaseGeometry
     s_range: tuple[float, float]

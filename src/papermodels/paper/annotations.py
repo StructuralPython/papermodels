@@ -1,3 +1,11 @@
+"""
+Parse, tag, filter, scale and align Annotations.
+
+These functions turn raw :class:`~papermodels.datatypes.annotation.Annotation`
+records into the attribute dictionaries consumed by
+:meth:`~papermodels.datatypes.element.Element.from_parsed_annotations`.
+"""
+
 from __future__ import annotations
 from copy import deepcopy
 from decimal import Decimal
@@ -139,6 +147,9 @@ def is_region_markup(annot_attrs: dict) -> bool:
 
 
 def is_joist_container(annot_attrs: dict) -> bool:
+    """
+    Returns True if the parsed annotation attributes describe a joist container markup.
+    """
     return "container" in str(annot_attrs.get("type", "")).lower()
 
 
@@ -421,7 +432,7 @@ def parse_annot_kwargs(text_contents: str) -> dict[str, str]:
 
 def remove_windows_crlf(text_contents: str) -> str:
     """
-    Replaces any \r\n with \n and any \r with \n
+    Normalizes Windows (CRLF) and classic Mac (CR) line endings to LF.
     """
     return text_contents.replace("\r\n", "\n").replace("\r", "\n")
 
@@ -510,6 +521,7 @@ def strip_html_tags(s: str) -> str:
 
 
 def str_to_int(s: str) -> int | str:
+    """Returns 's' as an int if it parses as one, otherwise returns 's' unchanged."""
     try:
         return int(s)
     except ValueError:

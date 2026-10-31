@@ -254,14 +254,17 @@ class JoistArrayModel:
 
     @property
     def joist_geoms(self) -> list[LineString]:
+        """The LineString geometry of each generated joist, in station order."""
         return [j.geometry for j in self.result.joists]
 
     @property
     def joist_trib_areas(self) -> list:
+        """The trib area of each generated joist, in station order."""
         return [j.trib_area for j in self.result.joists]
 
     @property
     def joist_locations(self) -> list[float]:
+        """The final station (position along the array axis) of each generated joist."""
         return [j.station for j in self.result.joists]
 
     def __call__(self) -> Element:

@@ -1,3 +1,5 @@
+"""Low-level geometry operations on shapely geometries used throughout papermodels."""
+
 from decimal import Decimal
 import math
 from typing import Optional, Union
@@ -1066,6 +1068,7 @@ def get_vector_angle(v1, v2) -> float:
 
 
 def cross_product_2d(v1, v2):
+    """Returns the z-component of the cross product of 2D vectors 'v1' and 'v2'."""
     return v1[0] * v2[1] - v2[0] * v1[1]
 
 
@@ -1078,20 +1081,25 @@ def min_with_none(x: list, key=None):
 
 
 def create_linestring(points: list[tuple]) -> LineString:
+    """Returns a LineString through 'points'."""
     return LineString(points)
 
 
 def create_multipoint(points: list[tuple]) -> MultiPoint:
+    """Returns a MultiPoint of 'points'."""
     return MultiPoint(points)
 
 
 def create_polygon(points: list[tuple]) -> Polygon:
+    """Returns a Polygon with 'points' as its exterior ring."""
     return Polygon(points)
 
 
 def create_multipolygon(polygons: list[Polygon]) -> MultiPolygon:
+    """Returns a MultiPolygon of 'polygons'."""
     return MultiPolygon(polygons)
 
 
 def create_convex_hull(points: list[Point]) -> Polygon:
+    """Returns the convex hull of 'points'."""
     return convex_hull(points)
