@@ -19,8 +19,9 @@ jobs:
     - name: Build docs
       # The 'docs' dependency group is Sphinx and its extensions. The example
       # notebooks are rendered from their saved outputs, so nothing else is needed.
+      # -d keeps Sphinx's build cache (doctrees) out of the deployed folder.
       run: |
-        uv run --locked --no-default-groups --group docs sphinx-build -W -b html docs docs/_build/html
+        uv run --locked --no-default-groups --group docs sphinx-build -W -b html -d docs/_build/doctrees docs docs/_build/html
     - name: Deploy to BunnyCDN
       # Pull requests only build the docs; a push to main deploys them.
       if: github.event_name == 'push'
