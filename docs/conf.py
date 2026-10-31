@@ -24,7 +24,6 @@ extensions = [
     "sphinx.ext.napoleon",
     "sphinx.ext.viewcode",
     "sphinx.ext.intersphinx",
-    "sphinx.ext.githubpages",
     "sphinx_copybutton",
     "sphinx_design",
     "myst_nb",
