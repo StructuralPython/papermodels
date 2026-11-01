@@ -10,4 +10,4 @@ from . import collectors
 
 from .datatypes.geometry_graph import GeometryGraph
 
-__version__ = "0.22.2"
+__version__ = "0.22.3"
