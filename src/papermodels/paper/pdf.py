@@ -138,7 +138,7 @@ def pike_annotation_to_pm_annotation(
     # The below gets the linked XObject content stream
     content_stream = annot.get("/AP", {}).get("/N", None)
     if content_stream is not None:
-        utf_stream = pike.Stream.read_bytes(content_stream).decode("utf-8")
+        utf_stream = content_stream.read_bytes().decode("utf-8")
         stream_dict = parse_content_stream(utf_stream)
     else:
         utf_stream = None
