@@ -1,4 +1,4 @@
-"""LoadedElement.to_beamz: a loaded element as a beamz9000 scheme beam."""
+"""LoadedElement.to_beamz: a member's symbolic load transfer as a beamz9000 beam."""
 
 import math
 import pathlib
@@ -7,61 +7,83 @@ from decimal import Decimal
 import pytest
 
 from papermodels.datatypes.geometry_graph import GeometryGraph
+from papermodels.datatypes.joist_models import JoistArrayModel
 
 QUARTER_INCH_SCALE = Decimal(1) / Decimal(72) * Decimal(4)
 TEST_DATA = pathlib.Path(__file__).parent / "test_data"
-OCCUPANCIES = {"f": {"D": 0.015, "L": 0.040}, "a": {"D": 0.015, "L": 0.100}}
+
+
+def _loaded(name: str, joists: bool = False):
+    graph = GeometryGraph.from_pdf_file(TEST_DATA / name, scale=QUARTER_INCH_SCALE)
+    if joists:
+        graph.assign_collector_behaviour(JoistArrayModel, spacing=1)
+    return graph.create_loaded_elements()
 
 
 @pytest.fixture(scope="module")
-def trib_areas_basic():
-    graph = GeometryGraph.from_pdf_file(
-        TEST_DATA / "trib-areas-basic.pdf", scale=QUARTER_INCH_SCALE
-    )
-    return graph.create_loaded_elements()
+def sketch():
+    return _loaded("sketch_to_scale.pdf")
+
+
+@pytest.fixture(scope="module")
+def sketch_joists():
+    return _loaded("sketch_to_scale.pdf", joists=True)
 
 
 @pytest.fixture(scope="module")
 def collector_extents():
-    graph = GeometryGraph.from_pdf_file(
-        TEST_DATA / "collector_extents.pdf", scale=QUARTER_INCH_SCALE
-    )
-    return graph.create_loaded_elements()
+    return _loaded("collector_extents.pdf")
 
 
-def _area(load: dict) -> float:
-    p = load["pressure"]
-    t1 = p.get("trib", p.get("trib_width1"))
-    t2 = p.get("trib", p.get("trib_width2"))
-    return (t1 + t2) / 2 * (p["x2"] - p["x1"])
+def _loads(beam: dict) -> list[tuple]:
+    return [(kind, load) for item in beam["loads"] for kind, load in item.items()]
 
 
-def test_beam_with_area_loads(trib_areas_basic):
-    beam = trib_areas_basic["FB0.0"].to_beamz(OCCUPANCIES)
-    assert beam["spans"] == [20.274]
-    assert beam["supports"] == ["pin", "roller"]
-    assert beam["occupancies"] == OCCUPANCIES
-    first = beam["loads"][0]["pressure"]
-    assert first == {"q": "f", "trib": 4.028, "x1": 0.0, "x2": 20.274}
-    # The loads stay on the beam.
-    for load in beam["loads"]:
-        assert 0 <= load["pressure"]["x1"] < load["pressure"]["x2"] <= 20.274
+def test_transfers_are_labelled_with_their_source(sketch):
+    beam = sketch["FB3.1"].to_beamz()
+    assert beam["spans"] == [13.436, 4.875]
+    assert beam["supports"] == ["pin", "roller", "roller"]
+    assert _loads(beam) == [
+        ("point", {"p": 1, "x": 4.98, "label": "CB3.0"}),
+        ("dist", {"w": 1, "x1": 0.025, "x2": 18.282, "label": "J3.0"}),
+    ]
 
 
-def test_trib_widths_carry_each_loading_areas_share(trib_areas_basic):
-    elem = trib_areas_basic["FB0.0"]
-    beam = elem.to_beamz(OCCUPANCIES)
-    # Loading area "a" lies within the beam, so its pressure loads cover its
-    # whole applied area. "f" is trimmed to the beam's ends.
-    a_area = sum(_area(l) for l in beam["loads"] if l["pressure"]["q"] == "a")
-    applied = next(
-        d["applied_area"]
-        for d in elem._get_distributed_loads(12)
-        if d["occupancy"] == "a"
-    )
-    assert a_area == pytest.approx(applied, rel=2e-3)
-    f_area = sum(_area(l) for l in beam["loads"] if l["pressure"]["q"] == "f")
-    assert f_area == pytest.approx(4.028 * 20.274, rel=1e-6)
+def test_each_joist_of_an_array_is_a_labelled_point_load(sketch_joists):
+    loads = _loads(sketch_joists["FB3.1"].to_beamz())
+    labels = [load["label"] for kind, load in loads if kind == "point"]
+    assert "CB3.0" in labels
+    assert [l for l in labels if l.startswith("J3.0-")] == [
+        f"J3.0-{i}" for i in range(20)
+    ]
+    assert all(load["p"] == 1 for _, load in loads)
+
+
+def test_loading_areas_are_one_pressure_load_per_stretch(sketch_joists):
+    # "big stuff" reaches J3.0-5 in several trapezoid pieces; they become one load.
+    loads = _loads(sketch_joists["J3.0-5"].to_beamz())
+    assert loads == [
+        (
+            "pressure",
+            {"q": 1, "trib": 1, "x1": 0.0, "x2": 11.062, "label": "residential"},
+        ),
+        (
+            "pressure",
+            {"q": 1, "trib": 1, "x1": 2.391, "x2": 9.627, "label": "big stuff"},
+        ),
+    ]
+
+
+def test_loads_stay_on_the_beam(sketch, sketch_joists):
+    for loaded in (sketch, sketch_joists):
+        for elem in loaded.values():
+            if elem.geometry.geom_type != "LineString":
+                continue
+            beam = elem.to_beamz()
+            length = sum(beam["spans"])
+            for kind, load in _loads(beam):
+                xs = [load["x"]] if kind == "point" else [load["x1"], load["x2"]]
+                assert all(0 <= x <= length + 1e-9 for x in xs)
 
 
 def test_terminus_supports_start_the_beam_and_overhangs_are_cantilevers(
@@ -77,21 +99,11 @@ def test_terminus_supports_start_the_beam_and_overhangs_are_cantilevers(
     assert math.isclose(sum(beam["spans"]), 7.526)
 
 
-def test_units_and_beam_options(trib_areas_basic):
-    beam = trib_areas_basic["FB0.0"].to_beamz(
-        {"f": {"D": "15 psf"}, "a": {"D": "15 psf"}},
-        length_unit="ft",
-        results=["forces", "reactions"],
-        node_labels="auto",
-    )
-    assert beam["spans"] == ["20.274 ft"]
-    assert beam["loads"][0]["pressure"]["trib"] == "4.028 ft"
-    assert beam["results"] == ["forces", "reactions"] and beam["node_labels"] == "auto"
-
-
-def test_missing_occupancy_is_named(trib_areas_basic):
-    with pytest.raises(ValueError, match="occupancy 'a'"):
-        trib_areas_basic["FB0.0"].to_beamz({"f": {"D": 1.0}})
+def test_units_and_beam_options(sketch):
+    beam = sketch["FB3.1"].to_beamz(length_unit="ft", node_labels="auto")
+    assert beam["spans"] == ["13.436 ft", "4.875 ft"]
+    assert _loads(beam)[0] == ("point", {"p": "1 kN", "x": "4.98 ft", "label": "CB3.0"})
+    assert beam["node_labels"] == "auto"
 
 
 def test_only_horizontal_elements(collector_extents):
@@ -102,13 +114,17 @@ def test_only_horizontal_elements(collector_extents):
         wall.to_beamz()
 
 
-def test_the_beam_draws_and_analyses_in_beamz9000(trib_areas_basic):
+@pytest.mark.parametrize("length_unit", [None, "ft"])
+def test_every_member_draws_in_beamz9000(sketch_joists, length_unit):
     bz = pytest.importorskip("beamz9000")
-    analysis = pytest.importorskip("beamz9000.analysis")
-    pytest.importorskip("pycba_tools")
-    beam = trib_areas_basic["FB0.0"].to_beamz(OCCUPANCIES, results=["reactions"])
-    scheme = bz.parse_scheme({"FB0.0": beam})
-    result = analysis.analyze(scheme["FB0.0"])
-    total_d = sum(r.fy for r in result.reactions if r.case == "D")
-    expected = sum(0.015 * _area(l) for l in beam["loads"])
-    assert total_d == pytest.approx(expected, rel=1e-4)
+    for tag, elem in sketch_joists.items():
+        if elem.geometry.geom_type != "LineString":
+            continue
+        scheme = {tag: elem.to_beamz(length_unit=length_unit)}
+        if length_unit:
+            scheme["_environment"] = "structural"
+        spec = bz.from_scheme(bz.parse_scheme(scheme)[tag])
+        assert [l.label1 for l in spec.loads] == [
+            load["label"] for _, load in _loads(scheme[tag])
+        ]
+        assert not spec.keys  # Symbolic: no load cases, no legend.
