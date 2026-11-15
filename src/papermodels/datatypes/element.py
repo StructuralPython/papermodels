@@ -10,7 +10,7 @@ model (TOML or JSON) for downstream analysis.
 
 from copy import deepcopy
 from dataclasses import dataclass
-from typing import Optional, Union, NamedTuple
+from typing import Any, Optional, Union, NamedTuple
 import load_distribution as ld
 import numpy as np
 import numpy.typing as npt
@@ -1005,6 +1005,127 @@ class LoadedElement(Element):
             return distributed_loads
         else:
             return []
+
+    def to_beamz(
+        self,
+        occupancies: Optional[dict[str, dict[str, Any]]] = None,
+        precision: int = 3,
+        length_unit: Optional[str] = None,
+        **beam_options,
+    ) -> dict:
+        """
+        Returns this element as a beam in the beamz9000 scheme format
+        (https://beamz9000.structuralpython.com/scheme.html): its spans, its
+        supports and, as pressure loads, the loading areas it carries.
+
+        'occupancies': {occupancy: {load case: pressure}} for the occupancies
+            of the loading areas on this element, e.g. {"office": {"D": 2.0,
+            "L": 2.4}}. Required when the element carries any.
+        'precision': Decimal places for lengths and trib widths.
+        'length_unit': A unit written after every length and trib width (e.g.
+            "ft" or "m") for a scheme with a forallpeople `_environment`. The
+            pressures in 'occupancies' should then carry units too ("40 psf").
+            Without it, the numbers are in the model's units.
+        'beam_options': Any other keys of the beamz9000 beam, added as given,
+            e.g. e="200 GPa", i="300e6 mm**4", results=["forces", "reactions"],
+            node_labels="auto" or load_combos=[...].
+
+        Each support is a pin (the first) or a roller. An end that bears on a
+        support starts the beam at that support's centre, so spans run centre
+        to centre; an end that runs past the outermost support is a free
+        cantilever. A loading area becomes a `pressure` load named by its
+        occupancy, with trib widths that give its share of the area; loads are
+        trimmed to the beam's ends (the part over an end bearing goes straight
+        into the support). Loads
+        transferred from elements above aren't included, as their magnitudes
+        are only known once the load path is solved (e.g. with loadtracer).
+
+        To draw it with beamz9000:
+
+            import beamz9000 as bz
+            scheme = bz.parse_scheme({elem.tag: elem.to_beamz(occupancies)})
+            bz.draw(scheme, "beam.svg")
+        """
+        if self.geometry.geom_type != "LineString":
+            raise ValueError(
+                f"{self.tag} is a {self.geometry.geom_type}: only horizontal (LineString) "
+                "elements can be exported as beams"
+            )
+        length = self.get_length()
+        occupancies = occupancies or {}
+
+        def fmt(value: float):
+            value = round(value, precision) + 0.0  # + 0.0 turns -0.0 into 0.0
+            return f"{value:g} {length_unit}" if length_unit else value
+
+        # Supports by location; a "terminus" support is one the element's end
+        # bears on. The element is measured from the centre of a terminus
+        # support, so the part over the bearing is not drawn as a cantilever.
+        found: dict[float, bool] = {}
+        for support in self._get_support_locations(precision):
+            loc = round(min(max(support["location"], 0.0), length), precision)
+            found[loc] = found.get(loc, False) or bool(support["terminus"])
+        if not found:
+            raise ValueError(f"{self.tag} has no supports below it")
+        locations = sorted(found)
+        tol = 10**-precision
+        start = locations[0] if found[locations[0]] else 0.0
+        end = locations[-1] if found[locations[-1]] else round(length, precision)
+        nodes = list(locations)
+        left_free = nodes[0] - start > tol
+        right_free = end - nodes[-1] > tol
+        if left_free:
+            nodes.insert(0, start)
+        if right_free:
+            nodes.append(end)
+        supports = ["pin"] + ["roller"] * (len(locations) - 1)
+        supports = (
+            (["free"] if left_free else [])
+            + supports
+            + (["free"] if right_free else [])
+        )
+
+        loads, used = [], {}
+        for load in self._get_distributed_loads(precision=12):
+            occupancy = load["occupancy"]
+            if not occupancy:
+                continue
+            if occupancy not in occupancies:
+                raise ValueError(
+                    f"{self.tag} carries occupancy {occupancy!r}; give its pressures in "
+                    f"'occupancies' (given: {list(occupancies)})"
+                )
+            used[occupancy] = occupancies[occupancy]
+            # magnitude × area is the trib width (cf. loadtracer's expand_occupancies).
+            if self.reaction_type == "linear":
+                area = length * load["applied_area_ratio"]
+            else:
+                area = load["applied_area"]
+            x1, x2 = load["start_loc"], load["end_loc"]
+            w1, w2 = load["start_magnitude"] * area, load["end_magnitude"] * area
+            a, b = max(x1, start), min(x2, end)
+            if b - a <= tol:
+                continue
+            trib = lambda x: w1 + (w2 - w1) * (x - x1) / (x2 - x1)
+            t1, t2 = round(trib(a), precision), round(trib(b), precision)
+            if t1 <= 0 and t2 <= 0:
+                continue
+            pressure = {"q": occupancy}
+            if t1 == t2:
+                pressure["trib"] = fmt(t1)
+            else:
+                pressure["trib_width1"], pressure["trib_width2"] = fmt(t1), fmt(t2)
+            pressure["x1"], pressure["x2"] = fmt(a - start), fmt(b - start)
+            loads.append({"pressure": pressure})
+
+        beam = {
+            "spans": [fmt(b - a) for a, b in zip(nodes, nodes[1:])],
+            "supports": supports,
+            "loads": loads,
+        }
+        if used:
+            beam["occupancies"] = used
+        return beam | beam_options
 
     def dump_json(self, fp, precision=3):
         """
