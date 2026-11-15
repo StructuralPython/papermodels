@@ -35,6 +35,37 @@ TOML, pass `member.model()` to a
 TOML writer such as [tomli-w](https://pypi.org/project/tomli-w/).
 ```
 
+## Load transfer diagrams with beamz9000
+
+{meth}`~papermodels.datatypes.element.LoadedElement.to_beamz` returns a
+horizontal member as a beam in the
+[beamz9000](https://beamz9000.structuralpython.com) scheme format, for a
+free-body diagram of its symbolic load transfer: which members and loading
+areas load it, and where. The loads have no magnitudes (each is a placeholder
+of 1); each is labelled with its source instead:
+
+```python
+import beamz9000 as bz   # uv add beamz9000
+
+beam = loaded_elements["FB3.1"].to_beamz(node_labels="auto")
+bz.draw(bz.parse_scheme({"FB3.1": beam}), "FB3.1.svg")
+```
+
+- A point load from a member above (a joist of an array, `J3.0-5`, or a
+  column, `CB3.0`) is a point load labelled with its tag.
+- A distributed load from a member above (joists `J3.0`, a wall `WB2.0`) is a
+  distributed load labelled with its tag.
+- A loading area is a hatched pressure load labelled with its occupancy, one
+  per stretch of the member it covers.
+- The supports are a pin, then rollers. An end that bears on a support
+  starts the beam at that support's centre; an end that runs past the
+  outermost support is a cantilever. Loads are trimmed to the beam's ends.
+- With `length_unit="ft"` (or `"m"`), the spans carry that unit; add a
+  forallpeople environment to the scheme:
+  `bz.parse_scheme({"_environment": "structural", "FB3.1": beam})`.
+- Any other beamz9000 beam keys pass through, e.g. `node_labels="auto"` or
+  `display={"legend": "top"}`.
+
 ## Tagged PDFs
 
 To keep a record of which tag belongs to which markup, write the tags back into

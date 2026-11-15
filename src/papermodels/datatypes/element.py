@@ -10,7 +10,7 @@ model (TOML or JSON) for downstream analysis.
 
 from copy import deepcopy
 from dataclasses import dataclass
-from typing import Optional, Union, NamedTuple
+from typing import Any, Optional, Union, NamedTuple
 import load_distribution as ld
 import numpy as np
 import numpy.typing as npt
@@ -1005,6 +1005,157 @@ class LoadedElement(Element):
             return distributed_loads
         else:
             return []
+
+    def to_beamz(
+        self,
+        precision: int = 3,
+        length_unit: Optional[str] = None,
+        **beam_options,
+    ) -> dict:
+        """
+        Returns this element as a beam in the beamz9000 scheme format
+        (https://beamz9000.structuralpython.com/scheme.html), for a diagram of
+        the symbolic load transfer: which elements and loading areas load it,
+        and where. Every load has a placeholder magnitude of 1 and is labelled
+        with its source instead of a value:
+
+        - a point load from an element above (e.g. a joist "J0.1-3" or a
+          column "CB3.0") is a point load labelled with that element's tag;
+        - a distributed load from an element above (e.g. joists "J2.0" or a
+          wall "WB2.0") is a distributed load labelled with its tag;
+        - a loading area is a hatched pressure load labelled with its
+          occupancy, one per stretch of the element it covers.
+
+        Each support is a pin (the first) or a roller. An end that bears on a
+        support starts the beam at that support's centre, so spans run centre
+        to centre; an end that runs past the outermost support is a free
+        cantilever. Loads are trimmed to the beam's ends.
+
+        'precision': Decimal places for lengths.
+        'length_unit': A unit written after every length (e.g. "ft" or "m"),
+            for a scheme with a forallpeople `_environment`. Without it, the
+            lengths are plain numbers in the model's units.
+        'beam_options': Any other keys of the beamz9000 beam, added as given,
+            e.g. node_labels="auto" or display={"legend": "none"}.
+
+        To draw it with beamz9000:
+
+            import beamz9000 as bz
+            bz.draw(bz.parse_scheme({elem.tag: elem.to_beamz()}), "beam.svg")
+        """
+        if self.geometry.geom_type != "LineString":
+            raise ValueError(
+                f"{self.tag} is a {self.geometry.geom_type}: only horizontal (LineString) "
+                "elements can be exported as beams"
+            )
+        length = self.get_length()
+        tol = 10**-precision
+
+        def fmt(value: float):
+            value = round(value, precision) + 0.0  # + 0.0 turns -0.0 into 0.0
+            return f"{value:g} {length_unit}" if length_unit else value
+
+        # Placeholder magnitudes, with units when the lengths have them. They
+        # are never shown: every load is labelled with its source.
+        if length_unit:
+            point, line, pressure = "1 kN", "1 kN/m", "1 kPa"
+        else:
+            point = line = pressure = 1
+
+        # Supports by location; a "terminus" support is one the element's end
+        # bears on. The element is measured from the centre of a terminus
+        # support, so the part over the bearing is not drawn as a cantilever.
+        found: dict[float, bool] = {}
+        for support in self._get_support_locations(precision):
+            loc = round(min(max(support["location"], 0.0), length), precision)
+            found[loc] = found.get(loc, False) or bool(support["terminus"])
+        if not found:
+            raise ValueError(f"{self.tag} has no supports below it")
+        locations = sorted(found)
+        start = locations[0] if found[locations[0]] else 0.0
+        end = locations[-1] if found[locations[-1]] else round(length, precision)
+        nodes = list(locations)
+        left_free = nodes[0] - start > tol
+        right_free = end - nodes[-1] > tol
+        if left_free:
+            nodes.insert(0, start)
+        if right_free:
+            nodes.append(end)
+        supports = ["pin"] + ["roller"] * (len(locations) - 1)
+        supports = (
+            (["free"] if left_free else [])
+            + supports
+            + (["free"] if right_free else [])
+        )
+
+        def span(x1, x2) -> Optional[tuple]:
+            """(x1, x2) trimmed to the beam and measured from its start, or None if off it."""
+            a, b = max(x1, start), min(x2, end)
+            return None if b - a <= tol else (fmt(a - start), fmt(b - start))
+
+        model = self.model(precision)
+        loads = []
+        for load in model["loads"]["point_loads"]:
+            x = min(max(load["location"], start), end)  # Over a bearing: at the end.
+            loads.append(
+                {
+                    "point": {
+                        "p": point,
+                        "x": fmt(x - start),
+                        "label": load["transfer_source"],
+                    }
+                }
+            )
+        areas: dict[str, list[list[float]]] = {}
+        for load in model["loads"]["distributed_loads"]:
+            x1, x2 = load["start_loc"], load["end_loc"]
+            if load["transfer_source"]:
+                if x1 == [] or x2 == []:  # No extents: the whole element.
+                    x1, x2 = start, end
+                trimmed = span(x1, x2)
+                if trimmed:
+                    loads.append(
+                        {
+                            "dist": {
+                                "w": line,
+                                "x1": trimmed[0],
+                                "x2": trimmed[1],
+                                "label": load["transfer_source"],
+                            }
+                        }
+                    )
+            elif load["occupancy"] and x2 - x1 > tol:
+                # Loading areas come in pieces (one per trapezoid): join the
+                # pieces of an occupancy that touch or overlap into stretches.
+                areas.setdefault(load["occupancy"], []).append([x1, x2])
+        for occupancy, pieces in areas.items():
+            stretches: list[list[float]] = []
+            for x1, x2 in sorted(pieces):
+                if stretches and x1 <= stretches[-1][1] + tol:
+                    stretches[-1][1] = max(stretches[-1][1], x2)
+                else:
+                    stretches.append([x1, x2])
+            for x1, x2 in stretches:
+                trimmed = span(x1, x2)
+                if trimmed:
+                    loads.append(
+                        {
+                            "pressure": {
+                                "q": pressure,
+                                "trib": fmt(1.0) if length_unit else 1,
+                                "x1": trimmed[0],
+                                "x2": trimmed[1],
+                                "label": occupancy,
+                            }
+                        }
+                    )
+
+        beam = {
+            "spans": [fmt(b - a) for a, b in zip(nodes, nodes[1:])],
+            "supports": supports,
+            "loads": loads,
+        }
+        return beam | beam_options
 
     def dump_json(self, fp, precision=3):
         """
